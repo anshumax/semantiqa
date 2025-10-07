@@ -1,13 +1,14 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ModelsDownloadRequest",
   "type": "object",
   "properties": {
     "id": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     }
   },
   "required": [
     "id"
-  ]
+  ],
+  "additionalProperties": false,
+  "definitions": {}
 }

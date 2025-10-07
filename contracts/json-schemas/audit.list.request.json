@@ -1,12 +1,11 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "AuditListRequest",
   "type": "object",
   "properties": {
     "since": {
       "type": "string",
-      "format": "date-time"
+      "minLength": 1
     }
   },
-  "required": []
+  "additionalProperties": false,
+  "definitions": {}
 }

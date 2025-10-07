@@ -13,14 +13,14 @@
   - Status: Completed
   - Last Update: 2025-10-07
   - Notes: pnpm workspace scaffolded, root tooling configs added (TypeScript, ESLint, Prettier, Vitest, Playwright), development guide created, dependencies installed
-- [ ] **T-002:** Define contracts (DTOs + JSON Schemas)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-003:** Electron app shell (hardened renderer)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
+- [x] **T-002:** Define contracts (DTOs + JSON Schemas)
+  - Status: Completed
+  - Last Update: 2025-10-07
+  - Notes: Added contracts package with Zod DTOs, schema generation script, and validation tests; regenerated JSON Schemas
+- [x] **T-003:** Electron app shell (hardened renderer)
+  - Status: Completed
+  - Last Update: 2025-10-07
+  - Notes: Hardened Electron main + gateway, preload IPC whitelist, renderer Vite shell with status display, combined dev scripts, builds verified
 - [ ] **T-004:** IPC layer (typed, minimal) + audit hook
   - Status: Not Started
   - Last Update: —

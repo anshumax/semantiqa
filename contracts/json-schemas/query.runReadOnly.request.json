@@ -1,21 +1,26 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "QueryRunReadOnlyRequest",
   "type": "object",
   "properties": {
     "sourceId": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "sql": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "maxRows": {
       "type": "integer",
-      "minimum": 1
+      "exclusiveMinimum": true,
+      "minimum": 0,
+      "maximum": 10000,
+      "default": 500
     }
   },
   "required": [
     "sourceId",
     "sql"
-  ]
+  ],
+  "additionalProperties": false,
+  "definitions": {}
 }

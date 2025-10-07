@@ -1,10 +1,9 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ModelsEnableRequest",
   "type": "object",
   "properties": {
     "id": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "tasks": {
       "type": "array",
@@ -14,11 +13,14 @@
           "summaries",
           "nlsql"
         ]
-      }
+      },
+      "minItems": 1
     }
   },
   "required": [
     "id",
     "tasks"
-  ]
+  ],
+  "additionalProperties": false,
+  "definitions": {}
 }

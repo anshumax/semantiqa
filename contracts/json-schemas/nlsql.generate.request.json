@@ -1,19 +1,51 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "NlSqlGenerateRequest",
   "type": "object",
   "properties": {
     "question": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "scope": {
-      "type": [
-        "object",
-        "null"
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "sourceId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tableHints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "columnHints": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "maxJoins": {
+              "type": "integer",
+              "exclusiveMinimum": true,
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
       ]
     }
   },
   "required": [
     "question"
-  ]
+  ],
+  "additionalProperties": false,
+  "definitions": {}
 }

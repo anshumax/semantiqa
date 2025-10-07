@@ -28,6 +28,8 @@
 - TypeScript with project references (see `tsconfig.base.json`)
 - ESLint + Prettier for linting/formatting
 - Vitest for unit tests, Playwright for end-to-end tests
+- Electron (main/preload/renderer packages under `app/`)
+- Vite + React for renderer development (`app/renderer`)
 - Husky/Lint-Staged reserved for future commit hooks
 
 ## Scripts
@@ -36,6 +38,9 @@
 - `pnpm test` — execute unit tests across packages
 - `pnpm build` — run build targets across packages
 - `pnpm typecheck` — run TypeScript type-checking across packages
+- `pnpm --filter @semantiqa/app-renderer run dev` — start renderer dev server (Vite)
+- `pnpm --filter @semantiqa/app-main run start` — launch Electron shell (pre-build preload/renderer first)
+- `pnpm app:dev` — run renderer + Electron main together (requires separate terminal on Windows)
 
 ## Next Steps
 - Scaffold individual package `package.json` files as features land

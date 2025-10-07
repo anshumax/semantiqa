@@ -1,0 +1,15 @@
+{
+  "name": "@semantiqa/app-preload",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/preload.js",
+  "types": "dist/preload.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "electron": "^32.2.0"
+  }
+}

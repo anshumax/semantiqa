@@ -1,7 +1,56 @@
 {
   "type": "object",
   "properties": {
-    "q": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "source",
+              "schema",
+              "table",
+              "column",
+              "collection",
+              "field",
+              "metric",
+              "domain",
+              "note"
+            ]
+          },
+          "score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "score",
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "query": {
       "type": "string",
       "minLength": 1
     },
@@ -48,10 +97,16 @@
           "type": "null"
         }
       ]
+    },
+    "total": {
+      "type": "integer",
+      "exclusiveMinimum": true,
+      "minimum": 0
     }
   },
   "required": [
-    "q"
+    "items",
+    "query"
   ],
   "additionalProperties": false,
   "definitions": {}

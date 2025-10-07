@@ -1,17 +1,149 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ModelsListResponse",
   "type": "object",
   "properties": {
     "installed": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "embedding",
+              "generator"
+            ]
+          },
+          "sizeMb": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
+          "license": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "summaries",
+                "nlsql"
+              ]
+            }
+          },
+          "installedAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "enabledTasks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "summaries",
+                "nlsql"
+              ]
+            }
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "sizeMb",
+          "license",
+          "sha256",
+          "tasks",
+          "installedAt",
+          "enabledTasks"
+        ],
+        "additionalProperties": false
+      }
     },
     "available": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "embedding",
+              "generator"
+            ]
+          },
+          "sizeMb": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
+          "license": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "summaries",
+                "nlsql"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "sizeMb",
+          "license",
+          "sha256",
+          "tasks"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "required": [
     "installed",
     "available"
-  ]
+  ],
+  "additionalProperties": false,
+  "definitions": {}
 }

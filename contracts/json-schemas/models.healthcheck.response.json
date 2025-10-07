@@ -1,21 +1,45 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ModelsHealthcheckResponse",
   "type": "object",
   "properties": {
-    "latency": {
-      "type": "number"
-    },
-    "tokensPerSec": {
-      "type": "number"
+    "id": {
+      "type": "string",
+      "minLength": 1
     },
     "ok": {
       "type": "boolean"
+    },
+    "latencyMs": {
+      "type": "integer",
+      "exclusiveMinimum": true,
+      "minimum": 0
+    },
+    "tokensPerSec": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "exclusiveMinimum": true,
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
     }
   },
   "required": [
-    "latency",
-    "tokensPerSec",
-    "ok"
-  ]
+    "id",
+    "ok",
+    "latencyMs",
+    "tokensPerSec"
+  ],
+  "additionalProperties": false,
+  "definitions": {}
 }

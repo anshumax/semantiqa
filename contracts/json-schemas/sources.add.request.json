@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SourcesAddRequest",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "postgres",
+        "mysql",
+        "mongo",
+        "duckdb"
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "connection": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "kind",
+    "name",
+    "connection"
+  ]
+}

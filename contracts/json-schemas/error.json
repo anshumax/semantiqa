@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SemantiqaError",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "enum": [
+        "POLICY_VIOLATION",
+        "DIALECT_UNSUPPORTED",
+        "TIMEOUT",
+        "VALIDATION_ERROR",
+        "AUTH_REQUIRED",
+        "NOT_FOUND"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "details": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "code",
+    "message"
+  ]
+}

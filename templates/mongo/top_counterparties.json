@@ -1,0 +1,26 @@
+[
+  {
+    "$match": {
+      "direction": "DEBIT"
+    }
+  },
+  {
+    "$group": {
+      "_id": "$counterparty",
+      "amt": {
+        "$sum": "$amount"
+      },
+      "cnt": {
+        "$sum": 1
+      }
+    }
+  },
+  {
+    "$sort": {
+      "amt": -1
+    }
+  },
+  {
+    "$limit": 10
+  }
+]

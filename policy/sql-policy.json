@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "dialects": [
+    "postgres",
+    "mysql",
+    "duckdb"
+  ],
+  "select_only": true,
+  "blocked_schemas": [
+    "information_schema",
+    "pg_catalog",
+    "mysql",
+    "performance_schema",
+    "sys"
+  ],
+  "allowed_schemas": [
+    "core"
+  ],
+  "row_limit_default": 1000,
+  "row_limit_max": 5000,
+  "timeout_ms": 8000,
+  "blocked_patterns": [
+    "DROP ",
+    "DELETE ",
+    "UPDATE ",
+    "INSERT ",
+    "ALTER ",
+    "CREATE "
+  ],
+  "pii_columns": [
+    "email",
+    "phone"
+  ],
+  "pii_mask": {
+    "email": "partial",
+    "phone": "last4"
+  },
+  "block_cross_pii_joins": true,
+  "explain_required": true,
+  "explain_reject_if_seqscan": false
+}

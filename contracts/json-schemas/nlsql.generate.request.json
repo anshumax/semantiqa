@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NlSqlGenerateRequest",
+  "type": "object",
+  "properties": {
+    "question": {
+      "type": "string"
+    },
+    "scope": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "question"
+  ]
+}

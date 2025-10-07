@@ -1,0 +1,4 @@
+customer_id,full_name,email,phone,kyc_status,created_at
+1,Aditi Rao,aditi@example.com,9990012345,VERIFIED,2025-06-01
+2,Rahul Mehta,rahul@example.com,9990012346,VERIFIED,2025-08-01
+3,Neha Singh,neha@example.com,9990012347,PENDING,2025-09-27

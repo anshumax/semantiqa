@@ -1,0 +1,5 @@
+{"_id": "t1", "account_id": "a1", "txn_ts": "2025-09-07T00:00:00Z", "amount": 5000, "currency": "INR", "direction": "DEBIT", "mcc": "5411", "channel": "UPI", "counterparty": "BigBazaar"}
+{"_id": "t2", "account_id": "a1", "txn_ts": "2025-09-08T00:00:00Z", "amount": 15000, "currency": "INR", "direction": "CREDIT", "channel": "NETBANKING", "counterparty": "Salary"}
+{"_id": "t3", "account_id": "a2", "txn_ts": "2025-09-22T00:00:00Z", "amount": 12000, "currency": "INR", "direction": "DEBIT", "mcc": "5812", "channel": "CARD", "counterparty": "Cafe Coffee"}
+{"_id": "t4", "account_id": "a2", "txn_ts": "2025-10-02T00:00:00Z", "amount": 8000, "currency": "INR", "direction": "DEBIT", "mcc": "5814", "channel": "CARD", "counterparty": "Restaurant"}
+{"_id": "t5", "account_id": "a3", "txn_ts": "2025-10-05T00:00:00Z", "amount": 25000, "currency": "INR", "direction": "DEBIT", "mcc": "7399", "channel": "NETBANKING", "counterparty": "VendorX"}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SearchSemanticRequest",
+  "type": "object",
+  "properties": {
+    "q": {
+      "type": "string"
+    },
+    "scope": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "q"
+  ]
+}

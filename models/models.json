@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "models": [
+    {
+      "id": "embed-bge-small-onnx",
+      "name": "BGE Small (ONNX)",
+      "kind": "embedding",
+      "size_mb": 95,
+      "license": "Apache-2.0",
+      "sha256": "placeholder-onnx",
+      "url": "https://example.com/models/embed-bge-small.onnx"
+    },
+    {
+      "id": "gen-llama3-8b-q4_k_m-gguf",
+      "name": "Llama3 8B Q4_K_M (GGUF)",
+      "kind": "generator",
+      "size_mb": 4100,
+      "license": "Meta Llama 3 (weights)",
+      "sha256": "placeholder-gguf",
+      "url": "https://example.com/models/llama3-8b-q4_k_m.gguf"
+    }
+  ]
+}

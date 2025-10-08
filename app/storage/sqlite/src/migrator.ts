@@ -77,14 +77,30 @@ export function runMigrations(dbPath: string, migrationsDir: string): MigrationR
     'INSERT INTO migrations (id, checksum, applied_at) VALUES (@id, @checksum, @applied_at)',
   );
 
-  const applyMigration = db.transaction((migration: Migration) => {
-    db.exec(migration.sql);
-    insertMigration.run({
-      id: migration.id,
-      checksum: migration.checksum,
-      applied_at: new Date().toISOString(),
+  const applyMigration = (migration: Migration) => {
+    const hasExplicitTransaction = /^\s*BEGIN\b/i.test(migration.sql);
+
+    if (hasExplicitTransaction) {
+      db.exec(migration.sql);
+      insertMigration.run({
+        id: migration.id,
+        checksum: migration.checksum,
+        applied_at: new Date().toISOString(),
+      });
+      return;
+    }
+
+    const runInTxn = db.transaction((migrationInner: Migration) => {
+      db.exec(migrationInner.sql);
+      insertMigration.run({
+        id: migrationInner.id,
+        checksum: migrationInner.checksum,
+        applied_at: new Date().toISOString(),
+      });
     });
-  });
+
+    runInTxn(migration);
+  };
 
   for (const migration of migrations) {
     const existingChecksum = appliedMap.get(migration.id);

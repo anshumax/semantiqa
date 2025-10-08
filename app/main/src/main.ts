@@ -1,4 +1,5 @@
 import { app, BrowserWindow, protocol, session } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
@@ -7,6 +8,7 @@ import { registerIpcHandlers, type IpcHandlerMap } from './ipc/registry';
 let graphServices: {
   GraphSnapshotService: typeof import('./services/GraphSnapshotService').GraphSnapshotService;
   createSqliteFactory: (options: { dbPath: string }) => unknown;
+  runMigrations: (dbPath: string, migrationsDir: string) => { applied: string[] };
 } | null = null;
 
 async function ensureGraphServices() {
@@ -18,6 +20,7 @@ async function ensureGraphServices() {
     graphServices = {
       GraphSnapshotService: serviceModule.GraphSnapshotService,
       createSqliteFactory: storageModule.createSqliteFactory as (options: { dbPath: string }) => unknown,
+      runMigrations: storageModule.runMigrations as (dbPath: string, migrationsDir: string) => { applied: string[] },
     };
   }
 
@@ -110,7 +113,23 @@ app.whenReady().then(async () => {
   });
 
   const services = await ensureGraphServices();
-  const graphDbFactory = services.createSqliteFactory({ dbPath: app.getPath('userData') + '/graph.db' }) as () => any;
+  const dbPath = path.join(app.getPath('userData'), 'graph.db');
+  const migrationsDir = app.isPackaged
+    ? path.join(process.resourcesPath, 'app', 'storage', 'sqlite', 'migrations')
+    : path.join(__dirname, '..', '..', 'storage', 'sqlite', 'migrations');
+
+  if (!fs.existsSync(migrationsDir)) {
+    console.warn(`SQLite migrations directory not found at ${migrationsDir}; skipping migrations`);
+  } else {
+    try {
+      services.runMigrations(dbPath, migrationsDir);
+    } catch (error) {
+      console.error('Failed to run SQLite migrations', error);
+      throw error;
+    }
+  }
+
+  const graphDbFactory = services.createSqliteFactory({ dbPath }) as () => any;
   const graphSnapshotService = new services.GraphSnapshotService({ openDatabase: graphDbFactory });
 
   const handlerMap: IpcHandlerMap = {

@@ -6,11 +6,16 @@
   "main": "dist/main.js",
   "types": "dist/main.d.ts",
   "scripts": {
+    "prebuild": "pnpm --filter @semantiqa/app-config run build",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
     "start": "pnpm run build && electron ."
   },
   "dependencies": {
-    "electron": "^32.2.0"
+    "@semantiqa/app-config": "workspace:^0.1.0",
+    "@semantiqa/contracts": "workspace:^0.1.0",
+    "electron": "^32.3.3",
+    "zod": "^3.25.0"
   }
 }

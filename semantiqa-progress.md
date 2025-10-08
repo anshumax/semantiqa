@@ -21,20 +21,20 @@
   - Status: Completed
   - Last Update: 2025-10-07
   - Notes: Hardened Electron main + gateway, preload IPC whitelist, renderer Vite shell with status display, combined dev scripts, builds verified
-- [ ] **T-004:** IPC layer (typed, minimal) + audit hook
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
+- [x] **T-004:** IPC layer (typed, minimal) + audit hook
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Added shared IPC contracts, validated main handlers with audit logging, preload bridge + renderer wiring, and documentation updates
 
 ## Phase 1 — Local Storage & Audit
-- [ ] **T-005:** SQLite bootstrap (schema + migrations)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-006:** Audit log (append-only JSONL)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
+- [x] **T-005:** SQLite bootstrap (schema + migrations)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Added storage package with migrations, migration runner, tests, and docs update
+- [x] **T-006:** Audit log (append-only JSONL)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Implemented audit logger with rotation, integrated with IPC logging, added tests and docs
 
 ## Phase 2 — Connections & Metadata (All MVP Sources)
 ### PostgreSQL

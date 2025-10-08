@@ -1,38 +1,35 @@
+import type { IpcChannel, IpcRequest, IpcResponse } from '@semantiqa/app-config';
+
 const { contextBridge, ipcRenderer } = require('electron') as typeof import('electron');
 
-const safeChannels = new Set(['health:ping']);
+const allowedChannels: readonly IpcChannel[] = [
+  'health:ping',
+  'sources:add',
+  'metadata:crawl',
+  'search:semantic',
+  'query:run-read-only',
+  'models:list',
+  'models:download',
+  'models:enable',
+  'nlsql:generate',
+  'audit:list',
+];
+
+function assertChannel(channel: IpcChannel): IpcChannel {
+  if (!allowedChannels.includes(channel)) {
+    throw new Error(`Blocked attempt to access channel: ${channel}`);
+  }
+
+  return channel;
+}
 
 const api = {
-  ping(): string {
-    return 'semantiqa-preload-ok';
+  invoke<T extends IpcChannel>(channel: T, payload: IpcRequest<T>) {
+    const safeChannel = assertChannel(channel);
+    return ipcRenderer.invoke(safeChannel, payload) as Promise<IpcResponse<T>>;
   },
-  getEnv(): Record<string, string | undefined> {
-    return {
-      NODE_ENV: process.env.NODE_ENV,
-      SEMANTIQA_VERSION: process.env.SEMANTIQA_VERSION,
-    };
-  },
-  send(channel: string, ...args: unknown[]) {
-    if (!safeChannels.has(channel)) {
-      throw new Error(`Blocked attempt to send on unsafe channel: ${channel}`);
-    }
-
-    ipcRenderer.send(channel, ...args);
-  },
-  on(channel: string, listener: (...args: unknown[]) => void) {
-    if (!safeChannels.has(channel)) {
-      throw new Error(`Blocked attempt to listen on unsafe channel: ${channel}`);
-    }
-
-    const wrappedListener = (_event: unknown, ...payload: unknown[]) => {
-      listener(...payload);
-    };
-
-    ipcRenderer.on(channel, wrappedListener);
-
-    return () => {
-      ipcRenderer.removeListener(channel, wrappedListener);
-    };
+  ping(): Promise<IpcResponse<'health:ping'>> {
+    return api.invoke('health:ping', undefined as IpcRequest<'health:ping'>);
   },
 };
 

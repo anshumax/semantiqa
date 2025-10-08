@@ -1,19 +1,34 @@
+import { useEffect, useState } from 'react';
 import './App.css';
 
 declare global {
   interface Window {
     semantiqa?: {
       api: {
-        ping: () => string;
-        getEnv: () => Record<string, string | undefined>;
+        invoke: <T extends import('@semantiqa/app-config').IpcChannel>(
+          channel: T,
+          payload: import('@semantiqa/app-config').IpcRequest<T>,
+        ) => Promise<import('@semantiqa/app-config').IpcResponse<T>>;
+        ping: () => Promise<import('@semantiqa/app-config').IpcResponse<'health:ping'>>;
       };
     };
   }
 }
 
 export default function App() {
-  const env = window.semantiqa?.api.getEnv();
-  const pingResult = window.semantiqa?.api.ping();
+  const [env, setEnv] = useState<string>('unknown');
+  const [ping, setPing] = useState<string>('pending');
+
+  useEffect(() => {
+    setEnv(process.env.NODE_ENV ?? 'unknown');
+
+    window.semantiqa?.api
+      .ping()
+      .then((response) => {
+        setPing(`ok @ ${new Date(response.ts).toLocaleTimeString()}`);
+      })
+      .catch(() => setPing('error'));
+  }, []);
 
   return (
     <div className="app-shell">
@@ -21,8 +36,8 @@ export default function App() {
         <h1>Semantiqa Shell</h1>
         <p>Renderer sandboxed. IPC bridge ready.</p>
         <div className="status-panel">
-          <span>{`ENV: ${env?.NODE_ENV ?? 'unknown'}`}</span>
-          <span>{`PING: ${pingResult ?? 'unavailable'}`}</span>
+          <span>{`ENV: ${env}`}</span>
+          <span>{`PING: ${ping}`}</span>
         </div>
       </header>
     </div>

@@ -1,6 +1,7 @@
 import { app, BrowserWindow, protocol, session } from 'electron';
 import path from 'node:path';
 import url from 'node:url';
+import { registerIpcHandlers } from './ipc/registry';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -86,6 +87,8 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_, __, callback) => {
     callback(false);
   });
+
+  registerIpcHandlers({});
 
   await createWindow();
 

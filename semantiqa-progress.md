@@ -92,22 +92,22 @@
   - Notes: Persisted Mongo collections/fields into SQLite nodes/edges with tests alongside other adapters
 
 ### CSV/Parquet via DuckDB
-- [ ] **T-007-DU:** DuckDB local engine
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-008-DU:** Metadata capture (DU)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-009-DU:** Profiling sampler (DU)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-010-DU:** Persist snapshot (DU)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
+- [x] **T-007-DU:** DuckDB local engine
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Added DuckDB adapter with file-based connection validation, health check, and mocked unit tests
+- [x] **T-008-DU:** Metadata capture (DU)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Implemented information_schema crawler for DuckDB tables/columns with tests
+- [x] **T-009-DU:** Profiling sampler (DU)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Added sampling-based column stats (null/distinct/min/max) for DuckDB with coverage
+- [x] **T-010-DU:** Persist snapshot (DU)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Persisted DuckDB tables/columns into SQLite nodes/edges with tests
 
 ## Phase 3 — Embeddings & Search (Works OOTB)
 - [ ] **T-011:** Bundle ONNX embeddings

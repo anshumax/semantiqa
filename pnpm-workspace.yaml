@@ -1,4 +1,5 @@
 packages:
+  - core
   - core/*
   - app/adapters/*
   - app/*

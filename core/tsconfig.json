@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "baseUrl": ".",
+    "types": ["vitest/globals", "node"],
+    "paths": {
+      "onnxruntime-node": ["../stubs/onnxruntime-node"],
+      "@semantiqa/contracts": ["../contracts/src/index.ts"],
+      "@semantiqa/contracts/*": ["../contracts/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules", "test"]
+}
+
+

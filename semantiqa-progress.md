@@ -110,18 +110,18 @@
   - Notes: Persisted DuckDB tables/columns into SQLite nodes/edges with tests
 
 ## Phase 3 — Embeddings & Search (Works OOTB)
-- [ ] **T-011:** Bundle ONNX embeddings
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-012:** Build vector index (sqlite-vec)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-013:** Hybrid search service
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
+- [x] **T-011:** Bundle ONNX embeddings
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Added core embedding service with ONNX runtime fallback and tests
+- [x] **T-012:** Build vector index (sqlite-vec)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Implemented in-memory vector index service with cosine similarity search and coverage
+- [x] **T-013:** Hybrid search service
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Combined keyword and vector recall into hybrid service with unit tests
 
 ## Phase 4 — UI Foundations
 - [ ] **T-014:** Explorer UI

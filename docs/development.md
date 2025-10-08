@@ -53,8 +53,13 @@
 - Main process will invoke `runMigrations()` during startup (integration TBD in later tasks).
 
 ### Database Adapters
-- Postgres connector lives in `app/adapters/postgres`. Run unit checks with `pnpm --filter @semantiqa/adapter-postgres run test`.
-- Connector enforces read-only SQL (SELECT/EXPLAIN/SHOW). Health checks run `SELECT 1` via pooled connection.
+- Postgres connector lives in `app/adapters/postgres`; run unit checks with `pnpm --filter @semantiqa/adapter-postgres run test`.
+- MySQL connector lives in `app/adapters/mysql`; run unit checks with `pnpm --filter @semantiqa/adapter-mysql run test`.
+- Adapters enforce read-only SQL (SELECT/EXPLAIN/SHOW/DESCRIBE). Health checks run `SELECT 1` via pooled connection.
+
+### Metadata crawler & profiler
+- Metadata crawlers & profilers live under each adapter’s `src/metadata` folder. Tests run with their respective adapter test scripts.
+- Snapshot persistence into SQLite resides in `@semantiqa/storage-sqlite/src/persistence`. Tests run with `pnpm --filter @semantiqa/storage-sqlite run test`.
 
 ## Next Steps
 - Scaffold individual package `package.json` files as features land

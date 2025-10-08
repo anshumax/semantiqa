@@ -42,54 +42,54 @@
   - Status: Completed
   - Last Update: 2025-10-08
   - Notes: Added read-only Postgres adapter with validation, health-check, tests, and docs
-- [ ] **T-008-PG:** Metadata crawl (PG)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-009-PG:** Profiling sampler (PG)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-010-PG:** Persist snapshot (PG)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
+- [x] **T-008-PG:** Metadata crawl (PG)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Implemented metadata crawler returning SchemaSnapshot with tests
+- [x] **T-009-PG:** Profiling sampler (PG)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Added pg_stats-based profiling sampler with tests
+- [x] **T-010-PG:** Persist snapshot (PG)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Persisted Postgres snapshot into SQLite nodes/edges with tests and docs updates
 
 ### MySQL
-- [ ] **T-007-MY:** MySQL connector (read-only)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-008-MY:** Metadata crawl (MY)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-009-MY:** Profiling sampler (MY)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-010-MY:** Persist snapshot (MY)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
+- [x] **T-007-MY:** MySQL connector (read-only)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Added read-only MySQL adapter with validation, read-only enforcement, health check, and unit tests
+- [x] **T-008-MY:** Metadata crawl (MY)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Implemented MySQL metadata crawler with Zod validation, system schema filtering, and tests
+- [x] **T-009-MY:** Profiling sampler (MY)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Added bounded sampling profiler for MySQL columns with configurable sample size and tests
+- [x] **T-010-MY:** Persist snapshot (MY)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Persisted MySQL schema snapshot into SQLite nodes/edges with coverage tests alongside Postgres helper
 
 ### MongoDB
-- [ ] **T-007-MO:** Mongo connector (read-only)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-008-MO:** Metadata crawl (MO)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-009-MO:** Profiling sampler (MO)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-010-MO:** Persist snapshot (MO)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
+- [x] **T-007-MO:** Mongo connector (read-only)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Added Mongo adapter with connection validation, health check, and capped aggregation helpers
+- [x] **T-008-MO:** Metadata crawl (MO)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Implemented sampling-based crawler that flattens nested fields with tests
+- [x] **T-009-MO:** Profiling sampler (MO)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Added field profiling (null/unique counts) with bounded sampling and unit coverage
+- [x] **T-010-MO:** Persist snapshot (MO)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Persisted Mongo collections/fields into SQLite nodes/edges with tests alongside other adapters
 
 ### CSV/Parquet via DuckDB
 - [ ] **T-007-DU:** DuckDB local engine

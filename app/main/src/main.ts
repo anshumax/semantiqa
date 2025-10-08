@@ -1,7 +1,28 @@
 import { app, BrowserWindow, protocol, session } from 'electron';
 import path from 'node:path';
 import url from 'node:url';
-import { registerIpcHandlers } from './ipc/registry';
+import { IPC_CHANNELS } from '@semantiqa/app-config';
+import { registerIpcHandlers, type IpcHandlerMap } from './ipc/registry';
+
+let graphServices: {
+  GraphSnapshotService: typeof import('./services/GraphSnapshotService').GraphSnapshotService;
+  createSqliteFactory: (options: { dbPath: string }) => unknown;
+} | null = null;
+
+async function ensureGraphServices() {
+  if (!graphServices) {
+    const [serviceModule, storageModule] = await Promise.all([
+      import('./services/GraphSnapshotService'),
+      import('../../storage/sqlite/dist/index.js'),
+    ]);
+    graphServices = {
+      GraphSnapshotService: serviceModule.GraphSnapshotService,
+      createSqliteFactory: storageModule.createSqliteFactory as (options: { dbPath: string }) => unknown,
+    };
+  }
+
+  return graphServices;
+}
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -88,7 +109,15 @@ app.whenReady().then(async () => {
     callback(false);
   });
 
-  registerIpcHandlers({});
+  const services = await ensureGraphServices();
+  const graphDbFactory = services.createSqliteFactory({ dbPath: app.getPath('userData') + '/graph.db' }) as () => any;
+  const graphSnapshotService = new services.GraphSnapshotService({ openDatabase: graphDbFactory });
+
+  const handlerMap: IpcHandlerMap = {
+    [IPC_CHANNELS.GRAPH_GET]: (request) => graphSnapshotService.getSnapshot(request),
+  };
+
+  registerIpcHandlers(handlerMap);
 
   await createWindow();
 

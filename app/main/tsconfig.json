@@ -6,7 +6,11 @@
     "rootDir": "src",
     "outDir": "dist",
     "module": "CommonJS",
-    "tsBuildInfoFile": "dist/.tsbuildinfo"
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "paths": {
+      "@semantiqa/storage-sqlite": ["../storage/sqlite/src"],
+      "better-sqlite3": ["../storage/sqlite/node_modules/@types/better-sqlite3"]
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["dist", "node_modules"]

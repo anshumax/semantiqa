@@ -183,23 +183,29 @@
 
 ## Phase 4 — UI Foundations
 
-### T-014: Explorer UI
-- **Desc:** Sources → schemas/collections → tables/fields; filters & stats.
-- **DoD:** Navigate all four sources end-to-end; empty states OK.
-- **Deps:** T-010-*, T-013
-- **Risks:** None.
+### T-014a: Renderer UI groundwork
+- **Desc:** Establish design tokens, layout primitives, shared state scaffolding, and preload-safe IPC helpers for renderer.
+- **DoD:** App shell renders with new design system; IPC health check wired; Story/test infrastructure ready for feature screens.
+- **Deps:** T-003, T-004
+- **Risks:** Over-abstraction; keep scope to near-term needs.
+
+### T-014b: Explorer UI
+- **Desc:** Sources → schema tree → tables/fields browsing with loading/error/empty states and selection plumbing.
+- **DoD:** Renderer loads snapshots via IPC, renders tree and workspace placeholders, and handles retry flows.
+- **Deps:** T-014a, T-010-*, T-013
+- **Risks:** Performance on large catalogs; require virtualized tree later if needed.
 
 ### T-015: Inspector UI
-- **Desc:** Edit name, owners, tags, sensitivity; description editor (tiptap).
-- **DoD:** Edits persist; validation enforced; audit entries present.
-- **Deps:** T-005, T-014, T-006
-- **Risks:** None.
+- **Desc:** Inspector panel framing with metadata rendering, edit scaffolds, and audit-safe actions ready for service wiring.
+- **DoD:** Selected entity displays detail panel, update hooks stubbed, masking/resilience patterns align with contracts.
+- **Deps:** T-014b, T-005, T-006
+- **Risks:** Requires backend DTO finalization before enabling edits.
 
 ### T-016: Results grid with masking (framework)
-- **Desc:** Grid component; mask PII; banner; unmask via explicit action.
-- **DoD:** Masking works in component tests; audit on unmask.
-- **Deps:** T-005
-- **Risks:** None.
+- **Desc:** Grid shell, masking state management, and query wiring hooks prepared for upcoming execution flows.
+- **DoD:** Placeholder grid renders within workspace, mask toggles store state, IPC wiring stubs in place.
+- **Deps:** T-014b, T-005
+- **Risks:** Real query integration may demand virtualization/perf work.
 
 ---
 

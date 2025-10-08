@@ -13,6 +13,7 @@ const allowedChannels: readonly IpcChannel[] = [
   'models:enable',
   'nlsql:generate',
   'audit:list',
+  'graph:get',
 ];
 
 function assertChannel(channel: IpcChannel): IpcChannel {

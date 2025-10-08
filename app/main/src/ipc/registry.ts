@@ -9,6 +9,9 @@ import {
 } from '@semantiqa/app-config';
 import {
   AuditListRequestSchema,
+  GraphGetRequestSchema,
+  GraphGetResponseSchema,
+  GraphUpsertNodeRequestSchema,
   MetadataCrawlRequestSchema,
   ModelsDownloadRequestSchema,
   ModelsEnableRequestSchema,
@@ -36,6 +39,7 @@ const channelToSchema: Record<IpcChannel, z.ZodTypeAny> = {
   'models:enable': ModelsEnableRequestSchema,
   'nlsql:generate': NlSqlGenerateRequestSchema,
   'audit:list': AuditListRequestSchema,
+  'graph:get': GraphGetRequestSchema,
 };
 
 const okResponse = z.object({ ok: z.literal(true) });
@@ -51,6 +55,7 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'models:enable': z.union([okResponse, SemantiqaErrorSchema]),
   'nlsql:generate': z.union([NlSqlGenerateResponseSchema, SemantiqaErrorSchema]),
   'audit:list': z.union([auditResponse, SemantiqaErrorSchema]),
+  'graph:get': z.union([GraphGetResponseSchema, SemantiqaErrorSchema]),
 };
 
 export type IpcHandlerMap = {

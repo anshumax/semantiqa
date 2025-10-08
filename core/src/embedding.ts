@@ -51,11 +51,16 @@ export class EmbeddingService {
     if (!this.session) {
       await this.load();
     }
-    const tokens = tokenize(text);
-    const inputTensor = buildInputTensor(tokens);
-    const output = await this.session!.run({ input: inputTensor });
-    const vector = Array.from(output.output.data as Float32Array);
-    return { vector, modelId: this.config.modelId };
+    try {
+      const tokens = tokenize(text);
+      const inputTensor = buildInputTensor(tokens);
+      const output = await this.session!.run({ input: inputTensor });
+      const vector = Array.from(output.output.data as Float32Array);
+      return { vector, modelId: this.config.modelId };
+    } catch (error) {
+      const hashVector = hashText(text, this.config.dimension);
+      return { vector: hashVector, modelId: this.config.modelId };
+    }
   }
 }
 

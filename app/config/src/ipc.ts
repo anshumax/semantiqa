@@ -1,5 +1,7 @@
 import type {
   AuditListRequest,
+  GraphGetRequest,
+  GraphGetResponse,
   MetadataCrawlRequest,
   ModelsDownloadRequest,
   ModelsEnableRequest,
@@ -24,7 +26,8 @@ export type IpcChannel =
   | 'models:download'
   | 'models:enable'
   | 'nlsql:generate'
-  | 'audit:list';
+  | 'audit:list'
+  | 'graph:get';
 
 type HandlerMap = {
   'health:ping': {
@@ -67,6 +70,10 @@ type HandlerMap = {
     request: AuditListRequest;
     response: { entries: unknown[] } | SemantiqaError;
   };
+  'graph:get': {
+    request: GraphGetRequest;
+    response: GraphGetResponse | SemantiqaError;
+  };
 };
 
 export type IpcRequest<T extends IpcChannel> = HandlerMap[T]['request'];
@@ -83,6 +90,7 @@ export const IPC_CHANNELS = {
   MODELS_ENABLE: 'models:enable' as const,
   NLSQL_GENERATE: 'nlsql:generate' as const,
   AUDIT_LIST: 'audit:list' as const,
+  GRAPH_GET: 'graph:get' as const,
 } satisfies Record<string, IpcChannel>;
 
 export type SafeRendererChannels = Pick<
@@ -95,6 +103,7 @@ export type SafeRendererChannels = Pick<
   | 'MODELS_DOWNLOAD'
   | 'MODELS_ENABLE'
   | 'AUDIT_LIST'
+  | 'GRAPH_GET'
   | 'SOURCES_ADD'
   | 'METADATA_CRAWL'
 >;

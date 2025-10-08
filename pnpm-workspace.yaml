@@ -4,6 +4,7 @@ packages:
   - app/adapters/*
   - app/*
   - app/storage/*
+  - packages/*
   - contracts
   - docs
 

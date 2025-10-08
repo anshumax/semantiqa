@@ -1,14 +1,28 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const duckdbMocks = vi.hoisted(() => {
-  const allMock = vi.fn().mockResolvedValue([{ ok: 1 }]);
+  const allCallback = vi.fn((sql: string, callback: (error: unknown, rows: unknown[]) => void) => {
+    callback(null, [{ ok: 1 }]);
+  });
+  const allPromise = vi.fn().mockResolvedValue([{ ok: 1 }]);
   const closeConnectionMock = vi.fn().mockResolvedValue(undefined);
-  const connectReturn = { all: allMock, close: closeConnectionMock };
+  const connectReturn = {
+    all: vi.fn((sql: string, ...args: unknown[]) => {
+      const maybeCallback = args.at(-1);
+      if (typeof maybeCallback === 'function') {
+        allCallback(sql, maybeCallback as (error: unknown, rows: unknown[]) => void);
+        return;
+      }
+      return allPromise(sql);
+    }),
+    close: closeConnectionMock,
+  };
   const connectMock = vi.fn().mockReturnValue(connectReturn);
   const closeDbMock = vi.fn().mockResolvedValue(undefined);
 
   return {
-    allMock,
+    allCallback,
+    allPromise,
     closeConnectionMock,
     connectMock,
     closeDbMock,
@@ -34,6 +48,7 @@ vi.mock('duckdb', () => ({
       await duckdbMocks.closeDbMock();
     }
   },
+  OPEN_READONLY: 1,
 }));
 
 import { DuckDbAdapter, DuckDbConnectionSchema } from '../src/duckdbAdapter';
@@ -47,13 +62,17 @@ function createMockOptions() {
       },
     },
     connect: duckdbMocks.connectMock,
-    all: duckdbMocks.allMock,
+    all: duckdbMocks.connectMock.mock.results[0]?.value.all ?? duckdbMocks.connectMock,
     closeConnection: duckdbMocks.closeConnectionMock,
     closeDb: duckdbMocks.closeDbMock,
   } as const;
 }
 
 describe('DuckDbAdapter', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('validates connection configuration', () => {
     expect(() =>
       DuckDbConnectionSchema.parse({
@@ -72,7 +91,7 @@ describe('DuckDbAdapter', () => {
 
     expect(healthy).toBe(true);
     expect(connect).toHaveBeenCalledTimes(1);
-    expect(all).toHaveBeenCalledWith('SELECT 1 AS ok');
+    expect(duckdbMocks.allCallback).toHaveBeenCalledWith('SELECT 1 AS ok', expect.any(Function));
     await adapter.close();
     expect(closeConnection).toHaveBeenCalledTimes(1);
     expect(closeDb).toHaveBeenCalledTimes(1);

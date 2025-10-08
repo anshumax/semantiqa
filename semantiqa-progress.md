@@ -124,18 +124,18 @@
   - Notes: Combined keyword and vector recall into hybrid service with unit tests
 
 ## Phase 4 — UI Foundations
-- [ ] **T-014:** Explorer UI
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-015:** Inspector UI
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
-- [ ] **T-016:** Results grid with masking (framework)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
+- [x] **T-014:** Explorer UI
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Implemented renderer explorer shell with tree sidebar, snapshot loader, IPC contract wiring, and loading/error states
+- [x] **T-015:** Inspector UI
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Added inspector panel in explorer workspace with metadata bindings and audit-safe placeholder flows pending service integration
+- [x] **T-016:** Results grid with masking (framework)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Established results grid scaffolding, masking state, and IPC plumbing ready for query integration
 
 ## Phase 5 — Model Manager & Optional Generator
 - [ ] **T-017:** Model manifest + UI

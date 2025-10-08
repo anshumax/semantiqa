@@ -15,7 +15,13 @@
   "dependencies": {
     "@semantiqa/app-config": "workspace:^0.1.0",
     "@semantiqa/contracts": "workspace:^0.1.0",
+    "@semantiqa/graph-service": "workspace:^0.1.0",
     "electron": "^32.3.3",
     "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@semantiqa/storage-sqlite": "workspace:^0.1.0",
+    "better-sqlite3": "^9.5.0"
   }
 }

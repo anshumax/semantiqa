@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import { AppStateProvider } from './state';
+import { StatusBadge, StatusBadgeLabel, StatusBadgeValue } from './components';
+import { ExplorerShell } from './explorer';
 import './App.css';
 
 declare global {
@@ -16,8 +19,17 @@ declare global {
 }
 
 export default function App() {
+  return (
+    <AppStateProvider>
+      <RootContent />
+    </AppStateProvider>
+  );
+}
+
+function RootContent() {
   const [env, setEnv] = useState<string>('unknown');
-  const [ping, setPing] = useState<string>('pending');
+  const [pingStatus, setPingStatus] = useState<'pending' | 'ok' | 'error'>('pending');
+  const [pingTimestamp, setPingTimestamp] = useState<string>('');
 
   useEffect(() => {
     setEnv(process.env.NODE_ENV ?? 'unknown');
@@ -25,22 +37,39 @@ export default function App() {
     window.semantiqa?.api
       .ping()
       .then((response) => {
-        setPing(`ok @ ${new Date(response.ts).toLocaleTimeString()}`);
+        setPingStatus('ok');
+        setPingTimestamp(new Date(response.ts).toLocaleTimeString());
       })
-      .catch(() => setPing('error'));
+      .catch(() => {
+        setPingStatus('error');
+        setPingTimestamp('');
+      });
   }, []);
 
   return (
-    <div className="app-shell">
-      <header>
-        <h1>Semantiqa Shell</h1>
-        <p>Renderer sandboxed. IPC bridge ready.</p>
-        <div className="status-panel">
-          <span>{`ENV: ${env}`}</span>
-          <span>{`PING: ${ping}`}</span>
+    <div className="app-frame">
+      <header className="app-frame__header">
+        <div className="header-brand">
+          <div className="brand-mark" aria-hidden />
+          <div className="brand-meta">
+            <span className="brand-title">Semantiqa</span>
+            <span className="brand-subtitle">Local semantic explorer</span>
+          </div>
+        </div>
+        <div className="header-status">
+          <StatusBadge tone="neutral">
+            <StatusBadgeLabel>Environment</StatusBadgeLabel>
+            <StatusBadgeValue>{env}</StatusBadgeValue>
+          </StatusBadge>
+          <StatusBadge tone={pingStatus === 'ok' ? 'positive' : pingStatus === 'error' ? 'negative' : 'neutral'}>
+            <StatusBadgeLabel>IPC</StatusBadgeLabel>
+            <StatusBadgeValue>
+              {pingStatus === 'pending' ? 'checking…' : pingStatus === 'ok' ? `ok @ ${pingTimestamp}` : 'error'}
+            </StatusBadgeValue>
+          </StatusBadge>
         </div>
       </header>
+      <ExplorerShell />
     </div>
   );
 }
-

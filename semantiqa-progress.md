@@ -38,10 +38,10 @@
 
 ## Phase 2 — Connections & Metadata (All MVP Sources)
 ### PostgreSQL
-- [ ] **T-007-PG:** Postgres connector (read-only)
-  - Status: Not Started
-  - Last Update: —
-  - Notes: —
+- [x] **T-007-PG:** Postgres connector (read-only)
+  - Status: Completed
+  - Last Update: 2025-10-08
+  - Notes: Added read-only Postgres adapter with validation, health-check, tests, and docs
 - [ ] **T-008-PG:** Metadata crawl (PG)
   - Status: Not Started
   - Last Update: —

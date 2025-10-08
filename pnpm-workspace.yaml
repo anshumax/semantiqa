@@ -1,10 +1,10 @@
 packages:
-  - core/*
-  - adapters/*
-  - app/*
-  - app/storage/*
-  - contracts
-  - docs
+  - "core/*"
+  - "app/adapters/*"
+  - "app/*"
+  - "app/storage/*"
+  - "contracts"
+  - "docs"
 
 ignoredBuiltDependencies:
   - electron

@@ -231,6 +231,29 @@
 - **Deps:** T-016-03
 - **Risks:** Keytar installation issues on Windows/macOS; guard with diagnostics and retries.
 
+### T-016-05: Source status persistence
+- **Desc:** Extend SQLite schema and repositories to record per-source status, timestamps, connection results, and error metadata.
+- **DoD:** New schema applied (clean re-init); status + connection fields updated via repository/service helpers; `graph:get` includes `status`, `lastCrawlAt`, `lastError`, `connectionStatus`, `lastConnectedAt`, `lastConnectionError`.
+- **Deps:** T-016-04, T-005
+- **Risks:** Requires full DB rebuild on schema change; ensure init script drops/creates tables.
+
+### T-016-06: Connection test & startup health check
+- **Desc:** Implement worker to test connectivity during wizard (“Test Connection” CTA) and on application startup for existing sources.
+- **DoD:** Wizard exposes Test Connection button with results; app startup runs connection checks, status updated in DB, renderer displays “Checking connectivity” → success/error states.
+- **Deps:** T-016-05
+- **Risks:** Blocking startup; use async tasks and throttled retries.
+
+### T-016-07: Crawl execution & status events
+- **Desc:** Execute metadata crawls asynchronously and emit status updates (not_crawled/crawling/crawled/error) back to renderer via IPC.
+- **DoD:** Crawl jobs update crawl status fields, push events, record timestamps/errors; manual “retry crawl” per-source and global “crawl all” coordinator in main process.
+- **Deps:** T-016-06, T-007-*, T-008-*, T-010-*
+- **Risks:** Long-running tasks; ensure worker threads or queues prevent main thread blockage.
+
+### T-016-08: Renderer status badges & crawl controls
+- **Desc:** Subscribe to status/connection events in renderer, render sidebar badges, and add per-source Retry Crawl plus global Crawl All CTA.
+- **DoD:** Badges show grey/blue/red/green states with hover error tooltip; wizard displays submitted-for-crawl message; notifications surface retry guidance; Crawl All button and per-source retry wired.
+- **Deps:** T-016-07, T-014b
+- **Risks:** State sync between renderer and main; throttle updates to avoid UI jitter.
 
 ---
 

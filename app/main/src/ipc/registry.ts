@@ -32,6 +32,8 @@ const channelToSchema: Record<IpcChannel, z.ZodTypeAny> = {
   'health:ping': z.undefined(),
   'sources:add': SourcesAddRequestSchema,
   'metadata:crawl': MetadataCrawlRequestSchema,
+  'sources:test-connection': z.object({ sourceId: z.string() }),
+  'sources:crawl-all': z.undefined(),
   'search:semantic': SearchSemanticRequestSchema,
   'query:run-read-only': QueryRunReadOnlyRequestSchema,
   'models:list': z.undefined(),
@@ -48,6 +50,8 @@ const auditResponse = z.object({ entries: z.array(z.unknown()) });
 const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'sources:add': z.union([z.object({ sourceId: z.string() }), SemantiqaErrorSchema]),
   'metadata:crawl': z.union([z.object({ snapshotId: z.string() }), SemantiqaErrorSchema]),
+  'sources:test-connection': z.enum(['connected', 'error']),
+  'sources:crawl-all': z.union([okResponse, SemantiqaErrorSchema]),
   'search:semantic': z.union([SearchResultsSchema, SemantiqaErrorSchema]),
   'query:run-read-only': z.union([QueryResultSchema, SemantiqaErrorSchema]),
   'models:list': z.union([ModelsListResponseSchema, SemantiqaErrorSchema]),

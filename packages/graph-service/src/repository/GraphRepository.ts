@@ -44,7 +44,7 @@ export class GraphRepository {
       const config = typeof row.config === 'string' ? JSON.parse(row.config) : row.config ?? {};
       const owners = typeof row.owners === 'string' ? JSON.parse(row.owners) : row.owners ?? [];
       const tags = typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags ?? [];
-      
+
       return {
         id: row.id,
         type: 'source' as const,
@@ -53,12 +53,17 @@ export class GraphRepository {
           description: config.description,
           owners,
           tags,
-          sensitivity: 'internal' as const,
-          status: 'draft' as const,
-          kind: row.kind, // Additional prop for source kind
-        } as any, // Type assertion needed because kind is not in GraphNodeProps schema
+          sensitivity: 'internal',
+          status: row.status ?? 'not_crawled',
+          connectionStatus: row.connection_status ?? 'unknown',
+          lastCrawlAt: row.last_crawl_at ?? undefined,
+          lastConnectedAt: row.last_connected_at ?? undefined,
+          lastError: row.last_error ?? row.last_connection_error ?? undefined,
+          lastErrorMeta: row.last_error_meta ? JSON.parse(row.last_error_meta) : undefined,
+          kind: row.kind,
+        } as any,
         createdAt: row.created_at,
-        updatedAt: row.created_at,
+        updatedAt: row.status_updated_at ?? row.created_at,
       } satisfies GraphNode;
     });
     

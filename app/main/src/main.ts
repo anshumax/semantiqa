@@ -7,6 +7,7 @@ import { IPC_CHANNELS } from '@semantiqa/app-config';
 import { registerIpcHandlers, type IpcHandlerMap } from './ipc/registry';
 import { SourceProvisioningService } from './application/SourceProvisioningService';
 import { MetadataCrawlService } from './application/MetadataCrawlService';
+import { ConnectivityService } from './application/ConnectivityService';
 import { logIpcEvent } from './logging/audit';
 
 let graphServices: {
@@ -173,20 +174,36 @@ app.whenReady().then(async () => {
       const repo = new SnapshotRepository(db);
       repo.persistSnapshot({ sourceId, kind, snapshot: snapshot as any, stats });
     },
-    updateSourceStatus,
+    updateCrawlStatus: async (sourceId, status, error) => {
+      await updateSourceStatus(sourceId, status, error);
+    },
+    updateConnectionStatus: async (sourceId, status, error) => {
+      await updateSourceStatus(sourceId, status, error);
+    },
     audit,
     logger: console,
   });
+
+  const connectivityService = new ConnectivityService({
+    openSourcesDb: graphDbFactory,
+    retrieveSecret,
+    audit,
+    logger: console,
+  });
+
+  // Run connectivity checks on startup (async)
+  void connectivityService.checkAllSources();
 
   // Source provisioning service
   const sourceProvisioningService = new SourceProvisioningService({
     openSourcesDb: graphDbFactory,
     triggerMetadataCrawl: async (sourceId: string) => {
-      // Trigger metadata crawl directly instead of roundtripping through renderer
       await metadataCrawlService.crawlSource(sourceId);
     },
     secureStore,
-    updateSourceStatus,
+    updateSourceStatus: async (sourceId, status, error) => {
+      await updateSourceStatus(sourceId, status, error);
+    },
     audit,
     logger: console,
   });
@@ -195,6 +212,15 @@ app.whenReady().then(async () => {
     [IPC_CHANNELS.GRAPH_GET]: (request) => graphSnapshotService.getSnapshot(request),
     [IPC_CHANNELS.SOURCES_ADD]: (request) => sourceProvisioningService.createSource(request),
     [IPC_CHANNELS.METADATA_CRAWL]: (request) => metadataCrawlService.crawlSource(request.sourceId),
+    [IPC_CHANNELS.SOURCES_TEST_CONNECTION]: (request) => connectivityService.checkSource(request.sourceId),
+    [IPC_CHANNELS.SOURCES_CRAWL_ALL]: async () => {
+      const db = graphDbFactory();
+      const rows = db.prepare<{ id: string }>('SELECT id FROM sources').all();
+      for (const row of rows) {
+        void metadataCrawlService.crawlSource(row.id);
+      }
+      return { ok: true };
+    },
   };
 
   registerIpcHandlers(handlerMap);

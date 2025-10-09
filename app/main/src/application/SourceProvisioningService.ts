@@ -5,7 +5,8 @@ export interface SourceProvisioningDeps {
   openSourcesDb: () => any;
   triggerMetadataCrawl: (sourceId: string) => Promise<void>;
   secureStore: (scope: { sourceId: string; key: string }, secret: string) => Promise<void>;
-  updateSourceStatus: (sourceId: string, status: 'connecting' | 'queued' | 'ready' | 'error' | 'needs_attention') => Promise<void> | void;
+  updateCrawlStatus: (sourceId: string, status: 'not_crawled' | 'crawling' | 'crawled' | 'error', error?: { message: string; meta?: Record<string, unknown> }) => Promise<void> | void;
+  updateConnectionStatus: (sourceId: string, status: 'unknown' | 'checking' | 'connected' | 'error', error?: { message: string; meta?: Record<string, unknown> }) => Promise<void> | void;
   audit: (event: {
     action: string;
     sourceId?: string;
@@ -47,10 +48,11 @@ export class SourceProvisioningService {
     let created: { sourceId: string } | null = null;
 
     try {
-      created = await sourceService.addSource(request);
+      created = await sourceService.addSource(request, 'not_crawled', 'checking');
       const { sourceId } = created;
 
-      await this.updateStatus(sourceId, 'connecting');
+      await this.updateStatus(sourceId, 'not_crawled', { audit, logger });
+      await this.updateConnectionStatus(sourceId, 'checking', { audit, logger });
 
       try {
         await this.persistSecrets({ request, sourceId, secureStore });
@@ -83,7 +85,16 @@ export class SourceProvisioningService {
           });
         }
 
-        await this.updateStatus(sourceId, 'error');
+        await this.updateStatus(sourceId, 'error', {
+          audit,
+          logger,
+          errorMeta: { message: (error as Error).message ?? 'Unable to store credentials' },
+        });
+        await this.updateConnectionStatus(sourceId, 'error', {
+          audit,
+          logger,
+          errorMessage: (error as Error).message ?? 'Unable to store credentials',
+        });
 
         return {
           code: 'AUTH_REQUIRED',
@@ -98,7 +109,7 @@ export class SourceProvisioningService {
         details: { kind: request.kind },
       });
 
-      await this.updateStatus(sourceId, 'queued');
+      await this.updateStatus(sourceId, 'crawling', { audit, logger });
 
       try {
         await triggerMetadataCrawl(sourceId);
@@ -107,8 +118,6 @@ export class SourceProvisioningService {
           sourceId,
           status: 'success',
         });
-
-        await this.updateStatus(sourceId, 'ready');
       } catch (error) {
         logger.warn('Failed to trigger metadata crawl', { error, sourceId });
         audit({
@@ -118,7 +127,11 @@ export class SourceProvisioningService {
           details: { error: (error as Error).message ?? 'Unknown error' },
         });
 
-        await this.updateStatus(sourceId, 'needs_attention');
+        await this.updateStatus(sourceId, 'error', {
+          audit,
+          logger,
+          errorMeta: { message: (error as Error).message ?? 'Failed to trigger metadata crawl' },
+        });
       }
 
       logger.info('Source provisioned', { sourceId });
@@ -152,7 +165,16 @@ export class SourceProvisioningService {
           });
         }
 
-        await this.updateStatus(created.sourceId, 'error');
+        await this.updateStatus(created.sourceId, 'error', {
+          audit,
+          logger,
+          errorMeta: { message: (error as Error).message ?? 'Provisioning failed' },
+        });
+        await this.updateConnectionStatus(created.sourceId, 'error', {
+          audit,
+          logger,
+          errorMessage: (error as Error).message ?? 'Provisioning failed',
+        });
       }
 
       return {
@@ -192,9 +214,34 @@ export class SourceProvisioningService {
 
   private async updateStatus(
     sourceId: string,
-    status: 'connecting' | 'queued' | 'ready' | 'error' | 'needs_attention',
+    status: 'not_crawled' | 'crawling' | 'crawled' | 'error',
+    opts: {
+      audit: SourceProvisioningDeps['audit'];
+      logger: SourceProvisioningDeps['logger'];
+      errorMeta?: { message: string; meta?: Record<string, unknown> };
+    },
   ) {
-    await this.deps.updateSourceStatus(sourceId, status);
+    const service = this.ensureSourceService();
+    service.setCrawlStatus(sourceId, status, opts.errorMeta);
+    await this.deps.updateCrawlStatus(sourceId, status, opts.errorMeta);
+  }
+
+  private async updateConnectionStatus(
+    sourceId: string,
+    status: 'unknown' | 'checking' | 'connected' | 'error',
+    opts: {
+      audit: SourceProvisioningDeps['audit'];
+      logger: SourceProvisioningDeps['logger'];
+      errorMessage?: string;
+    },
+  ) {
+    const service = this.ensureSourceService();
+    service.setConnectionStatus(sourceId, status, opts.errorMessage);
+    await this.deps.updateConnectionStatus(
+      sourceId,
+      status,
+      opts.errorMessage ? { message: opts.errorMessage } : undefined,
+    );
   }
 }
 

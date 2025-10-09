@@ -8,7 +8,6 @@ interface ExplorerState {
   isConnectSourceOpen: boolean;
   wizardStep: 'choose-kind' | 'configure' | 'review';
   selectedKind: 'postgres' | 'mysql' | 'mongo' | 'duckdb' | null;
-  sourceStatuses: Map<string, ExplorerSnapshot['sources'][number]['status']>;
 }
 
 type ExplorerAction =
@@ -19,12 +18,7 @@ type ExplorerAction =
   | { type: 'CLOSE_CONNECT_SOURCE' }
   | { type: 'SELECT_SOURCE_KIND'; kind: 'postgres' | 'mysql' | 'mongo' | 'duckdb' }
   | { type: 'GO_TO_REVIEW' }
-  | { type: 'RESET_CONNECT_WIZARD' }
-  | {
-      type: 'UPDATE_SOURCE_STATUS';
-      sourceId: string;
-      status: ExplorerSnapshot['sources'][number]['status'];
-    };
+  | { type: 'RESET_CONNECT_WIZARD' };
 
 const initialState: ExplorerState = {
   snapshot: {
@@ -37,7 +31,6 @@ const initialState: ExplorerState = {
   isConnectSourceOpen: false,
   wizardStep: 'choose-kind',
   selectedKind: null,
-  sourceStatuses: new Map<string, ExplorerSnapshot['sources'][number]['status']>(),
 };
 
 function reducer(state: ExplorerState, action: ExplorerAction): ExplorerState {

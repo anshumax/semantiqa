@@ -5,6 +5,7 @@ import { PostgresAdapter, crawlSchema as crawlPostgres, profileTables as profile
 import { MysqlAdapter, crawlSchema as crawlMysql, profileTables as profileMysql } from '@semantiqa/adapters-mysql';
 import { MongoAdapter, crawlMongoSchema, profileCollections as profileMongo } from '@semantiqa/adapters-mongo';
 import { DuckDbAdapter, crawlDuckDbSchema, profileTables as profileDuckDb } from '@semantiqa/adapters-duckdb';
+import { SourceService } from '@semantiqa/graph-service';
 
 export interface MetadataCrawlDeps {
   openSourcesDb: () => Database;
@@ -15,9 +16,15 @@ export interface MetadataCrawlDeps {
     snapshot: unknown;
     stats: unknown;
   }) => Promise<void>;
-  updateSourceStatus: (
+  updateCrawlStatus: (
     sourceId: string,
-    status: 'connecting' | 'queued' | 'ready' | 'error' | 'needs_attention',
+    status: 'not_crawled' | 'crawling' | 'crawled' | 'error',
+    error?: { message: string; meta?: Record<string, unknown> },
+  ) => Promise<void> | void;
+  updateConnectionStatus: (
+    sourceId: string,
+    status: 'unknown' | 'checking' | 'connected' | 'error',
+    error?: { message: string; meta?: Record<string, unknown> },
   ) => Promise<void> | void;
   audit: (event: {
     action: string;
@@ -43,13 +50,16 @@ export class MetadataCrawlService {
   constructor(private readonly deps: MetadataCrawlDeps) {}
 
   async crawlSource(sourceId: string): Promise<{ snapshotId: string } | SemantiqaError> {
-    const { openSourcesDb, retrieveSecret, persistSnapshot, updateSourceStatus, audit, logger } = this.deps;
+    const { openSourcesDb, retrieveSecret, persistSnapshot, updateCrawlStatus, updateConnectionStatus, audit, logger } = this.deps;
+
+    const sourceService = new SourceService({ openDatabase: openSourcesDb });
 
     logger.info('Starting metadata crawl', { sourceId });
     audit({ action: 'metadata.crawl.started', sourceId, status: 'success' });
 
     try {
-      await updateSourceStatus(sourceId, 'queued');
+      await updateCrawlStatus(sourceId, 'crawling');
+      sourceService.setCrawlStatus(sourceId, 'crawling');
 
       // Load source config
       const db = openSourcesDb();
@@ -118,7 +128,8 @@ export class MetadataCrawlService {
       // Persist snapshot
       await persistSnapshot({ sourceId, kind: source.kind, snapshot, stats });
 
-      await updateSourceStatus(sourceId, 'ready');
+      await updateCrawlStatus(sourceId, 'crawled');
+      sourceService.setCrawlStatus(sourceId, 'crawled');
       audit({
         action: 'metadata.crawl.completed',
         sourceId,
@@ -130,13 +141,19 @@ export class MetadataCrawlService {
       return { snapshotId: sourceId };
     } catch (error) {
       logger.error('Metadata crawl failed', { sourceId, error });
-      await updateSourceStatus(sourceId, 'error');
+      const errorMeta = { message: (error as Error).message ?? 'Unknown error' };
+      await updateCrawlStatus(sourceId, 'error', errorMeta);
+      sourceService.setCrawlStatus(sourceId, 'error', errorMeta);
       audit({
         action: 'metadata.crawl.failed',
         sourceId,
         status: 'failure',
-        details: { error: (error as Error).message ?? 'Unknown error' },
+        details: errorMeta,
       });
+
+      // Connection might be bad as well
+      await updateConnectionStatus(sourceId, 'error', errorMeta);
+      sourceService.setConnectionStatus(sourceId, 'error', errorMeta.message);
 
       return {
         code: 'INTERNAL_ERROR',

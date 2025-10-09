@@ -6,6 +6,8 @@ const allowedChannels: readonly IpcChannel[] = [
   'health:ping',
   'sources:add',
   'metadata:crawl',
+  'sources:test-connection',
+  'sources:crawl-all',
   'search:semantic',
   'query:run-read-only',
   'models:list',

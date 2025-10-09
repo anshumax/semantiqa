@@ -1,0 +1,10 @@
+BEGIN TRANSACTION;
+
+ALTER TABLE sources ADD COLUMN status TEXT NOT NULL DEFAULT 'idle';
+ALTER TABLE sources ADD COLUMN status_updated_at TEXT DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE sources ADD COLUMN last_crawl_at TEXT;
+ALTER TABLE sources ADD COLUMN last_error TEXT;
+ALTER TABLE sources ADD COLUMN last_error_meta JSON;
+
+COMMIT;
+

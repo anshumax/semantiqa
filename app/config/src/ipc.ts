@@ -20,6 +20,8 @@ export type IpcChannel =
   | 'health:ping'
   | 'sources:add'
   | 'metadata:crawl'
+  | 'sources:test-connection'
+  | 'sources:crawl-all'
   | 'search:semantic'
   | 'query:run-read-only'
   | 'models:list'
@@ -41,6 +43,14 @@ type HandlerMap = {
   'metadata:crawl': {
     request: MetadataCrawlRequest;
     response: { snapshotId: string } | SemantiqaError;
+  };
+  'sources:test-connection': {
+    request: { sourceId: string };
+    response: 'connected' | 'error';
+  };
+  'sources:crawl-all': {
+    request: void;
+    response: { ok: true } | SemantiqaError;
   };
   'search:semantic': {
     request: SearchSemanticRequest;
@@ -83,6 +93,8 @@ export const IPC_CHANNELS = {
   HEALTH_PING: 'health:ping' as const,
   SOURCES_ADD: 'sources:add' as const,
   METADATA_CRAWL: 'metadata:crawl' as const,
+  SOURCES_TEST_CONNECTION: 'sources:test-connection' as const,
+  SOURCES_CRAWL_ALL: 'sources:crawl-all' as const,
   SEARCH_SEMANTIC: 'search:semantic' as const,
   QUERY_RUN_READ_ONLY: 'query:run-read-only' as const,
   MODELS_LIST: 'models:list' as const,

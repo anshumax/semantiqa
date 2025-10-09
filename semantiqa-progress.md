@@ -136,22 +136,38 @@
   - Status: Completed
   - Last Update: 2025-10-08
   - Notes: Established results grid scaffolding, masking state, and IPC plumbing ready for query integration
-- [x] **T-016-01:** Connect Source entry point (UI)
-  - Status: Completed
-  - Last Update: 2025-10-09
-  - Notes: Connect Source button added to ExplorerSidebar header and ExplorerTree empty state; modal opens with wizard; keyboard/mouse dismissal working
-- [x] **T-016-02:** Connection wizard scaffolding
-  - Status: Completed
-  - Last Update: 2025-10-09
-  - Notes: Multi-step wizard (choose kind → configure → review) fully implemented with per-adapter field definitions, inline validation, and keyboard navigation
-- [x] **T-016-03:** Source provisioning backend service
-  - Status: Completed
-  - Last Update: 2025-10-09
-  - Notes: Main-service persists sources in SQLite transactions, stores secrets via keytar (`sourceId:key`), emits audit breadcrumbs, triggers crawl
-- [x] **T-016-04:** Credential storage & IPC handshake
-  - Status: Completed
-  - Last Update: 2025-10-09
-  - Notes: Renderer submission hits `sources:add`, returns typed success/error, secrets stored out of process, audit entries captured for success/failure; additionally implemented full metadata crawl orchestration with MetadataCrawlService, SnapshotRepository for persisting schema to graph, and live status updates via sources:status events
+- [ ] **T-016-01:** Connect Source entry point (UI)
+  - Status: Pending
+  - Last Update: —
+  - Notes: CTA/modal wiring not yet implemented
+- [ ] **T-016-02:** Connection wizard scaffolding
+  - Status: Pending
+  - Last Update: —
+  - Notes: Multi-step wizard still to be built
+- [ ] **T-016-03:** Source provisioning backend service
+  - Status: Pending
+  - Last Update: —
+  - Notes: Service creation queued behind wizard scaffolding
+- [ ] **T-016-04:** Credential storage & IPC handshake
+  - Status: Pending
+  - Last Update: —
+  - Notes: Awaits provisioning service foundation
+- [ ] **T-016-05:** Source status persistence
+  - Status: Pending
+  - Last Update: —
+  - Notes: Needs schema update and repository support for status + connection fields
+- [ ] **T-016-06:** Connection test & startup health check
+  - Status: Pending
+  - Last Update: —
+  - Notes: Requires connectivity worker for wizard/startup checks
+- [ ] **T-016-07:** Crawl execution & status events
+  - Status: Pending
+  - Last Update: —
+  - Notes: Asynchronous crawl pipeline and IPC push events outstanding
+- [ ] **T-016-08:** Renderer status badges & crawl controls
+  - Status: Pending
+  - Last Update: —
+  - Notes: UI badges, per-source retry, and crawl-all CTA not yet implemented
 
 ## Phase 5 — Model Manager & Optional Generator
 - [ ] **T-017:** Model manifest + UI

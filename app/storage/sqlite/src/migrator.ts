@@ -71,6 +71,7 @@ export function runMigrations(dbPath: string, migrationsDir: string): MigrationR
   const appliedMap = new Map<string, string>(appliedRows.map((row) => [row.id, row.checksum]));
 
   const migrations = loadMigrations(migrationsDir);
+
   const applied: string[] = [];
 
   const insertMigration = db.prepare(

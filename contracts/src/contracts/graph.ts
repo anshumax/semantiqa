@@ -72,7 +72,14 @@ export const ExplorerSourceSchema = z.object({
   id: NonEmptyString,
   name: NonEmptyString,
   kind: z.enum(['postgres', 'mysql', 'mongo', 'duckdb']),
-  status: z.enum(['idle', 'loading', 'error', 'ready']).default('idle'),
+  status: z
+    .enum(['not_crawled', 'crawling', 'crawled', 'error'])
+    .default('not_crawled'),
+  connectionStatus: z.enum(['unknown', 'checking', 'connected', 'error']).default('unknown'),
+  lastCrawlAt: IsoDateTimeSchema.optional(),
+  lastError: z.string().optional(),
+  lastConnectedAt: IsoDateTimeSchema.optional(),
+  lastConnectionError: z.string().optional(),
   owners: z.array(NonEmptyString).default([]),
 });
 

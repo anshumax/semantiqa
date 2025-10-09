@@ -1,3 +1,13 @@
+DROP TABLE IF EXISTS nodes;
+DROP TABLE IF EXISTS edges;
+DROP TABLE IF EXISTS docs;
+DROP TABLE IF EXISTS embeddings;
+DROP TABLE IF EXISTS provenance;
+DROP TABLE IF EXISTS changelog;
+DROP TABLE IF EXISTS models;
+DROP TABLE IF EXISTS settings;
+DROP TABLE IF EXISTS sources;
+
 BEGIN TRANSACTION;
 
 CREATE TABLE IF NOT EXISTS nodes (
@@ -95,7 +105,15 @@ CREATE TABLE IF NOT EXISTS sources (
   config JSON NOT NULL,
   owners JSON,
   tags JSON,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  status TEXT NOT NULL DEFAULT 'not_crawled',
+  status_updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  last_crawl_at TEXT,
+  last_error TEXT,
+  last_error_meta JSON,
+  connection_status TEXT NOT NULL DEFAULT 'unknown',
+  last_connected_at TEXT,
+  last_connection_error TEXT
 );
 
 COMMIT;

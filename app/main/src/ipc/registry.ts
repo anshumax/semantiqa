@@ -50,7 +50,7 @@ const auditResponse = z.object({ entries: z.array(z.unknown()) });
 const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'sources:add': z.union([z.object({ sourceId: z.string() }), SemantiqaErrorSchema]),
   'metadata:crawl': z.union([z.object({ snapshotId: z.string() }), SemantiqaErrorSchema]),
-  'sources:test-connection': z.enum(['connected', 'error']),
+  'sources:test-connection': z.object({ queued: z.boolean() }),
   'sources:crawl-all': z.union([okResponse, SemantiqaErrorSchema]),
   'search:semantic': z.union([SearchResultsSchema, SemantiqaErrorSchema]),
   'query:run-read-only': z.union([QueryResultSchema, SemantiqaErrorSchema]),

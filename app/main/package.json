@@ -16,6 +16,7 @@
     "@semantiqa/app-config": "workspace:^0.1.0",
     "@semantiqa/contracts": "workspace:^0.1.0",
     "@semantiqa/graph-service": "workspace:^0.1.0",
+    "@semantiqa/adapters-runtime": "workspace:^0.1.0",
     "electron": "^32.3.3",
     "keytar": "^7.9.0",
     "zod": "^3.25.0"

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "module": "CommonJS",
+    "moduleResolution": "Node"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules"],
+  "references": [
+    { "path": "../../app/adapters/postgres" },
+    { "path": "../../app/adapters/mysql" },
+    { "path": "../../app/adapters/mongo" },
+    { "path": "../../app/adapters/duckdb" }
+  ]
+}
+

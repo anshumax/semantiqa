@@ -1,10 +1,28 @@
 BEGIN TRANSACTION;
 
-ALTER TABLE sources ADD COLUMN status TEXT NOT NULL DEFAULT 'idle';
-ALTER TABLE sources ADD COLUMN status_updated_at TEXT DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE sources ADD COLUMN last_crawl_at TEXT;
-ALTER TABLE sources ADD COLUMN last_error TEXT;
-ALTER TABLE sources ADD COLUMN last_error_meta JSON;
+ALTER TABLE sources
+  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'not_crawled';
+
+ALTER TABLE sources
+  ADD COLUMN IF NOT EXISTS status_updated_at TEXT DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE sources
+  ADD COLUMN IF NOT EXISTS last_crawl_at TEXT;
+
+ALTER TABLE sources
+  ADD COLUMN IF NOT EXISTS last_error TEXT;
+
+ALTER TABLE sources
+  ADD COLUMN IF NOT EXISTS last_error_meta JSON;
+
+ALTER TABLE sources
+  ADD COLUMN IF NOT EXISTS connection_status TEXT NOT NULL DEFAULT 'unknown';
+
+ALTER TABLE sources
+  ADD COLUMN IF NOT EXISTS last_connected_at TEXT;
+
+ALTER TABLE sources
+  ADD COLUMN IF NOT EXISTS last_connection_error TEXT;
 
 COMMIT;
 

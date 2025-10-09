@@ -5,6 +5,7 @@ packages:
   - app/*
   - app/storage/*
   - packages/*
+  - packages/adapters-runtime
   - contracts
   - docs
 

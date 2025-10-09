@@ -7,7 +7,7 @@ import { IPC_CHANNELS } from '@semantiqa/app-config';
 import { registerIpcHandlers, type IpcHandlerMap } from './ipc/registry';
 import { SourceProvisioningService } from './application/SourceProvisioningService';
 import { MetadataCrawlService } from './application/MetadataCrawlService';
-import { ConnectivityService } from './application/ConnectivityService';
+import { ConnectivityQueue, ConnectivityService } from './application/ConnectivityService';
 import { logIpcEvent } from './logging/audit';
 
 let graphServices: {
@@ -233,8 +233,17 @@ const graphSnapshotService = new services.GraphSnapshotService({ openDatabase: g
     logger: console,
   });
 
+  const connectivityQueue = new ConnectivityQueue({
+    service: connectivityService,
+    broadcastStatus: (sourceId, payload) => {
+      broadcastSourceStatus(sourceId, payload);
+    },
+    mapStatus: mapConnectionStatusToUi,
+    logger: console,
+  });
+
   // Run connectivity checks on startup (async)
-  void connectivityService.checkAllSources();
+  void connectivityQueue.queueStartupSweep();
 
   // Source provisioning service
   const sourceProvisioningService = new SourceProvisioningService({
@@ -258,7 +267,7 @@ const graphSnapshotService = new services.GraphSnapshotService({ openDatabase: g
     [IPC_CHANNELS.GRAPH_GET]: (request) => graphSnapshotService.getSnapshot(request),
     [IPC_CHANNELS.SOURCES_ADD]: (request) => sourceProvisioningService.createSource(request),
     [IPC_CHANNELS.METADATA_CRAWL]: (request) => metadataCrawlService.crawlSource(request.sourceId),
-    [IPC_CHANNELS.SOURCES_TEST_CONNECTION]: (request) => connectivityService.checkSource(request.sourceId),
+    [IPC_CHANNELS.SOURCES_TEST_CONNECTION]: (request) => connectivityQueue.queueCheck(request.sourceId),
     [IPC_CHANNELS.SOURCES_CRAWL_ALL]: async () => {
       const db = graphDbFactory();
       const rows = db.prepare<{ id: string }>('SELECT id FROM sources').all();

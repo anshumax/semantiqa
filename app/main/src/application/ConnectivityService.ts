@@ -5,7 +5,7 @@ import {
   PostgresAdapter,
   DuckDbAdapter,
   MongoAdapter,
-} from '@semantiqa/adapters';
+} from '@semantiqa/adapters-runtime';
 import { SourceService } from '@semantiqa/graph-service';
 
 export interface ConnectivityServiceDeps {
@@ -30,6 +30,10 @@ interface SourceRecord {
   config: string;
 }
 
+export type ConnectivityCheckResult =
+  | { status: 'connected' }
+  | { status: 'error'; message: string };
+
 export class ConnectivityService {
   constructor(private readonly deps: ConnectivityServiceDeps) {}
 
@@ -47,7 +51,13 @@ export class ConnectivityService {
     }
   }
 
-  async checkSource(sourceId: string): Promise<'connected' | 'error'> {
+  listSourceIds(): string[] {
+    const db = this.deps.openSourcesDb();
+    const rows = db.prepare<{ id: string }>('SELECT id FROM sources').all();
+    return rows.map((row) => row.id);
+  }
+
+  async checkSource(sourceId: string): Promise<ConnectivityCheckResult> {
     const {
       openSourcesDb,
       retrieveSecret,
@@ -62,7 +72,7 @@ export class ConnectivityService {
 
     if (!row) {
       logger.warn('Source not found during connectivity check', { sourceId });
-      return 'error';
+      return { status: 'error', message: 'Source not found' } satisfies ConnectivityCheckResult;
     }
 
     const config = JSON.parse(row.config ?? '{}');
@@ -84,7 +94,7 @@ export class ConnectivityService {
         sourceId,
         status: 'success',
       });
-      return 'connected';
+      return { status: 'connected' } satisfies ConnectivityCheckResult;
     } catch (error) {
       const message = (error as Error).message ?? 'Unknown connection error';
       sourceService.setConnectionStatus(sourceId, 'error', message);
@@ -94,7 +104,7 @@ export class ConnectivityService {
         status: 'failure',
         details: { error: message },
       });
-      return 'error';
+      return { status: 'error', message } satisfies ConnectivityCheckResult;
     }
   }
 
@@ -154,5 +164,89 @@ export class ConnectivityService {
         return exhaustive;
       }
     }
+  }
+}
+
+type ConnectionStatusUi = {
+  status: 'connecting' | 'queued' | 'ready' | 'error' | 'needs_attention';
+  error?: { message: string; meta?: Record<string, unknown> };
+};
+
+type MapStatusFn = (
+  status: 'unknown' | 'checking' | 'connected' | 'error',
+  error?: { message: string },
+) => ConnectionStatusUi;
+
+interface ConnectivityQueueDeps {
+  service: ConnectivityService;
+  broadcastStatus: (sourceId: string, payload: ConnectionStatusUi) => void;
+  mapStatus: MapStatusFn;
+  logger: ConnectivityServiceDeps['logger'];
+}
+
+export class ConnectivityQueue {
+  private readonly queue: string[] = [];
+  private readonly pending = new Set<string>();
+  private running = false;
+
+  constructor(private readonly deps: ConnectivityQueueDeps) {}
+
+  queueCheck(sourceId: string): { queued: boolean } {
+    if (this.pending.has(sourceId)) {
+      this.deps.logger.info('Connectivity check already queued', { sourceId });
+      return { queued: false };
+    }
+
+    this.pending.add(sourceId);
+    this.deps.broadcastStatus(sourceId, this.deps.mapStatus('checking'));
+    this.queue.push(sourceId);
+    void this.processQueue();
+    return { queued: true };
+  }
+
+  async queueStartupSweep(): Promise<number> {
+    const ids = this.deps.service.listSourceIds();
+    let queuedCount = 0;
+    for (const id of ids) {
+      const result = this.queueCheck(id);
+      if (result.queued) {
+        queuedCount += 1;
+      }
+    }
+    return queuedCount;
+  }
+
+  private async processQueue(): Promise<void> {
+    if (this.running) {
+      return;
+    }
+
+    this.running = true;
+
+    while (this.queue.length > 0) {
+      const sourceId = this.queue.shift();
+      if (!sourceId) {
+        continue;
+      }
+
+      this.deps.broadcastStatus(sourceId, this.deps.mapStatus('checking'));
+
+      try {
+        const result = await this.deps.service.checkSource(sourceId);
+        if (result.status === 'connected') {
+          this.deps.broadcastStatus(sourceId, this.deps.mapStatus('connected'));
+        } else {
+          this.deps.broadcastStatus(sourceId, this.deps.mapStatus('error', { message: result.message }));
+        }
+      } catch (error) {
+        const message = (error as Error).message ?? 'Unknown connectivity error';
+        this.deps.logger.error('Connectivity check failed unexpectedly', { sourceId, error });
+        this.deps.broadcastStatus(sourceId, this.deps.mapStatus('error', { message }));
+      } finally {
+        this.pending.delete(sourceId);
+      }
+    }
+
+    this.running = false;
   }
 }

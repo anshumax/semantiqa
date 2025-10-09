@@ -47,7 +47,7 @@ type HandlerMap = {
   };
   'sources:test-connection': {
     request: { sourceId: string };
-    response: 'connected' | 'error';
+    response: { queued: boolean };
   };
   'sources:crawl-all': {
     request: void;

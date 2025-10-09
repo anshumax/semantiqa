@@ -5,6 +5,31 @@
   color: var(--color-text);
 }
 
+.connect-wizard__steps {
+  display: flex;
+  gap: var(--spacing-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.connect-wizard__step {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: rgba(18, 20, 28, 0.55);
+}
+
+.connect-wizard__step--active {
+  border-color: rgba(214, 216, 224, 0.35);
+  background: rgba(26, 28, 36, 0.85);
+  color: var(--color-text);
+}
+
 .connect-wizard__panel {
   display: flex;
   flex-direction: column;

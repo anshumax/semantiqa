@@ -26,14 +26,33 @@ function mapEdge(row: any): GraphEdge {
 }
 
 export class GraphRepository {
-  constructor(private readonly db: { prepare: (sql: string) => { all: () => any[] } }) {}
+  constructor(private readonly db: { prepare: (sql: string) => { all: (params?: unknown[]) => any[] } }) {}
 
   getGraph(_request: GraphGetRequest): GraphGetResponse {
     // Load regular nodes
     const nodeRows = this.db.prepare('SELECT id, type, props, origin_device_id, created_at, updated_at FROM nodes').all();
     
     // Load source nodes from sources table
-    const sourceRows = this.db.prepare('SELECT id, name, kind, config, owners, tags, created_at FROM sources').all();
+    const sourceRows = this.db
+      .prepare(
+        `SELECT id,
+                name,
+                kind,
+                config,
+                owners,
+                tags,
+                status,
+                connection_status,
+                last_crawl_at,
+                last_connected_at,
+                last_error,
+                last_connection_error,
+                last_error_meta,
+                status_updated_at,
+                created_at
+         FROM sources`,
+      )
+      .all();
     
     const edgeRows = this.db.prepare('SELECT id, src_id, dst_id, type, props, created_at, updated_at FROM edges').all();
 

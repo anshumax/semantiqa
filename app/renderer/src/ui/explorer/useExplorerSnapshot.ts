@@ -88,7 +88,13 @@ function transformGraph(nodes: GraphNode[], edges: GraphEdge[]): ExplorerSnapsho
       name: node.props.displayName,
       kind: ((node.props as any).kind ?? 'postgres') as ExplorerSnapshot['sources'][number]['kind'],
       owners: node.props.owners,
-      status: 'ready' as const,
+      status: mapSourceStatus((node.props as any).status),
+      connectionStatus: (node.props as any).connectionStatus ?? 'unknown',
+      lastCrawlAt: (node.props as any).lastCrawlAt ?? undefined,
+      lastError: (node.props as any).lastError ?? undefined,
+      lastConnectedAt: (node.props as any).lastConnectedAt ?? undefined,
+      lastConnectionError: (node.props as any).lastConnectionError ?? undefined,
+      tags: (node.props as any).tags ?? [],
     }));
 
   const treeNodes = nodes
@@ -125,15 +131,18 @@ function mapNodeType(type: GraphNode['type']): ExplorerSnapshot['nodes'][number]
 }
 
 function mapSourceStatus(status: unknown): ExplorerSnapshot['sources'][number]['status'] {
-  if (status === 'loading') {
-    return 'loading';
+  if (status === 'crawling') {
+    return 'crawling';
+  }
+  if (status === 'crawled') {
+    return 'crawled';
   }
   if (status === 'error') {
     return 'error';
   }
-  if (status === 'idle') {
-    return 'idle';
+  if (status === 'not_crawled') {
+    return 'not_crawled';
   }
 
-  return 'ready';
+  return 'not_crawled';
 }

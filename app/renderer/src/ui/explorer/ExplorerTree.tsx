@@ -21,25 +21,26 @@ export function ExplorerTree({
   onSelect,
   onConnectSource,
 }: ExplorerTreeProps) {
+  const hasSources = sources.length > 0;
+
   const groupedNodes = useMemo(() => groupNodesByParent(nodes), [nodes]);
 
   return (
     <div className="explorer-tree">
-      {sources.length === 0 ? (
-        <EmptyState onConnect={onConnectSource} />
-      ) : (
-        sources.map((source) => (
-          <SourceSection
-            key={source.id}
-            source={source}
-            nodes={groupedNodes}
-            expandedNodeIds={expandedNodeIds}
-            selectedNodeId={selectedNodeId}
-            onToggle={onToggle}
-            onSelect={onSelect}
-          />
-        ))
-      )}
+      {!hasSources ? <EmptyState onConnect={onConnectSource} /> : null}
+      {hasSources
+        ? sources.map((source) => (
+            <SourceSection
+              key={source.id}
+              source={source}
+              nodes={groupedNodes}
+              expandedNodeIds={expandedNodeIds}
+              selectedNodeId={selectedNodeId}
+              onToggle={onToggle}
+              onSelect={onSelect}
+            />
+          ))
+        : null}
     </div>
   );
 }

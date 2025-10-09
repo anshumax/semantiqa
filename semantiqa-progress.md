@@ -130,24 +130,24 @@
   - Notes: Implemented renderer explorer shell with tree sidebar, snapshot loader, IPC contract wiring, and loading/error states
 - [x] **T-015:** Inspector UI
   - Status: Completed
-  - Last Update: 2025-10-08
-  - Notes: Added inspector panel in explorer workspace with metadata bindings and audit-safe placeholder flows pending service integration
+  - Last Update: 2025-10-09
+  - Notes: Added inspector panel with derived metadata, breadcrumbs, and profiling details driven by `useExplorerState` and new `InspectorPanel`
 - [x] **T-016:** Results grid with masking (framework)
   - Status: Completed
-  - Last Update: 2025-10-08
-  - Notes: Established results grid scaffolding, masking state, and IPC plumbing ready for query integration
-- [ ] **T-016-01:** Connect Source entry point (UI)
-  - Status: Pending
-  - Last Update: —
-  - Notes: CTA/modal wiring not yet implemented
-- [ ] **T-016-02:** Connection wizard scaffolding
-  - Status: Pending
-  - Last Update: —
-  - Notes: Multi-step wizard still to be built
+  - Last Update: 2025-10-09
+  - Notes: Established workspace layout with results placeholder, masking controls scaffolding, and future IPC integration points
+- [x] **T-016-01:** Connect Source entry point (UI)
+  - Status: Completed
+  - Last Update: 2025-10-09
+  - Notes: Sidebar CTA and empty-state wiring now open the wizard via state machine
+- [x] **T-016-02:** Connection wizard scaffolding
+  - Status: Completed
+  - Last Update: 2025-10-09
+  - Notes: Multi-step wizard with validation, step indicator, and IPC submission plumbing
 - [ ] **T-016-03:** Source provisioning backend service
-  - Status: Pending
-  - Last Update: —
-  - Notes: Service creation queued behind wizard scaffolding
+  - Status: In Progress
+  - Last Update: 2025-10-09
+  - Notes: Wiring `SourceProvisioningService` to IPC/audit/secure storage in progress
 - [ ] **T-016-04:** Credential storage & IPC handshake
   - Status: Pending
   - Last Update: —

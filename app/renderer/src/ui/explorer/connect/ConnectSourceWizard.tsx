@@ -4,6 +4,7 @@ import { useExplorerState } from '../state/useExplorerState';
 import './ConnectSourceWizard.css';
 
 type SourceKind = 'postgres' | 'mysql' | 'mongo' | 'duckdb';
+type WizardStep = 'choose-kind' | 'configure' | 'review';
 
 interface FormState {
   name: string;
@@ -21,7 +22,7 @@ const DEFAULT_STATE: FormState = {
   connection: {},
 };
 
-const FIELD_DEFINITIONS: Record<SourceKind, Array<{ key: string; label: string; type?: string }>> = {
+const FIELD_DEFINITIONS: Record<SourceKind, Array<{ key: string; label: string; type?: string; optional?: boolean }>> = {
   postgres: [
     { key: 'host', label: 'Host' },
     { key: 'port', label: 'Port', type: 'number' },
@@ -39,7 +40,7 @@ const FIELD_DEFINITIONS: Record<SourceKind, Array<{ key: string; label: string; 
   mongo: [
     { key: 'uri', label: 'Connection URI' },
     { key: 'database', label: 'Database' },
-    { key: 'replicaSet', label: 'Replica set (optional)' },
+    { key: 'replicaSet', label: 'Replica set (optional)', optional: true },
   ],
   duckdb: [{ key: 'filePath', label: 'File path' }],
 };
@@ -52,6 +53,27 @@ export function ConnectSourceWizard() {
 
   const handleKindSelect = (kind: SourceKind) => {
     actions.selectSourceKind(kind);
+    handleNavigate('configure');
+  };
+
+  const handleNavigate = (step: WizardStep) => {
+    actions.advanceWizardTo(step);
+  };
+
+  const handleBackToTypes = () => {
+    setFormState(DEFAULT_STATE);
+    actions.resetConnectWizard();
+    handleNavigate('choose-kind');
+  };
+
+  const handleAdvanceToReview = () => {
+    handleNavigate('review');
+  };
+
+  const handleReturnToConfigure = () => {
+    if (selectedKind) {
+      handleNavigate('configure');
+    }
   };
 
   const handleBasicChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -78,12 +100,33 @@ export function ConnectSourceWizard() {
       return;
     }
 
+    const trimmedName = formState.name.trim();
+
+    if (!trimmedName) {
+      setError('Name is required.');
+      return;
+    }
+
+    const requiredConnectionFields = FIELD_DEFINITIONS[selectedKind]
+      .filter((field) => !field.optional)
+      .map((field) => field.key);
+
+    const missingField = requiredConnectionFields.find((key) => {
+      const value = formState.connection[key];
+      return !value || `${value}`.trim() === '';
+    });
+
+    if (missingField) {
+      setError('Please fill in all required connection fields.');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
     const payload: SourcesAddRequest = {
       kind: selectedKind,
-      name: formState.name,
+      name: trimmedName,
       description: formState.description || undefined,
       owners: ownersList,
       tags: tagsList,
@@ -102,7 +145,22 @@ export function ConnectSourceWizard() {
   };
 
   return (
-    <div className="connect-wizard">
+    <div className="connect-wizard" role="region" aria-live="polite">
+      <ol className="connect-wizard__steps">
+        {[
+          { id: 'choose-kind', label: 'Choose type' },
+          { id: 'configure', label: 'Configure' },
+          { id: 'review', label: 'Review' },
+        ].map((step) => (
+          <li
+            key={step.id}
+            className={wizardStep === step.id ? 'connect-wizard__step connect-wizard__step--active' : 'connect-wizard__step'}
+          >
+            {step.label}
+          </li>
+        ))}
+      </ol>
+
       {wizardStep === 'choose-kind' ? (
         <KindPicker onSelect={handleKindSelect} />
       ) : null}
@@ -113,8 +171,8 @@ export function ConnectSourceWizard() {
           formState={formState}
           onBasicChange={handleBasicChange}
           onConnectionChange={handleConnectionChange}
-          onBack={actions.resetConnectWizard}
-          onContinue={actions.advanceToReview}
+          onBack={handleBackToTypes}
+          onContinue={handleAdvanceToReview}
         />
       ) : null}
 
@@ -128,7 +186,7 @@ export function ConnectSourceWizard() {
             tags: tagsList,
             connection: formState.connection,
           }}
-          onBack={() => actions.selectSourceKind(selectedKind)}
+          onBack={handleReturnToConfigure}
           onSubmit={handleSubmit}
           submitting={submitting}
           error={error}

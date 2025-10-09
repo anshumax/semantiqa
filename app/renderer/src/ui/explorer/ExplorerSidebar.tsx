@@ -10,7 +10,9 @@ export function ExplorerSidebar() {
       <div className="explorer-sidebar__header">
         <div className="explorer-sidebar__title">
           <h2>Sources</h2>
-          <button type="button" onClick={actions.openConnectSource}>Connect Source</button>
+          <button type="button" onClick={actions.openConnectSource} className="explorer-sidebar__connect">
+            Connect source
+          </button>
         </div>
         <p>Select a source to explore its schemas and tables.</p>
       </div>

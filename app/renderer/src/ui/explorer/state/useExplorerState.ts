@@ -1,5 +1,5 @@
 import { createContext, createElement, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
-import type { ExplorerSnapshot } from '@semantiqa/contracts';
+import type { ExplorerSnapshot, ExplorerSource, ExplorerTreeNode, TableProfile } from '@semantiqa/contracts';
 
 interface ExplorerState {
   snapshot: ExplorerSnapshot;
@@ -8,6 +8,38 @@ interface ExplorerState {
   isConnectSourceOpen: boolean;
   wizardStep: 'choose-kind' | 'configure' | 'review';
   selectedKind: 'postgres' | 'mysql' | 'mongo' | 'duckdb' | null;
+  sourceStatuses: Map<string, ExplorerSnapshot['sources'][number]['status']>;
+  inspector: InspectorState;
+}
+
+interface InspectorState {
+  selectedNode: InspectorNode | null;
+  breadcrumbs: Array<{ id: string; label: string }>;
+  metadata: InspectorMetadata | null;
+  stats: InspectorStats | null;
+  lastCrawledAt: string | null;
+  lastError: string | null;
+}
+
+interface InspectorNode {
+  id: string;
+  label: string;
+  kind: ExplorerTreeNode['type'];
+}
+
+interface InspectorMetadata {
+  owners: string[];
+  tags: string[];
+  sensitivity?: string;
+  status?: string;
+  description?: string;
+  kind?: ExplorerSource['kind'];
+}
+
+interface InspectorStats {
+  rowCount?: number;
+  columnCount?: number;
+  profile?: TableProfile;
 }
 
 type ExplorerAction =
@@ -18,7 +50,13 @@ type ExplorerAction =
   | { type: 'CLOSE_CONNECT_SOURCE' }
   | { type: 'SELECT_SOURCE_KIND'; kind: 'postgres' | 'mysql' | 'mongo' | 'duckdb' }
   | { type: 'GO_TO_REVIEW' }
-  | { type: 'RESET_CONNECT_WIZARD' };
+  | { type: 'RESET_CONNECT_WIZARD' }
+  | { type: 'ADVANCE_WIZARD'; step: ExplorerState['wizardStep'] }
+  | {
+      type: 'UPDATE_SOURCE_STATUS';
+      sourceId: string;
+      status: ExplorerSnapshot['sources'][number]['status'];
+    };
 
 const initialState: ExplorerState = {
   snapshot: {
@@ -31,12 +69,18 @@ const initialState: ExplorerState = {
   isConnectSourceOpen: false,
   wizardStep: 'choose-kind',
   selectedKind: null,
+  sourceStatuses: new Map(),
+  inspector: emptyInspectorState(),
 };
 
 function reducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
   switch (action.type) {
     case 'INGEST_SNAPSHOT': {
       const mergedSnapshot = mergeSnapshotWithStatus(action.snapshot, state.sourceStatuses);
+      const inspector = buildInspectorState({
+        snapshot: mergedSnapshot,
+        selectedNodeId: state.selectedNodeId,
+      });
       return {
         snapshot: mergedSnapshot,
         expandedNodeIds: new Set(action.snapshot.sources.map((source) => source.id)),
@@ -45,6 +89,7 @@ function reducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
         wizardStep: state.wizardStep,
         selectedKind: state.selectedKind,
         sourceStatuses: state.sourceStatuses,
+        inspector,
       };
     }
     case 'TOGGLE_NODE': {
@@ -56,8 +101,10 @@ function reducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
       }
       return { ...state, expandedNodeIds: expanded };
     }
-    case 'SELECT_NODE':
-      return { ...state, selectedNodeId: action.nodeId };
+    case 'SELECT_NODE': {
+      const inspector = buildInspectorState({ snapshot: state.snapshot, selectedNodeId: action.nodeId });
+      return { ...state, selectedNodeId: action.nodeId, inspector };
+    }
     case 'OPEN_CONNECT_SOURCE':
       return { ...state, isConnectSourceOpen: true, wizardStep: 'choose-kind', selectedKind: null };
     case 'CLOSE_CONNECT_SOURCE':
@@ -66,6 +113,8 @@ function reducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
       return { ...state, selectedKind: action.kind, wizardStep: 'configure' };
     case 'GO_TO_REVIEW':
       return { ...state, wizardStep: 'review' };
+    case 'ADVANCE_WIZARD':
+      return { ...state, wizardStep: action.step };
     case 'RESET_CONNECT_WIZARD':
       return { ...state, wizardStep: 'choose-kind', selectedKind: null };
     case 'UPDATE_SOURCE_STATUS': {
@@ -76,6 +125,7 @@ function reducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
         ...state,
         sourceStatuses: statuses,
         snapshot: mergeSnapshotWithStatus(state.snapshot, statuses),
+        inspector: buildInspectorState({ snapshot: state.snapshot, selectedNodeId: state.selectedNodeId }),
       };
     }
     default:
@@ -162,6 +212,7 @@ export function useExplorerState() {
         sourceId: string,
         status: ExplorerSnapshot['sources'][number]['status'],
       ) => dispatch({ type: 'UPDATE_SOURCE_STATUS', sourceId, status }),
+      advanceWizardTo: (step: ExplorerState['wizardStep']) => dispatch({ type: 'ADVANCE_WIZARD', step }),
     }),
     [dispatch],
   );
@@ -174,6 +225,7 @@ export function useExplorerState() {
     wizardStep: state.wizardStep,
     selectedKind: state.selectedKind,
     actions,
+    inspector: state.inspector,
   };
 }
 
@@ -183,16 +235,145 @@ function mergeSnapshotWithStatus(
 ): ExplorerSnapshot {
   const mergedSources = snapshot.sources.map((source) => {
     const override = statuses.get(source.id);
+
     return {
       ...source,
       status: override ?? source.status,
-    };
+      connectionStatus: source.connectionStatus,
+      lastCrawlAt: source.lastCrawlAt,
+      lastConnectedAt: source.lastConnectedAt,
+      lastError: source.lastError,
+      lastConnectionError: source.lastConnectionError,
+      owners: source.owners ?? [],
+      tags: source.tags ?? [],
+    } satisfies ExplorerSnapshot['sources'][number];
   });
 
   return {
     ...snapshot,
     sources: mergedSources,
   } satisfies ExplorerSnapshot;
+}
+
+function buildInspectorState(params: {
+  snapshot: ExplorerSnapshot;
+  selectedNodeId: string | null;
+}): InspectorState {
+  const { snapshot, selectedNodeId } = params;
+
+  if (!selectedNodeId) {
+    return emptyInspectorState();
+  }
+
+  const selectedNode = snapshot.nodes.find((node) => node.id === selectedNodeId);
+
+  if (!selectedNode) {
+    return emptyInspectorState();
+  }
+
+  const breadcrumbs = buildBreadcrumbs(snapshot.nodes, selectedNodeId);
+  const source = resolveSourceForNode(snapshot.sources, breadcrumbs);
+  const metadata = buildMetadata(selectedNode, source);
+  const stats = buildStats(selectedNode);
+
+  return {
+    selectedNode: {
+      id: selectedNode.id,
+      label: selectedNode.label,
+      kind: selectedNode.type,
+    },
+    breadcrumbs,
+    metadata,
+    stats,
+    lastCrawledAt: source?.lastCrawlAt ?? null,
+    lastError: source?.lastError ?? source?.lastConnectionError ?? null,
+  } satisfies InspectorState;
+}
+
+function emptyInspectorState(): InspectorState {
+  return {
+    selectedNode: null,
+    breadcrumbs: [],
+    metadata: null,
+    stats: null,
+    lastCrawledAt: null,
+    lastError: null,
+  } satisfies InspectorState;
+}
+
+function buildBreadcrumbs(nodes: ExplorerTreeNode[], selectedNodeId: string) {
+  const breadcrumbs: Array<{ id: string; label: string }> = [];
+  let currentId: string | undefined = selectedNodeId;
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+
+  while (currentId) {
+    const node = nodeById.get(currentId);
+    if (!node) {
+      break;
+    }
+    breadcrumbs.unshift({ id: node.id, label: node.label });
+    currentId = node.parentId;
+  }
+
+  return breadcrumbs;
+}
+
+function resolveSourceForNode(
+  sources: ExplorerSource[],
+  breadcrumbs: Array<{ id: string; label: string }>,
+): ExplorerSource | undefined {
+  const sourceIds = sources.map((source) => source.id);
+  const match = breadcrumbs.find((crumb) => sourceIds.includes(crumb.id));
+  if (!match) {
+    return undefined;
+  }
+  return sources.find((source) => source.id === match.id);
+}
+
+function buildMetadata(node: ExplorerTreeNode, source?: ExplorerSource): InspectorMetadata | null {
+  const owners = source?.owners ?? [];
+  const nodeTags = Array.isArray((node.meta as { tags?: unknown }).tags)
+    ? ((node.meta as { tags?: string[] }).tags ?? [])
+    : [];
+  const tags = nodeTags.length > 0 ? nodeTags : Array.isArray(source?.tags) ? source.tags : [];
+  const description = (node.meta as { description?: string }).description ?? source?.description;
+
+  if (!owners.length && !tags.length && !description) {
+    return null;
+  }
+
+  return {
+    owners,
+    tags,
+    description,
+    sensitivity: (node.meta as { sensitivity?: string }).sensitivity,
+    status: (node.meta as { status?: string }).status,
+    kind: source?.kind,
+  } satisfies InspectorMetadata;
+}
+
+function buildStats(node: ExplorerTreeNode): InspectorStats | null {
+  const meta = node.meta as { profile?: TableProfile; columnCount?: number; rowCount?: number; stats?: { rowCount?: number; columnCount?: number } };
+
+  if (!meta) {
+    return null;
+  }
+
+  const rowCount = meta.rowCount ?? meta.stats?.rowCount;
+  const columnCount = meta.columnCount ?? meta.stats?.columnCount;
+  const profile = meta.profile;
+  const hasProfile = Boolean(meta.profile);
+  const hasCounts = typeof rowCount === 'number' || typeof columnCount === 'number';
+
+  if (!hasProfile && !hasCounts) {
+    return null;
+  }
+
+  return {
+    rowCount,
+    columnCount,
+    profile,
+  } satisfies InspectorStats;
 }
 
 

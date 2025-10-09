@@ -56,6 +56,7 @@ type ExplorerAction =
       type: 'UPDATE_SOURCE_STATUS';
       sourceId: string;
       status: ExplorerSnapshot['sources'][number]['status'];
+      error?: { message: string; meta?: Record<string, unknown> };
     };
 
 const initialState: ExplorerState = {
@@ -124,7 +125,7 @@ function reducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
       return {
         ...state,
         sourceStatuses: statuses,
-        snapshot: mergeSnapshotWithStatus(state.snapshot, statuses),
+        snapshot: mergeSnapshotWithStatus(state.snapshot, statuses, action.sourceId, action.error),
         inspector: buildInspectorState({ snapshot: state.snapshot, selectedNodeId: state.selectedNodeId }),
       };
     }
@@ -211,7 +212,8 @@ export function useExplorerState() {
       updateSourceStatus: (
         sourceId: string,
         status: ExplorerSnapshot['sources'][number]['status'],
-      ) => dispatch({ type: 'UPDATE_SOURCE_STATUS', sourceId, status }),
+        error?: { message: string; meta?: Record<string, unknown> },
+      ) => dispatch({ type: 'UPDATE_SOURCE_STATUS', sourceId, status, error }),
       advanceWizardTo: (step: ExplorerState['wizardStep']) => dispatch({ type: 'ADVANCE_WIZARD', step }),
     }),
     [dispatch],
@@ -232,18 +234,20 @@ export function useExplorerState() {
 function mergeSnapshotWithStatus(
   snapshot: ExplorerSnapshot,
   statuses: Map<string, ExplorerSnapshot['sources'][number]['status']>,
+  changedSourceId?: string,
+  error?: { message: string; meta?: Record<string, unknown> },
 ): ExplorerSnapshot {
   const mergedSources = snapshot.sources.map((source) => {
     const override = statuses.get(source.id);
+    const isChanged = changedSourceId === source.id;
 
     return {
       ...source,
       status: override ?? source.status,
+      lastError: isChanged && error ? error.message : source.lastError,
+      lastCrawlAt: isChanged && override === 'crawled' ? new Date().toISOString() : source.lastCrawlAt,
+      lastConnectionError: isChanged && error ? error.message : source.lastConnectionError,
       connectionStatus: source.connectionStatus,
-      lastCrawlAt: source.lastCrawlAt,
-      lastConnectedAt: source.lastConnectedAt,
-      lastError: source.lastError,
-      lastConnectionError: source.lastConnectionError,
       owners: source.owners ?? [],
       tags: source.tags ?? [],
     } satisfies ExplorerSnapshot['sources'][number];

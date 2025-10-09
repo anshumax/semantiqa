@@ -148,10 +148,10 @@
   - Status: Completed
   - Last Update: 2025-10-09
   - Notes: Provisioning service integrated with messaging, status broadcast, crawl trigger, and added unit coverage
-- [ ] **T-016-04:** Credential storage & IPC handshake
-  - Status: Pending
-  - Last Update: —
-  - Notes: Awaits provisioning service foundation
+- [x] **T-016-04:** Credential storage & IPC handshake
+  - Status: Completed
+  - Last Update: 2025-10-09
+  - Notes: Preload/main IPC hardened with secure channel usage, keychain storage rollback handled, status events carry error context
 - [ ] **T-016-05:** Source status persistence
   - Status: Pending
   - Last Update: —

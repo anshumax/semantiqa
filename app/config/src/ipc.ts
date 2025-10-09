@@ -19,6 +19,7 @@ import type {
 export type IpcChannel =
   | 'health:ping'
   | 'sources:add'
+  | 'sources:add:secure'
   | 'metadata:crawl'
   | 'sources:test-connection'
   | 'sources:crawl-all'

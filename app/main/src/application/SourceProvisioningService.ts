@@ -67,27 +67,7 @@ export class SourceProvisioningService {
           status: 'failure',
           details: { error: (error as Error).message ?? 'Unknown error' },
         });
-
-        try {
-          sourceService.removeSource(sourceId);
-          audit({
-            action: 'sources.add.rollback',
-            sourceId,
-            status: 'success',
-          });
-        } catch (cleanupError) {
-          logger.warn('Failed to rollback source after secret persistence error', {
-            error: cleanupError,
-            sourceId,
-          });
-          audit({
-            action: 'sources.add.rollback_failed',
-            sourceId,
-            status: 'failure',
-            details: { error: (cleanupError as Error).message ?? 'Unknown error' },
-          });
-        }
-
+        this.safeRemoveSource(sourceService, sourceId, audit, logger);
         await this.updateStatus(sourceId, 'error', {
           audit,
           logger,
@@ -148,26 +128,7 @@ export class SourceProvisioningService {
       });
 
       if (created) {
-        try {
-          sourceService.removeSource(created.sourceId);
-          audit({
-            action: 'sources.add.rollback',
-            sourceId: created.sourceId,
-            status: 'success',
-          });
-        } catch (cleanupError) {
-          logger.warn('Failed to rollback source after provisioning error', {
-            error: cleanupError,
-            sourceId: created.sourceId,
-          });
-          audit({
-            action: 'sources.add.rollback_failed',
-            sourceId: created.sourceId,
-            status: 'failure',
-            details: { error: (cleanupError as Error).message ?? 'Unknown error' },
-          });
-        }
-
+        this.safeRemoveSource(sourceService, created.sourceId, audit, logger);
         await this.updateStatus(created.sourceId, 'error', {
           audit,
           logger,
@@ -185,6 +146,33 @@ export class SourceProvisioningService {
         message: 'Unable to add source. Check inputs and try again.',
         details: { error: (error as Error).message ?? 'Unknown error' },
       } satisfies SemantiqaError;
+    }
+  }
+
+  private safeRemoveSource(
+    service: SourceService,
+    sourceId: string,
+    audit: SourceProvisioningDeps['audit'],
+    logger: SourceProvisioningDeps['logger'],
+  ) {
+    try {
+      service.removeSource(sourceId);
+      audit({
+        action: 'sources.add.rollback',
+        sourceId,
+        status: 'success',
+      });
+    } catch (cleanupError) {
+      logger.warn('Failed to rollback source after provisioning error', {
+        error: cleanupError,
+        sourceId,
+      });
+      audit({
+        action: 'sources.add.rollback_failed',
+        sourceId,
+        status: 'failure',
+        details: { error: (cleanupError as Error).message ?? 'Unknown error' },
+      });
     }
   }
 

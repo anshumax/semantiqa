@@ -144,10 +144,10 @@
   - Status: Completed
   - Last Update: 2025-10-09
   - Notes: Multi-step wizard with validation, step indicator, and IPC submission plumbing
-- [ ] **T-016-03:** Source provisioning backend service
-  - Status: In Progress
+- [x] **T-016-03:** Source provisioning backend service
+  - Status: Completed
   - Last Update: 2025-10-09
-  - Notes: Wiring `SourceProvisioningService` to IPC/audit/secure storage in progress
+  - Notes: Provisioning service integrated with messaging, status broadcast, crawl trigger, and added unit coverage
 - [ ] **T-016-04:** Credential storage & IPC handshake
   - Status: Pending
   - Last Update: —

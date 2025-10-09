@@ -18,6 +18,7 @@ export interface SourceProvisioningDeps {
     warn(message: string, meta?: Record<string, unknown>): void;
     error(message: string, meta?: Record<string, unknown>): void;
   };
+  createSourceService?: () => SourceService;
 }
 
 export class SourceProvisioningService {
@@ -27,7 +28,9 @@ export class SourceProvisioningService {
 
   private ensureSourceService() {
     if (!this.sourceService) {
-      this.sourceService = new SourceService({ openDatabase: this.deps.openSourcesDb });
+      this.sourceService = this.deps.createSourceService
+        ? this.deps.createSourceService()
+        : new SourceService({ openDatabase: this.deps.openSourcesDb });
     }
     return this.sourceService;
   }

@@ -34,5 +34,15 @@ const api = {
   },
 };
 
-contextBridge.exposeInMainWorld('semantiqa', Object.freeze({ api }));
+const bridge = {
+  publish(event: 'sources:status', payload: unknown) {
+    window.dispatchEvent(new CustomEvent(event, { detail: payload }));
+  },
+};
+
+ipcRenderer.on('sources:status', (_event, payload: unknown) => {
+  bridge.publish('sources:status', payload);
+});
+
+contextBridge.exposeInMainWorld('semantiqa', Object.freeze({ api, bridge }));
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ExplorerSnapshot, GraphEdge, GraphGetRequest, GraphGetResponse, GraphNode } from '@semantiqa/contracts';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
+import { useExplorerState } from './state/useExplorerState';
 
 export type ExplorerSnapshotState =
   | { status: 'idle'; snapshot: null }
@@ -10,7 +11,7 @@ export type ExplorerSnapshotState =
 
 export function useExplorerSnapshot() {
   const [state, setState] = useState<ExplorerSnapshotState>({ status: 'idle', snapshot: null });
-
+  const { actions } = useExplorerState();
   const loadSnapshot = useCallback(async () => {
     setState((prev) => ({ status: 'loading', snapshot: prev.snapshot }));
 
@@ -27,6 +28,7 @@ export function useExplorerSnapshot() {
       const snapshot = transformGraph(response.nodes, response.edges ?? []);
 
       setState({ status: 'ready', snapshot });
+
     } catch (error) {
       setState((prev) => ({
         status: 'error',
@@ -37,30 +39,56 @@ export function useExplorerSnapshot() {
   }, []);
 
   useEffect(() => {
+    const listener = (event: Event) => {
+      const customEvent = event as CustomEvent<{ sourceId: string; status: ExplorerSnapshot['sources'][number]['status'] }>;
+      const payload = customEvent.detail;
+      if (!payload || typeof payload !== 'object' || !payload.sourceId) {
+        return;
+      }
+
+      actions.updateSourceStatus(payload.sourceId, payload.status);
+    };
+
+    window.addEventListener('sources:status', listener as EventListener);
+
+    return () => {
+      window.removeEventListener('sources:status', listener as EventListener);
+    };
+  }, [actions]);
+
+  useEffect(() => {
     if (state.status === 'idle') {
       void loadSnapshot();
     }
   }, [loadSnapshot, state.status]);
 
-  return useMemo(() => ({ state, loadSnapshot }), [state, loadSnapshot]);
+  return useMemo(
+    () => ({
+      state,
+      loadSnapshot,
+      refresh: loadSnapshot,
+    }),
+    [state, loadSnapshot],
+  );
 }
 
 function transformGraph(nodes: GraphNode[], edges: GraphEdge[]): ExplorerSnapshot {
   const parentByChild = new Map<string, string>();
   edges
-    .filter((edge) => edge.type === 'BELONGS_TO')
+    .filter((edge) => edge.type === 'CONTAINS' || edge.type === 'HAS_COLUMN' || edge.type === 'HAS_FIELD')
     .forEach((edge) => {
-      parentByChild.set(edge.srcId ?? edge.src_id ?? edge.src_id, edge.dstId ?? edge.dst_id ?? edge.dst_id);
+      // src CONTAINS dst, so dst's parent is src
+      parentByChild.set(edge.dstId ?? edge.dst_id, edge.srcId ?? edge.src_id);
     });
 
   const sources = nodes
     .filter((node) => node.type === 'source')
     .map((node) => ({
       id: node.id,
-      name: node.props.displayName ?? node.props.name ?? node.id,
-      kind: (node.props.kind ?? 'postgres') as ExplorerSnapshot['sources'][number]['kind'],
-      owners: node.props.owners ?? [],
-      status: mapSourceStatus(node.props.status),
+      name: node.props.displayName,
+      kind: ((node.props as any).kind ?? 'postgres') as ExplorerSnapshot['sources'][number]['kind'],
+      owners: node.props.owners,
+      status: 'ready' as const,
     }));
 
   const treeNodes = nodes

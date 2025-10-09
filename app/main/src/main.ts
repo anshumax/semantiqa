@@ -2,8 +2,12 @@ import { app, BrowserWindow, protocol, session } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
+import keytar from 'keytar';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
 import { registerIpcHandlers, type IpcHandlerMap } from './ipc/registry';
+import { SourceProvisioningService } from './application/SourceProvisioningService';
+import { MetadataCrawlService } from './application/MetadataCrawlService';
+import { logIpcEvent } from './logging/audit';
 
 let graphServices: {
   GraphSnapshotService: typeof import('./services/GraphSnapshotService').GraphSnapshotService;
@@ -132,8 +136,65 @@ app.whenReady().then(async () => {
   const graphDbFactory = services.createSqliteFactory({ dbPath }) as () => any;
   const graphSnapshotService = new services.GraphSnapshotService({ openDatabase: graphDbFactory });
 
+  // Shared dependencies for services
+  const updateSourceStatus = (sourceId: string, status: 'connecting' | 'queued' | 'ready' | 'error' | 'needs_attention') => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send('sources:status', {
+        sourceId,
+        status,
+      });
+    }
+  };
+
+  const audit = ({ action, sourceId, status, details }: { action: string; sourceId?: string; status: 'success' | 'failure'; details?: Record<string, unknown> }) => {
+    logIpcEvent({
+      channel: action,
+      direction: 'renderer->main',
+      status: status === 'success' ? 'ok' : 'error',
+      request: { sourceId, ...details },
+    });
+  };
+
+  const retrieveSecret = async ({ sourceId, key }: { sourceId: string; key: string }) => {
+    return await keytar.getPassword('semantiqa', `${sourceId}:${key}`);
+  };
+
+  const secureStore = async ({ sourceId, key }: { sourceId: string; key: string }, secret: string) => {
+    await keytar.setPassword('semantiqa', `${sourceId}:${key}`, secret);
+  };
+
+  // Metadata crawl service
+  const metadataCrawlService = new MetadataCrawlService({
+    openSourcesDb: graphDbFactory,
+    retrieveSecret,
+    persistSnapshot: async ({ sourceId, kind, snapshot, stats }) => {
+      const { SnapshotRepository } = await import('@semantiqa/graph-service');
+      const db = graphDbFactory();
+      const repo = new SnapshotRepository(db);
+      repo.persistSnapshot({ sourceId, kind, snapshot: snapshot as any, stats });
+    },
+    updateSourceStatus,
+    audit,
+    logger: console,
+  });
+
+  // Source provisioning service
+  const sourceProvisioningService = new SourceProvisioningService({
+    openSourcesDb: graphDbFactory,
+    triggerMetadataCrawl: async (sourceId: string) => {
+      // Trigger metadata crawl directly instead of roundtripping through renderer
+      await metadataCrawlService.crawlSource(sourceId);
+    },
+    secureStore,
+    updateSourceStatus,
+    audit,
+    logger: console,
+  });
+
   const handlerMap: IpcHandlerMap = {
     [IPC_CHANNELS.GRAPH_GET]: (request) => graphSnapshotService.getSnapshot(request),
+    [IPC_CHANNELS.SOURCES_ADD]: (request) => sourceProvisioningService.createSource(request),
+    [IPC_CHANNELS.METADATA_CRAWL]: (request) => metadataCrawlService.crawlSource(request.sourceId),
   };
 
   registerIpcHandlers(handlerMap);

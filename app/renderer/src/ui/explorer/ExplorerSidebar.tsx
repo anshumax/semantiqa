@@ -8,7 +8,10 @@ export function ExplorerSidebar() {
   return (
     <aside className="explorer-sidebar">
       <div className="explorer-sidebar__header">
-        <h2>Sources</h2>
+        <div className="explorer-sidebar__title">
+          <h2>Sources</h2>
+          <button type="button" onClick={actions.openConnectSource}>Connect Source</button>
+        </div>
         <p>Select a source to explore its schemas and tables.</p>
       </div>
       <div className="explorer-sidebar__content">
@@ -19,6 +22,7 @@ export function ExplorerSidebar() {
           onSelect={(nodeId) => actions.selectNode(nodeId)}
           expandedNodeIds={snapshot.expandedNodeIds}
           selectedNodeId={snapshot.selectedNodeId}
+          onConnectSource={actions.openConnectSource}
         />
       </div>
     </aside>

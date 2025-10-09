@@ -9,6 +9,7 @@ interface ExplorerTreeProps {
   selectedNodeId: string | null;
   onToggle: (nodeId: string) => void;
   onSelect: (nodeId: string) => void;
+  onConnectSource: () => void;
 }
 
 export function ExplorerTree({
@@ -18,13 +19,14 @@ export function ExplorerTree({
   selectedNodeId,
   onToggle,
   onSelect,
+  onConnectSource,
 }: ExplorerTreeProps) {
   const groupedNodes = useMemo(() => groupNodesByParent(nodes), [nodes]);
 
   return (
     <div className="explorer-tree">
       {sources.length === 0 ? (
-        <EmptyState />
+        <EmptyState onConnect={onConnectSource} />
       ) : (
         sources.map((source) => (
           <SourceSection
@@ -153,10 +155,14 @@ function TreeNode({
   );
 }
 
-function EmptyState() {
+function EmptyState({ onConnect }: { onConnect: () => void }) {
   return (
     <div className="explorer-tree__empty">
-      <p>No sources connected yet. Add a source to begin exploring.</p>
+      <h3>No sources connected yet</h3>
+      <p>Add a source to begin exploring your schemas.</p>
+      <button type="button" onClick={onConnect}>
+        Connect Source
+      </button>
     </div>
   );
 }

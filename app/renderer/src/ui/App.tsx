@@ -3,6 +3,7 @@ import { AppStateProvider } from './state';
 import { StatusBadge, StatusBadgeLabel, StatusBadgeValue } from './components';
 import { ExplorerShell } from './explorer';
 import './App.css';
+import './components/Modal.css';
 
 declare global {
   interface Window {

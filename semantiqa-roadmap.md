@@ -207,6 +207,31 @@
 - **Deps:** T-014b, T-005
 - **Risks:** Real query integration may demand virtualization/perf work.
 
+### T-016-01: Connect Source entry point (UI)
+- **Desc:** Add the primary "Connect Source" action to the explorer header/empty state and open a modal scaffold that hosts the wizard.
+- **DoD:** CTA renders in empty and populated states, launches the modal, and respects keyboard/mouse dismissal patterns.
+- **Deps:** T-014b, T-016
+- **Risks:** CTA hierarchy or layout crowding; keep visual weight minimal.
+
+### T-016-02: Connection wizard scaffolding
+- **Desc:** Implement the multi-step wizard (choose kind, configure, review) with validation plumbing for Postgres/MySQL/Mongo/DuckDB.
+- **DoD:** Wizard advances between steps, enforces required fields per adapter, and surfaces inline validation and keyboard navigation.
+- **Deps:** T-016-01, T-007-*
+- **Risks:** Form sprawl; contain scope with per-kind field definitions.
+
+### T-016-03: Source provisioning backend service
+- **Desc:** Implement main-process service to persist new sources, securely store secrets, emit audit events, and trigger metadata crawl.
+- **DoD:** IPC handler calls backend service, source persisted in SQLite within a transaction, secrets stored via keytar `sourceId:key`, audit trail captured, crawl trigger invoked; unit tests cover happy path and failure rollback.
+- **Deps:** T-016-02, T-004, T-005
+- **Risks:** Schema drift; ensure migrations and contracts stay aligned.
+
+### T-016-04: Credential storage & IPC handshake
+- **Desc:** Wire wizard submission to preload IPC, enforce typed error handling, persist credentials via OS keychain, and audit the attempt.
+- **DoD:** Submission stores secrets outside the renderer, returns typed success/error, and records audit events with redacted payloads; tests cover keytar fallback paths.
+- **Deps:** T-016-03
+- **Risks:** Keytar installation issues on Windows/macOS; guard with diagnostics and retries.
+
+
 ---
 
 ## Phase 5 — Model Manager & Optional Generator

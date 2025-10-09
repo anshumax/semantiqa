@@ -5,12 +5,26 @@ interface ExplorerState {
   snapshot: ExplorerSnapshot;
   expandedNodeIds: Set<string>;
   selectedNodeId: string | null;
+  isConnectSourceOpen: boolean;
+  wizardStep: 'choose-kind' | 'configure' | 'review';
+  selectedKind: 'postgres' | 'mysql' | 'mongo' | 'duckdb' | null;
+  sourceStatuses: Map<string, ExplorerSnapshot['sources'][number]['status']>;
 }
 
 type ExplorerAction =
   | { type: 'INGEST_SNAPSHOT'; snapshot: ExplorerSnapshot }
   | { type: 'TOGGLE_NODE'; nodeId: string }
-  | { type: 'SELECT_NODE'; nodeId: string | null };
+  | { type: 'SELECT_NODE'; nodeId: string | null }
+  | { type: 'OPEN_CONNECT_SOURCE' }
+  | { type: 'CLOSE_CONNECT_SOURCE' }
+  | { type: 'SELECT_SOURCE_KIND'; kind: 'postgres' | 'mysql' | 'mongo' | 'duckdb' }
+  | { type: 'GO_TO_REVIEW' }
+  | { type: 'RESET_CONNECT_WIZARD' }
+  | {
+      type: 'UPDATE_SOURCE_STATUS';
+      sourceId: string;
+      status: ExplorerSnapshot['sources'][number]['status'];
+    };
 
 const initialState: ExplorerState = {
   snapshot: {
@@ -20,16 +34,26 @@ const initialState: ExplorerState = {
   },
   expandedNodeIds: new Set<string>(),
   selectedNodeId: null,
+  isConnectSourceOpen: false,
+  wizardStep: 'choose-kind',
+  selectedKind: null,
+  sourceStatuses: new Map<string, ExplorerSnapshot['sources'][number]['status']>(),
 };
 
 function reducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
   switch (action.type) {
-    case 'INGEST_SNAPSHOT':
+    case 'INGEST_SNAPSHOT': {
+      const mergedSnapshot = mergeSnapshotWithStatus(action.snapshot, state.sourceStatuses);
       return {
-        snapshot: action.snapshot,
+        snapshot: mergedSnapshot,
         expandedNodeIds: new Set(action.snapshot.sources.map((source) => source.id)),
         selectedNodeId: state.selectedNodeId,
+        isConnectSourceOpen: state.isConnectSourceOpen,
+        wizardStep: state.wizardStep,
+        selectedKind: state.selectedKind,
+        sourceStatuses: state.sourceStatuses,
       };
+    }
     case 'TOGGLE_NODE': {
       const expanded = new Set(state.expandedNodeIds);
       if (expanded.has(action.nodeId)) {
@@ -41,6 +65,26 @@ function reducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
     }
     case 'SELECT_NODE':
       return { ...state, selectedNodeId: action.nodeId };
+    case 'OPEN_CONNECT_SOURCE':
+      return { ...state, isConnectSourceOpen: true, wizardStep: 'choose-kind', selectedKind: null };
+    case 'CLOSE_CONNECT_SOURCE':
+      return { ...state, isConnectSourceOpen: false, wizardStep: 'choose-kind', selectedKind: null };
+    case 'SELECT_SOURCE_KIND':
+      return { ...state, selectedKind: action.kind, wizardStep: 'configure' };
+    case 'GO_TO_REVIEW':
+      return { ...state, wizardStep: 'review' };
+    case 'RESET_CONNECT_WIZARD':
+      return { ...state, wizardStep: 'choose-kind', selectedKind: null };
+    case 'UPDATE_SOURCE_STATUS': {
+      const statuses = new Map(state.sourceStatuses);
+      statuses.set(action.sourceId, action.status);
+
+      return {
+        ...state,
+        sourceStatuses: statuses,
+        snapshot: mergeSnapshotWithStatus(state.snapshot, statuses),
+      };
+    }
     default:
       return state;
   }
@@ -77,6 +121,28 @@ export function ExplorerStateProvider({
     }
   }, [initialSnapshot]);
 
+  // Listen for source status updates from main process
+  useEffect(() => {
+    const handleStatusUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        sourceId: string;
+        status: 'connecting' | 'queued' | 'ready' | 'error' | 'needs_attention';
+      }>;
+      if (customEvent.detail) {
+        dispatch({
+          type: 'UPDATE_SOURCE_STATUS',
+          sourceId: customEvent.detail.sourceId,
+          status: customEvent.detail.status,
+        });
+      }
+    };
+
+    window.addEventListener('sources:status', handleStatusUpdate);
+    return () => {
+      window.removeEventListener('sources:status', handleStatusUpdate);
+    };
+  }, []);
+
   const value = useMemo(() => ({ state, dispatch }), [state]);
   return createElement(ExplorerStateContext.Provider, { value }, children);
 }
@@ -93,6 +159,16 @@ export function useExplorerState() {
       ingestSnapshot: (snapshot: ExplorerSnapshot) => dispatch({ type: 'INGEST_SNAPSHOT', snapshot }),
       toggleNode: (nodeId: string) => dispatch({ type: 'TOGGLE_NODE', nodeId }),
       selectNode: (nodeId: string | null) => dispatch({ type: 'SELECT_NODE', nodeId }),
+      openConnectSource: () => dispatch({ type: 'OPEN_CONNECT_SOURCE' }),
+      closeConnectSource: () => dispatch({ type: 'CLOSE_CONNECT_SOURCE' }),
+      selectSourceKind: (kind: 'postgres' | 'mysql' | 'mongo' | 'duckdb') =>
+        dispatch({ type: 'SELECT_SOURCE_KIND', kind }),
+      advanceToReview: () => dispatch({ type: 'GO_TO_REVIEW' }),
+      resetConnectWizard: () => dispatch({ type: 'RESET_CONNECT_WIZARD' }),
+      updateSourceStatus: (
+        sourceId: string,
+        status: ExplorerSnapshot['sources'][number]['status'],
+      ) => dispatch({ type: 'UPDATE_SOURCE_STATUS', sourceId, status }),
     }),
     [dispatch],
   );
@@ -101,8 +177,29 @@ export function useExplorerState() {
     snapshot: state.snapshot,
     expandedNodeIds: state.expandedNodeIds,
     selectedNodeId: state.selectedNodeId,
+    isConnectSourceOpen: state.isConnectSourceOpen,
+    wizardStep: state.wizardStep,
+    selectedKind: state.selectedKind,
     actions,
   };
+}
+
+function mergeSnapshotWithStatus(
+  snapshot: ExplorerSnapshot,
+  statuses: Map<string, ExplorerSnapshot['sources'][number]['status']>,
+): ExplorerSnapshot {
+  const mergedSources = snapshot.sources.map((source) => {
+    const override = statuses.get(source.id);
+    return {
+      ...source,
+      status: override ?? source.status,
+    };
+  });
+
+  return {
+    ...snapshot,
+    sources: mergedSources,
+  } satisfies ExplorerSnapshot;
 }
 
 

@@ -32,5 +32,8 @@
     "tsx": "^4.20.6",
     "typescript": "^5.4.0",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "keytar": "^7.9.0"
   }
 }

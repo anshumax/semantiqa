@@ -4,4 +4,6 @@ export * from './persistence/mysql';
 export * from './persistence/mongo';
 export * from './persistence/duckdb';
 export * from './graph/GraphStore';
+export * from './source/SourceStore';
+export * from './repository/SourceSummaryRepository';
 

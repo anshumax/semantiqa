@@ -136,6 +136,22 @@
   - Status: Completed
   - Last Update: 2025-10-08
   - Notes: Established results grid scaffolding, masking state, and IPC plumbing ready for query integration
+- [x] **T-016-01:** Connect Source entry point (UI)
+  - Status: Completed
+  - Last Update: 2025-10-09
+  - Notes: Connect Source button added to ExplorerSidebar header and ExplorerTree empty state; modal opens with wizard; keyboard/mouse dismissal working
+- [x] **T-016-02:** Connection wizard scaffolding
+  - Status: Completed
+  - Last Update: 2025-10-09
+  - Notes: Multi-step wizard (choose kind → configure → review) fully implemented with per-adapter field definitions, inline validation, and keyboard navigation
+- [x] **T-016-03:** Source provisioning backend service
+  - Status: Completed
+  - Last Update: 2025-10-09
+  - Notes: Main-service persists sources in SQLite transactions, stores secrets via keytar (`sourceId:key`), emits audit breadcrumbs, triggers crawl
+- [x] **T-016-04:** Credential storage & IPC handshake
+  - Status: Completed
+  - Last Update: 2025-10-09
+  - Notes: Renderer submission hits `sources:add`, returns typed success/error, secrets stored out of process, audit entries captured for success/failure; additionally implemented full metadata crawl orchestration with MetadataCrawlService, SnapshotRepository for persisting schema to graph, and live status updates via sources:status events
 
 ## Phase 5 — Model Manager & Optional Generator
 - [ ] **T-017:** Model manifest + UI

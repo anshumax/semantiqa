@@ -88,5 +88,15 @@ CREATE TABLE IF NOT EXISTS settings (
   value JSON NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS sources (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  config JSON NOT NULL,
+  owners JSON,
+  tags JSON,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 COMMIT;
 

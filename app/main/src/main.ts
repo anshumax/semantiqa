@@ -11,7 +11,7 @@ import { ConnectivityQueue, ConnectivityService } from './application/Connectivi
 import { CrawlQueue } from './application/CrawlQueue';
 import { logIpcEvent } from './logging/audit';
 import { SourceService, SnapshotRepository } from '@semantiqa/graph-service';
-import { createSqliteFactory, runMigrations } from '@semantiqa/storage-sqlite';
+import { createSqliteFactory, initializeSchema } from '@semantiqa/storage-sqlite';
 
 let graphServices: {
   GraphSnapshotService: typeof import('./services/GraphSnapshotService').GraphSnapshotService;
@@ -203,19 +203,12 @@ app.whenReady().then(async () => {
 
   const services = await ensureGraphServices();
   const dbPath = path.join(app.getPath('userData'), 'graph.db');
-  const migrationsDir = app.isPackaged
-    ? path.join(process.resourcesPath, 'app', 'storage', 'sqlite', 'migrations')
-    : path.join(__dirname, '..', '..', 'storage', 'sqlite', 'migrations');
 
-  if (!fs.existsSync(migrationsDir)) {
-    console.warn(`SQLite migrations directory not found at ${migrationsDir}; skipping migrations`);
-  } else {
-    try {
-      runMigrations(dbPath, migrationsDir);
-    } catch (error) {
-      console.error('Failed to run SQLite migrations', error);
-      throw error;
-    }
+  try {
+    initializeSchema(dbPath);
+  } catch (error) {
+    console.error('Failed to initialize database schema', error);
+    throw error;
   }
 
   const graphDbFactory = createSqliteFactory({ dbPath });

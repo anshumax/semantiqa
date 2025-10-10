@@ -1,6 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
 import type BetterSqlite3 from 'better-sqlite3';
 
 let Sqlite: typeof BetterSqlite3 | null = null;
@@ -16,111 +13,133 @@ try {
 
 export const sqliteAvailable = Sqlite !== null;
 
-export interface Migration {
-  id: string;
-  filepath: string;
-  checksum: string;
-  sql: string;
-}
-
-export interface MigrationResult {
-  applied: string[];
-}
-
-const MIGRATIONS_TABLE = `CREATE TABLE IF NOT EXISTS migrations (
-  id TEXT PRIMARY KEY,
-  checksum TEXT NOT NULL,
-  applied_at TEXT NOT NULL
-)`;
-
-function calculateChecksum(sql: string) {
-  return require('node:crypto').createHash('sha256').update(sql).digest('hex');
-}
-
-export function loadMigrations(dir: string): Migration[] {
-  const filenames = fs
-    .readdirSync(dir)
-    .filter((file) => file.endsWith('.sql'))
-    .sort();
-
-  return filenames.map((filename) => {
-    const filepath = path.join(dir, filename);
-    const sql = fs.readFileSync(filepath, 'utf8');
-    const checksum = calculateChecksum(sql);
-    return {
-      id: filename,
-      filepath,
-      checksum,
-      sql,
-    } satisfies Migration;
-  });
-}
-
-export function runMigrations(dbPath: string, migrationsDir: string): MigrationResult {
+export function initializeSchema(dbPath: string): void {
   if (!Sqlite) {
-    return { applied: [] };
+    console.warn('SQLite not available, skipping schema initialization');
+    return;
   }
 
   const db = new Sqlite(dbPath);
   db.pragma('journal_mode = WAL');
 
-  db.exec(MIGRATIONS_TABLE);
+  console.log('Initializing database schema...');
 
-  const appliedStmt = db.prepare('SELECT id, checksum FROM migrations ORDER BY id');
-  const appliedRows = appliedStmt.all() as Array<{ id: string; checksum: string }>;
-  const appliedMap = new Map<string, string>(appliedRows.map((row) => [row.id, row.checksum]));
+  // Create nodes table
+  db.exec(`CREATE TABLE IF NOT EXISTS nodes (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    props JSON NOT NULL,
+    owner_ids JSON,
+    tags JSON,
+    sensitivity TEXT,
+    status TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    origin_device_id TEXT
+  )`);
 
-  const migrations = loadMigrations(migrationsDir);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_nodes_type ON nodes(type)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_nodes_updated_at ON nodes(updated_at)`);
 
-  const applied: string[] = [];
+  // Create edges table
+  db.exec(`CREATE TABLE IF NOT EXISTS edges (
+    id TEXT PRIMARY KEY,
+    src_id TEXT NOT NULL,
+    dst_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    props JSON,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    origin_device_id TEXT,
+    UNIQUE (src_id, dst_id, type)
+  )`);
 
-  const insertMigration = db.prepare(
-    'INSERT INTO migrations (id, checksum, applied_at) VALUES (@id, @checksum, @applied_at)',
-  );
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_edges_src_type ON edges(src_id, type)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_edges_dst_type ON edges(dst_id, type)`);
 
-  const applyMigration = (migration: Migration) => {
-    const hasExplicitTransaction = /\bBEGIN\s+(TRANSACTION|DEFERRED|IMMEDIATE|EXCLUSIVE)?\b/i.test(migration.sql);
+  // Create docs table
+  db.exec(`CREATE TABLE IF NOT EXISTS docs (
+    id TEXT PRIMARY KEY,
+    node_id TEXT NOT NULL,
+    ydoc BLOB NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-    if (hasExplicitTransaction) {
-      db.exec(migration.sql);
-      insertMigration.run({
-        id: migration.id,
-        checksum: migration.checksum,
-        applied_at: new Date().toISOString(),
-      });
-      return;
-    }
+  // Create embeddings table
+  db.exec(`CREATE TABLE IF NOT EXISTS embeddings (
+    id TEXT PRIMARY KEY,
+    owner_type TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    vec BLOB NOT NULL,
+    dim INTEGER NOT NULL,
+    model TEXT NOT NULL,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (owner_type, owner_id)
+  )`);
 
-    const runInTxn = db.transaction((migrationInner: Migration) => {
-      db.exec(migrationInner.sql);
-      insertMigration.run({
-        id: migrationInner.id,
-        checksum: migrationInner.checksum,
-        applied_at: new Date().toISOString(),
-      });
-    });
+  // Create provenance table
+  db.exec(`CREATE TABLE IF NOT EXISTS provenance (
+    id TEXT PRIMARY KEY,
+    owner_type TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    ref TEXT,
+    meta JSON,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-    runInTxn(migration);
-  };
+  // Create changelog table
+  db.exec(`CREATE TABLE IF NOT EXISTS changelog (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT,
+    op TEXT NOT NULL,
+    patch JSON,
+    ts TEXT DEFAULT CURRENT_TIMESTAMP,
+    origin_device_id TEXT
+  )`);
 
-  for (const migration of migrations) {
-    const existingChecksum = appliedMap.get(migration.id);
-    if (existingChecksum === migration.checksum) {
-      continue;
-    }
+  // Create models table
+  db.exec(`CREATE TABLE IF NOT EXISTS models (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    size_mb INTEGER NOT NULL,
+    path TEXT,
+    sha256 TEXT,
+    enabled_tasks JSON,
+    installed_at TEXT,
+    updated_at TEXT
+  )`);
 
-    if (existingChecksum && existingChecksum !== migration.checksum) {
-      throw new Error(
-        `Checksum mismatch for migration ${migration.id}. Expected ${existingChecksum}, found ${migration.checksum}.`,
-      );
-    }
+  // Create settings table
+  db.exec(`CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value JSON NOT NULL
+  )`);
 
-    applyMigration(migration);
-    applied.push(migration.id);
-  }
+  // Create sources table
+  db.exec(`CREATE TABLE IF NOT EXISTS sources (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    config JSON NOT NULL,
+    owners JSON,
+    tags JSON,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    status TEXT NOT NULL DEFAULT 'not_crawled',
+    status_updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    last_crawl_at TEXT,
+    last_error TEXT,
+    last_error_meta JSON,
+    connection_status TEXT NOT NULL DEFAULT 'unknown',
+    last_connected_at TEXT,
+    last_connection_error TEXT
+  )`);
 
   db.close();
-
-  return { applied };
+  console.log('Database schema initialized successfully');
 }
 

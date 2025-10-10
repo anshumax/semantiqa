@@ -10,7 +10,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "start": "pnpm run build && electron ."
+    "start": "pnpm run build && cross-env NODE_ENV=development electron ."
   },
   "dependencies": {
     "@semantiqa/app-config": "workspace:^0.1.0",
@@ -29,6 +29,7 @@
     "@semantiqa/storage-sqlite": "workspace:^0.1.0",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^11.1.2",
-    "@electron/rebuild": "^3.7.1"
+    "@electron/rebuild": "^3.7.1",
+    "cross-env": "^7.0.3"
   }
 }

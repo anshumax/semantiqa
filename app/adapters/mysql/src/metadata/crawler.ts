@@ -43,7 +43,11 @@ export interface SchemaSnapshot {
 }
 
 const TABLE_QUERY = `
-SELECT table_schema, table_name, table_type, table_comment
+SELECT
+  table_schema AS table_schema,
+  table_name AS table_name,
+  table_type AS table_type,
+  table_comment AS table_comment
 FROM information_schema.tables
 WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
 ORDER BY table_schema, table_name;
@@ -51,16 +55,16 @@ ORDER BY table_schema, table_name;
 
 const COLUMN_QUERY = `
 SELECT
-  table_schema,
-  table_name,
-  column_name,
-  data_type,
-  is_nullable,
-  column_default,
-  character_maximum_length,
-  numeric_precision,
-  numeric_scale,
-  column_comment
+  table_schema AS table_schema,
+  table_name AS table_name,
+  column_name AS column_name,
+  data_type AS data_type,
+  is_nullable AS is_nullable,
+  column_default AS column_default,
+  character_maximum_length AS character_maximum_length,
+  numeric_precision AS numeric_precision,
+  numeric_scale AS numeric_scale,
+  column_comment AS column_comment
 FROM information_schema.columns
 WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
 ORDER BY table_schema, table_name, ordinal_position;

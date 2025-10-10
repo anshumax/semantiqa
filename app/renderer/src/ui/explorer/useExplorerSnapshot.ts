@@ -111,18 +111,8 @@ function mapNodeType(type: GraphNode['type']): ExplorerSnapshot['nodes'][number]
 }
 
 function mapSourceStatus(status: unknown): ExplorerSnapshot['sources'][number]['status'] {
-  if (status === 'crawling') {
-    return 'crawling';
-  }
-  if (status === 'crawled') {
-    return 'crawled';
-  }
-  if (status === 'error') {
-    return 'error';
-  }
-  if (status === 'not_crawled') {
-    return 'not_crawled';
-  }
-
-  return 'not_crawled';
+  const allowed: ExplorerSnapshot['sources'][number]['status'][] = ['not_crawled', 'crawling', 'crawled', 'error'];
+  return allowed.includes(status as ExplorerSnapshot['sources'][number]['status'])
+    ? (status as ExplorerSnapshot['sources'][number]['status'])
+    : 'not_crawled';
 }

@@ -82,8 +82,9 @@ export function ConnectSourceWizard() {
   };
 
   const handleConnectionChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target;
-    setFormState((prev) => ({ ...prev, connection: { ...prev.connection, [name]: value } }));
+    const { name, value, type } = event.target;
+    const nextValue = type === 'number' ? Number(value) : value;
+    setFormState((prev) => ({ ...prev, connection: { ...prev.connection, [name]: nextValue } }));
   };
 
   const ownersList = useMemo(

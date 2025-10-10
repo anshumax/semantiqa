@@ -135,8 +135,8 @@ const preloadPath = path.join(__dirname, '..', '..', 'preload', 'dist', 'preload
 const rendererDist = path.join(__dirname, '..', '..', 'renderer', 'dist');
 
 function resolveRendererUrl() {
-  if (isDev) {
-    const devServer = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost:5173';
+  const devServer = process.env.VITE_DEV_SERVER_URL;
+  if (isDev && devServer) {
     return devServer;
   }
 
@@ -156,7 +156,7 @@ async function createWindow() {
       contextIsolation: true,
       preload: preloadPath,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,
       defaultEncoding: 'utf-8',
       devTools: isDev,
       spellcheck: false,
@@ -166,6 +166,10 @@ async function createWindow() {
   });
 
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+  window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error('Renderer failed to load', { errorCode, errorDescription, validatedURL });
+  });
 
   window.webContents.on('will-navigate', (event, navigationUrl) => {
     const allowedOrigins = new Set<string>([
@@ -185,6 +189,9 @@ async function createWindow() {
 
   window.once('ready-to-show', () => {
     window.show();
+    if (isDev) {
+      window.webContents.openDevTools({ mode: 'detach' });
+    }
   });
 
   await window.loadURL(resolveRendererUrl());

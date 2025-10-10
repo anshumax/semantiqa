@@ -4,6 +4,25 @@ import { createRoot } from 'react-dom/client';
 import App from './ui/App';
 import './ui/global.css';
 
+if (import.meta.env.DEV && !(window as any).semantiqa) {
+  console.warn('[dev] Injecting mock semantiqa bridge for browser preview');
+  (window as any).semantiqa = {
+    api: {
+      async invoke() {
+        throw new Error('IPC bridge unavailable in browser mode');
+      },
+      async ping() {
+        return { ok: false, ts: Date.now(), message: 'bridge unavailable' };
+      },
+    },
+    bridge: {
+      publish() {
+        // noop
+      },
+    },
+  };
+}
+
 const container = document.getElementById('root');
 
 if (!container) {

@@ -4,7 +4,7 @@ import { SourceStatusPanel } from './SourceStatusPanel';
 import './ExplorerSidebar.css';
 
 export function ExplorerSidebar() {
-  const { snapshot, actions, runtimeStatuses, commands } = useExplorerState();
+  const { snapshot, expandedNodeIds, selectedNodeId, actions, runtimeStatuses, commands } = useExplorerState();
 
   return (
     <aside className="explorer-sidebar">
@@ -33,8 +33,8 @@ export function ExplorerSidebar() {
           nodes={snapshot.nodes}
           onToggle={(nodeId) => actions.toggleNode(nodeId)}
           onSelect={(nodeId) => actions.selectNode(nodeId)}
-          expandedNodeIds={snapshot.expandedNodeIds}
-          selectedNodeId={snapshot.selectedNodeId}
+          expandedNodeIds={expandedNodeIds}
+          selectedNodeId={selectedNodeId}
           onConnectSource={actions.openConnectSource}
         />
       </div>

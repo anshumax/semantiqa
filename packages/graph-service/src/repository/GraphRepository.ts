@@ -2,6 +2,15 @@ import type { GraphEdge, GraphGetRequest, GraphGetResponse, GraphNode } from '@s
 
 function mapNode(row: any): GraphNode {
   const props = typeof row.props === 'string' ? JSON.parse(row.props) : row.props ?? {};
+
+  if (!props.displayName) {
+    props.displayName = row.name ?? row.id;
+  }
+
+  if (!props.description && row.description) {
+    props.description = row.description;
+  }
+
   return {
     id: row.id,
     type: row.type,
@@ -65,8 +74,10 @@ export class GraphRepository {
       const tags = typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags ?? [];
 
       const description = typeof config.description === 'string' ? config.description : undefined;
+      const displayName = row.name ?? config.displayName ?? row.id;
+
       const props = {
-        displayName: row.name,
+        displayName,
         description,
         owners,
         tags,

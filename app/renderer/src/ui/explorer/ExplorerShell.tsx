@@ -7,23 +7,20 @@ import { ExplorerWorkspace } from './ExplorerWorkspace';
 import { ConnectSourceWizard } from './connect/ConnectSourceWizard';
 
 export function ExplorerShell() {
+  const snapshotState = useExplorerSnapshot();
+  const { state, loadSnapshot } = snapshotState;
+
+  const initialSnapshot = state.status === 'ready' && state.snapshot ? state.snapshot : null;
+
   return (
-    <ExplorerStateProvider initialSnapshot={null}>
-      <ExplorerShellContent />
+    <ExplorerStateProvider initialSnapshot={initialSnapshot}>
+      <ExplorerView
+        loadSnapshot={loadSnapshot}
+        status={state.status}
+        snapshot={state.snapshot}
+        error={state.status === 'error' ? state.error ?? null : null}
+      />
     </ExplorerStateProvider>
-  );
-}
-
-function ExplorerShellContent() {
-  const { state, loadSnapshot } = useExplorerSnapshot();
-
-  return (
-    <ExplorerView
-      loadSnapshot={loadSnapshot}
-      status={state.status}
-      snapshot={state.snapshot}
-      error={state.status === 'error' ? state.error ?? null : null}
-    />
   );
 }
 

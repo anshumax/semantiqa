@@ -23,6 +23,7 @@ export default function App() {
   return (
     <AppStateProvider>
       <RootContent />
+      {/* <DevOverlay /> */}
     </AppStateProvider>
   );
 }
@@ -35,13 +36,26 @@ function RootContent() {
   useEffect(() => {
     setEnv(process.env.NODE_ENV ?? 'unknown');
 
-    window.semantiqa?.api
+    console.log('Renderer booting; window.semantiqa =', window.semantiqa);
+
+    const api = window.semantiqa?.api;
+
+    if (!api) {
+      console.error('preload bridge unavailable');
+      setPingStatus('error');
+      setPingTimestamp('preload unavailable');
+      return;
+    }
+
+    api
       .ping()
       .then((response) => {
+        console.log('Ping success', response);
         setPingStatus('ok');
         setPingTimestamp(new Date(response.ts).toLocaleTimeString());
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error('Ping failed', error);
         setPingStatus('error');
         setPingTimestamp('');
       });
@@ -71,6 +85,44 @@ function RootContent() {
         </div>
       </header>
       <ExplorerShell />
+    </div>
+  );
+}
+
+function DevOverlay() {
+  const [preloadAvailable, setPreloadAvailable] = useState<boolean>(false);
+  const [logs, setLogs] = useState<string[]>([]);
+
+  useEffect(() => {
+    const available = Boolean(window.semantiqa?.api);
+    setPreloadAvailable(available);
+    setLogs((prev) => [
+      `renderer mounted at ${new Date().toISOString()}`,
+      `preload available: ${available}`,
+      ...prev.slice(0, 8),
+    ]);
+
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      setLogs((prev) => [`status event: ${JSON.stringify(detail)}`, ...prev.slice(0, 8)]);
+    };
+
+    window.addEventListener('sources:status', handler as EventListener);
+
+    return () => {
+      window.removeEventListener('sources:status', handler as EventListener);
+    };
+  }, []);
+
+  return (
+    <div className="dev-overlay">
+      <h4>Debug</h4>
+      <ul>
+        <li>preload: {preloadAvailable ? 'yes' : 'no'}</li>
+        {logs.map((line, index) => (
+          <li key={index}>{line}</li>
+        ))}
+      </ul>
     </div>
   );
 }

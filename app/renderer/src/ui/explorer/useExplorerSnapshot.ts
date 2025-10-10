@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ExplorerSnapshot, GraphEdge, GraphGetRequest, GraphGetResponse, GraphNode } from '@semantiqa/contracts';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
-import { useExplorerState } from './state/useExplorerState';
 
 export type ExplorerSnapshotState =
   | { status: 'idle'; snapshot: null }
@@ -11,7 +10,6 @@ export type ExplorerSnapshotState =
 
 export function useExplorerSnapshot() {
   const [state, setState] = useState<ExplorerSnapshotState>({ status: 'idle', snapshot: null });
-  const { actions } = useExplorerState();
   const loadSnapshot = useCallback(async () => {
     setState((prev) => ({ status: 'loading', snapshot: prev.snapshot }));
 
@@ -37,24 +35,6 @@ export function useExplorerSnapshot() {
       }));
     }
   }, []);
-
-  useEffect(() => {
-    const listener = (event: Event) => {
-      const customEvent = event as CustomEvent<{ sourceId: string; status: ExplorerSnapshot['sources'][number]['status'] }>;
-      const payload = customEvent.detail;
-      if (!payload || typeof payload !== 'object' || !payload.sourceId) {
-        return;
-      }
-
-      actions.updateSourceStatus(payload.sourceId, payload.status);
-    };
-
-    window.addEventListener('sources:status', listener as EventListener);
-
-    return () => {
-      window.removeEventListener('sources:status', listener as EventListener);
-    };
-  }, [actions]);
 
   useEffect(() => {
     if (state.status === 'idle') {

@@ -1,3 +1,32 @@
+.dev-overlay {
+  position: fixed;
+  top: var(--spacing-lg);
+  right: var(--spacing-lg);
+  background: rgba(255, 85, 85, 0.9);
+  color: #fff;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.45);
+  z-index: 9999;
+}
+
+.dev-overlay h4 {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.dev-overlay ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.dev-overlay li {
+  margin: 2px 0;
+  font-size: 0.75rem;
+}
 .app-frame {
   min-height: 100vh;
   display: flex;

@@ -51,8 +51,16 @@ function ExplorerView({
               Retry
             </button>
           </div>
-        ) : (
+        ) : status === 'ready' && snapshot ? (
           <ExplorerWorkspace />
+        ) : (
+          <div className="explorer-shell__empty">
+            <h3>Waiting for snapshot</h3>
+            <p>Explorer state: {status}</p>
+            <button type="button" onClick={loadSnapshot}>
+              Load snapshot
+            </button>
+          </div>
         )}
       </div>
       <Modal

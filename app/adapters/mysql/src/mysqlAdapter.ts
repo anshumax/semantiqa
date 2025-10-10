@@ -33,6 +33,9 @@ const READ_ONLY_REGEX = /^(\s*WITH\s+[\s\S]+?\)\s*)?\s*(SELECT|EXPLAIN|SHOW|DESC
 
 export class MysqlAdapter {
   private readonly pool: Pool;
+  public getPool(): Pool {
+    return this.pool;
+  }
 
   constructor(options: MysqlAdapterOptions) {
     const config = MysqlConnectionSchema.parse(options.connection);

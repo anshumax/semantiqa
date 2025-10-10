@@ -8,63 +8,108 @@ import { registerIpcHandlers, type IpcHandlerMap } from './ipc/registry';
 import { SourceProvisioningService } from './application/SourceProvisioningService';
 import { MetadataCrawlService } from './application/MetadataCrawlService';
 import { ConnectivityQueue, ConnectivityService } from './application/ConnectivityService';
+import { CrawlQueue } from './application/CrawlQueue';
 import { logIpcEvent } from './logging/audit';
+import { SourceService, SnapshotRepository } from '@semantiqa/graph-service';
+import { createSqliteFactory, runMigrations } from '@semantiqa/storage-sqlite';
 
 let graphServices: {
   GraphSnapshotService: typeof import('./services/GraphSnapshotService').GraphSnapshotService;
-  createSqliteFactory: (options: { dbPath: string }) => unknown;
-  runMigrations: (dbPath: string, migrationsDir: string) => { applied: string[] };
 } | null = null;
 
-type UiStatusPayload = {
-  status: 'connecting' | 'queued' | 'ready' | 'error' | 'needs_attention';
-  error?: { message: string; meta?: Record<string, unknown> };
-};
+type UiStatus = 'queued' | 'running' | 'connecting' | 'ready' | 'error' | 'warning' | 'needs_attention';
+
+type CrawlStage = 'queued' | 'running' | 'completed' | 'failed';
+
+type SourceStatusPayload =
+  | {
+      kind: 'crawl';
+      status: UiStatus;
+      crawlStatus: 'not_crawled' | 'crawling' | 'crawled' | 'error';
+      stage?: CrawlStage;
+      error?: { message: string; meta?: Record<string, unknown> };
+      updatedAt: number;
+    }
+  | {
+      kind: 'connection';
+      status: UiStatus;
+      connectionStatus: 'unknown' | 'checking' | 'connected' | 'error';
+      error?: { message: string; meta?: Record<string, unknown> };
+      updatedAt: number;
+    };
 
 function mapCrawlStatusToUi(
   status: 'not_crawled' | 'crawling' | 'crawled' | 'error',
+  stage?: CrawlStage,
   error?: { message: string; meta?: Record<string, unknown> },
-): UiStatusPayload {
+): SourceStatusPayload {
   switch (status) {
     case 'crawling':
-      return { status: 'connecting' };
+      return { kind: 'crawl', status: 'running', crawlStatus: status, stage: stage ?? 'running', updatedAt: Date.now() };
     case 'crawled':
-      return { status: 'ready' };
+      return { kind: 'crawl', status: 'ready', crawlStatus: status, stage: stage ?? 'completed', updatedAt: Date.now() };
     case 'error':
-      return error ? { status: 'error', error } : { status: 'error' };
+      return {
+        kind: 'crawl',
+        status: 'error',
+        crawlStatus: status,
+        stage: stage ?? 'failed',
+        error,
+        updatedAt: Date.now(),
+      };
     case 'not_crawled':
     default:
-      return { status: 'queued' };
+      return { kind: 'crawl', status: 'queued', crawlStatus: status, stage: stage ?? 'queued', updatedAt: Date.now() };
   }
 }
 
-function mapConnectionStatusToUi(
+type ConnectionStage = 'queued' | 'running' | 'completed' | 'failed';
+
+const connectionStatusToStage = (
   status: 'unknown' | 'checking' | 'connected' | 'error',
-  error?: { message: string; meta?: Record<string, unknown> },
-): UiStatusPayload {
+): ConnectionStage => {
   switch (status) {
     case 'checking':
-      return { status: 'connecting' };
+      return 'running';
     case 'connected':
-      return { status: 'ready' };
+      return 'completed';
     case 'error':
-      return error ? { status: 'needs_attention', error } : { status: 'needs_attention' };
+      return 'failed';
     case 'unknown':
     default:
-      return { status: 'queued' };
+      return 'queued';
   }
+};
+
+function mapConnectionStatusToUi(
+  status: 'unknown' | 'checking' | 'connected' | 'error',
+  error?: { message: string },
+): { status: 'connecting' | 'queued' | 'ready' | 'error' | 'needs_attention'; error?: { message: string; meta?: Record<string, unknown> } } {
+  return {
+    status: status === 'connected' ? 'ready' : status === 'checking' ? 'connecting' : status === 'error' ? 'error' : 'queued',
+    error: error ? { message: error.message } : undefined,
+  };
+}
+
+function mapConnectionStatusToPayload(
+  status: 'unknown' | 'checking' | 'connected' | 'error',
+  error?: { message: string; meta?: Record<string, unknown> },
+): SourceStatusPayload {
+  const uiStatus = mapConnectionStatusToUi(status, error);
+  return {
+    kind: 'connection',
+    status: uiStatus.status,
+    connectionStatus: status,
+    error,
+    updatedAt: Date.now(),
+  } satisfies SourceStatusPayload;
 }
 
 async function ensureGraphServices() {
   if (!graphServices) {
-    const [serviceModule, storageModule] = await Promise.all([
-      import('./services/GraphSnapshotService'),
-      import('../../storage/sqlite/dist/index.js'),
-    ]);
+    const serviceModule = await import('./services/GraphSnapshotService');
     graphServices = {
       GraphSnapshotService: serviceModule.GraphSnapshotService,
-      createSqliteFactory: storageModule.createSqliteFactory as (options: { dbPath: string }) => unknown,
-      runMigrations: storageModule.runMigrations as (dbPath: string, migrationsDir: string) => { applied: string[] },
     };
   }
 
@@ -166,20 +211,20 @@ app.whenReady().then(async () => {
     console.warn(`SQLite migrations directory not found at ${migrationsDir}; skipping migrations`);
   } else {
     try {
-      services.runMigrations(dbPath, migrationsDir);
+      runMigrations(dbPath, migrationsDir);
     } catch (error) {
       console.error('Failed to run SQLite migrations', error);
       throw error;
     }
   }
 
-const graphDbFactory = services.createSqliteFactory({ dbPath }) as () => any;
-const graphSnapshotService = new services.GraphSnapshotService({ openDatabase: graphDbFactory });
+  const graphDbFactory = createSqliteFactory({ dbPath });
+  const graphSnapshotService = new (await ensureGraphServices()).GraphSnapshotService({ openDatabase: graphDbFactory });
 
   // Shared dependencies for services
   const broadcastSourceStatus = (
     sourceId: string,
-    payload: UiStatusPayload,
+    payload: SourceStatusPayload,
   ) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send('sources:status', {
@@ -189,7 +234,7 @@ const graphSnapshotService = new services.GraphSnapshotService({ openDatabase: g
     }
   };
 
-  const audit = ({ action, sourceId, status, details }: { action: string; sourceId?: string; status: 'success' | 'failure'; details?: Record<string, unknown> }) => {
+const audit = ({ action, sourceId, status, details }: { action: string; sourceId?: string; status: 'success' | 'failure'; details?: Record<string, unknown> }) => {
     logIpcEvent({
       channel: action,
       direction: 'renderer->main',
@@ -211,18 +256,40 @@ const graphSnapshotService = new services.GraphSnapshotService({ openDatabase: g
     openSourcesDb: graphDbFactory,
     retrieveSecret,
     persistSnapshot: async ({ sourceId, kind, snapshot, stats }) => {
-      const { SnapshotRepository } = await import('@semantiqa/graph-service');
       const db = graphDbFactory();
       const repo = new SnapshotRepository(db);
       repo.persistSnapshot({ sourceId, kind, snapshot: snapshot as any, stats });
     },
     updateCrawlStatus: async (sourceId, status, error) => {
-      broadcastSourceStatus(sourceId, mapCrawlStatusToUi(status, error));
+      broadcastSourceStatus(sourceId, mapCrawlStatusToUi(status, undefined, error));
     },
     updateConnectionStatus: async (sourceId, status, error) => {
-      broadcastSourceStatus(sourceId, mapConnectionStatusToUi(status, error));
+      broadcastSourceStatus(sourceId, mapConnectionStatusToPayload(status, error));
     },
     audit,
+    logger: console,
+  });
+
+  const crawlQueue = new CrawlQueue({
+    crawlService: metadataCrawlService,
+    notifyStatus: (sourceId, status) => {
+      switch (status.status) {
+        case 'queued':
+          broadcastSourceStatus(sourceId, mapCrawlStatusToUi('not_crawled', 'queued'));
+          break;
+        case 'running':
+          broadcastSourceStatus(sourceId, mapCrawlStatusToUi('crawling', 'running'));
+          break;
+        case 'completed':
+          broadcastSourceStatus(sourceId, mapCrawlStatusToUi('crawled', 'completed'));
+          break;
+        case 'failed':
+          broadcastSourceStatus(sourceId, mapCrawlStatusToUi('error', 'failed', { message: status.error.message }));
+          break;
+        default:
+          break;
+      }
+    },
     logger: console,
   });
 
@@ -236,9 +303,20 @@ const graphSnapshotService = new services.GraphSnapshotService({ openDatabase: g
   const connectivityQueue = new ConnectivityQueue({
     service: connectivityService,
     broadcastStatus: (sourceId, payload) => {
-      broadcastSourceStatus(sourceId, payload);
+      const connectionStatus = 
+        payload.status === 'ready' ? 'connected' :
+        payload.status === 'connecting' ? 'checking' :
+        payload.status === 'error' ? 'error' : 'unknown';
+      
+      broadcastSourceStatus(sourceId, {
+        kind: 'connection',
+        status: payload.status,
+        connectionStatus,
+        error: payload.error,
+        updatedAt: Date.now(),
+      });
     },
-    mapStatus: mapConnectionStatusToUi,
+    mapStatus: (status, error) => mapConnectionStatusToUi(status, error),
     logger: console,
   });
 
@@ -249,14 +327,14 @@ const graphSnapshotService = new services.GraphSnapshotService({ openDatabase: g
   const sourceProvisioningService = new SourceProvisioningService({
     openSourcesDb: graphDbFactory,
     triggerMetadataCrawl: async (sourceId: string) => {
-      await metadataCrawlService.crawlSource(sourceId);
+      crawlQueue.enqueue(sourceId);
     },
     secureStore,
     updateCrawlStatus: async (sourceId, status, error) => {
-      broadcastSourceStatus(sourceId, mapCrawlStatusToUi(status, error));
+      broadcastSourceStatus(sourceId, mapCrawlStatusToUi(status, undefined, error));
     },
     updateConnectionStatus: async (sourceId, status, error) => {
-      broadcastSourceStatus(sourceId, mapConnectionStatusToUi(status, error));
+      broadcastSourceStatus(sourceId, mapConnectionStatusToPayload(status, error));
     },
     audit,
     logger: console,
@@ -266,15 +344,13 @@ const graphSnapshotService = new services.GraphSnapshotService({ openDatabase: g
   const handlerMap: IpcHandlerMap = {
     [IPC_CHANNELS.GRAPH_GET]: (request) => graphSnapshotService.getSnapshot(request),
     [IPC_CHANNELS.SOURCES_ADD]: (request) => sourceProvisioningService.createSource(request),
-    [IPC_CHANNELS.METADATA_CRAWL]: (request) => metadataCrawlService.crawlSource(request.sourceId),
+    [IPC_CHANNELS.METADATA_CRAWL]: async (request) => crawlQueue.enqueue(request.sourceId),
     [IPC_CHANNELS.SOURCES_TEST_CONNECTION]: (request) => connectivityQueue.queueCheck(request.sourceId),
     [IPC_CHANNELS.SOURCES_CRAWL_ALL]: async () => {
       const db = graphDbFactory();
-      const rows = db.prepare<{ id: string }>('SELECT id FROM sources').all();
-      for (const row of rows) {
-        void metadataCrawlService.crawlSource(row.id);
-      }
-      return { ok: true };
+      const rows = db.prepare('SELECT id FROM sources').all() as Array<{ id: string }>;
+      const queued = crawlQueue.enqueueAll(rows.map((row) => row.id));
+      return { queued };
     },
   };
 

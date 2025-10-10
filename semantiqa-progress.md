@@ -152,14 +152,14 @@
   - Status: Completed
   - Last Update: 2025-10-09
   - Notes: Preload/main IPC hardened with secure channel usage, keychain storage rollback handled, status events carry error context
-- [ ] **T-016-05:** Source status persistence
-  - Status: Pending
-  - Last Update: —
-  - Notes: Needs schema update and repository support for status + connection fields
-- [ ] **T-016-06:** Connection test & startup health check
-  - Status: Pending
-  - Last Update: —
-  - Notes: Requires connectivity worker for wizard/startup checks
+- [x] **T-016-05:** Source status persistence
+  - Status: Completed
+  - Last Update: 2025-10-09
+  - Notes: SQLite schema and repositories now persist crawl/connection status fields with unit coverage
+- [x] **T-016-06:** Connection test & startup health check
+  - Status: Completed
+  - Last Update: 2025-10-09
+  - Notes: ConnectivityService wrapped in queue with startup sweep, IPC returns queued flag, tests added
 - [ ] **T-016-07:** Crawl execution & status events
   - Status: Pending
   - Last Update: —

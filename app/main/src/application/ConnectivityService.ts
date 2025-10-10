@@ -1,4 +1,11 @@
-import type Database from 'better-sqlite3';
+import type { Database as BetterSqliteDatabase } from 'better-sqlite3';
+
+import type {
+  MongoConnection,
+  MySqlConnection,
+  PostgresConnection,
+  DuckDbConnection,
+} from '@semantiqa/contracts';
 
 import {
   MysqlAdapter,
@@ -9,7 +16,7 @@ import {
 import { SourceService } from '@semantiqa/graph-service';
 
 export interface ConnectivityServiceDeps {
-  openSourcesDb: () => Database;
+  openSourcesDb: () => BetterSqliteDatabase;
   retrieveSecret: (scope: { sourceId: string; key: string }) => Promise<string | null>;
   audit: (event: {
     action: string;
@@ -40,7 +47,7 @@ export class ConnectivityService {
   async checkAllSources(): Promise<void> {
     const { openSourcesDb, logger } = this.deps;
     const db = openSourcesDb();
-    const rows = db.prepare<SourceRecord>('SELECT id, kind, config FROM sources').all();
+    const rows = db.prepare('SELECT id, kind, config FROM sources').all() as SourceRecord[];
 
     for (const row of rows) {
       try {
@@ -53,7 +60,7 @@ export class ConnectivityService {
 
   listSourceIds(): string[] {
     const db = this.deps.openSourcesDb();
-    const rows = db.prepare<{ id: string }>('SELECT id FROM sources').all();
+    const rows = db.prepare('SELECT id FROM sources').all() as Array<{ id: string }>;
     return rows.map((row) => row.id);
   }
 
@@ -67,15 +74,15 @@ export class ConnectivityService {
 
     const db = openSourcesDb();
     const row = db
-      .prepare<SourceRecord, [string]>('SELECT id, kind, config FROM sources WHERE id = ?')
-      .get(sourceId);
+      .prepare('SELECT id, kind, config FROM sources WHERE id = ?')
+      .get(sourceId) as SourceRecord | undefined;
 
     if (!row) {
       logger.warn('Source not found during connectivity check', { sourceId });
       return { status: 'error', message: 'Source not found' } satisfies ConnectivityCheckResult;
     }
 
-    const config = JSON.parse(row.config ?? '{}');
+    const config = JSON.parse(row.config ?? '{}') as { connection?: Record<string, unknown> };
 
     const connection = await this.enrichConnection(
       row.kind,
@@ -114,47 +121,49 @@ export class ConnectivityService {
     sourceId: string,
     retrieveSecret: ConnectivityServiceDeps['retrieveSecret'],
   ) {
-    const enriched = { ...connection };
-
     if (kind === 'postgres' || kind === 'mysql') {
       const password = await retrieveSecret({ sourceId, key: 'password' });
       if (password) {
-        enriched.password = password;
+        connection.password = password;
       }
+      return connection as PostgresConnection | MySqlConnection;
     }
 
     if (kind === 'mongo') {
       const uri = await retrieveSecret({ sourceId, key: 'uri' });
       if (uri) {
-        enriched.uri = uri;
+        connection.uri = uri;
       }
+      return connection as MongoConnection;
     }
 
-    return enriched;
+    return {
+      filePath: (connection as { filePath?: string }).filePath ?? '',
+    } satisfies DuckDbConnection;
   }
 
   private async testConnection(kind: SourceRecord['kind'], connection: Record<string, unknown>) {
     switch (kind) {
       case 'postgres': {
-        const adapter = new PostgresAdapter({ connection });
+        const adapter = new PostgresAdapter({ connection: connection as PostgresConnection });
         await adapter.healthCheck();
         await adapter.close();
         break;
       }
       case 'mysql': {
-        const adapter = new MysqlAdapter({ connection });
+        const adapter = new MysqlAdapter({ connection: connection as MySqlConnection });
         await adapter.healthCheck();
         await adapter.close();
         break;
       }
       case 'mongo': {
-        const adapter = new MongoAdapter({ connection });
+        const adapter = new MongoAdapter({ connection: connection as MongoConnection });
         await adapter.healthCheck();
         await adapter.close();
         break;
       }
       case 'duckdb': {
-        const adapter = new DuckDbAdapter({ connection });
+        const adapter = new DuckDbAdapter({ connection: { ...connection as DuckDbConnection, readOnly: false } });
         await adapter.healthCheck();
         await adapter.close();
         break;

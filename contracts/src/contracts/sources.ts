@@ -96,3 +96,9 @@ export const MetadataCrawlRequestSchema = z.object({
 });
 
 export type MetadataCrawlRequest = z.infer<typeof MetadataCrawlRequestSchema>;
+
+export const MetadataCrawlResponseSchema = z.object({
+  queued: z.boolean(),
+});
+
+export type MetadataCrawlResponse = z.infer<typeof MetadataCrawlResponseSchema>;

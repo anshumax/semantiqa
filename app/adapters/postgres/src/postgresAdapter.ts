@@ -28,6 +28,9 @@ const READ_ONLY_REGEX = /^(\s*WITH\s+[\s\S]+?\)\s*)?\s*(SELECT|EXPLAIN|SHOW|DESC
 
 export class PostgresAdapter {
   private readonly pool: Pool;
+  public getPool(): Pool {
+    return this.pool;
+  }
 
   constructor(options: PostgresAdapterOptions) {
     const config = PostgresConnectionSchema.parse(options.connection);

@@ -13,6 +13,7 @@ import {
   GraphGetResponseSchema,
   GraphUpsertNodeRequestSchema,
   MetadataCrawlRequestSchema,
+  MetadataCrawlResponseSchema,
   ModelsDownloadRequestSchema,
   ModelsEnableRequestSchema,
   ModelsListResponseSchema,
@@ -28,7 +29,7 @@ import {
 
 import { logIpcEvent } from '../logging/audit';
 
-const channelToSchema: Record<IpcChannel, z.ZodTypeAny> = {
+const channelToSchema: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'health:ping': z.undefined(),
   'sources:add': SourcesAddRequestSchema,
   'metadata:crawl': MetadataCrawlRequestSchema,
@@ -49,7 +50,7 @@ const auditResponse = z.object({ entries: z.array(z.unknown()) });
 
 const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'sources:add': z.union([z.object({ sourceId: z.string() }), SemantiqaErrorSchema]),
-  'metadata:crawl': z.union([z.object({ snapshotId: z.string() }), SemantiqaErrorSchema]),
+  'metadata:crawl': z.union([MetadataCrawlResponseSchema, SemantiqaErrorSchema]),
   'sources:test-connection': z.object({ queued: z.boolean() }),
   'sources:crawl-all': z.union([okResponse, SemantiqaErrorSchema]),
   'search:semantic': z.union([SearchResultsSchema, SemantiqaErrorSchema]),
@@ -69,15 +70,17 @@ export type IpcHandlerMap = {
 };
 
 export function registerIpcHandlers(handlerMap: IpcHandlerMap) {
-  (Object.keys(IPC_CHANNELS) as Array<keyof typeof IPC_CHANNELS>).forEach((key) => {
-    const channel = IPC_CHANNELS[key];
+  // Helper function to maintain type safety
+  function registerHandler<K extends IpcChannel>(channel: K) {
     const handler = handlerMap[channel];
-
     if (!handler) {
       return;
     }
 
     const payloadSchema = channelToSchema[channel];
+    if (!payloadSchema) {
+      return;
+    }
 
     ipcMain.handle(channel, async (event, rawPayload) => {
       const parseResult = payloadSchema.safeParse(rawPayload);
@@ -92,7 +95,8 @@ export function registerIpcHandlers(handlerMap: IpcHandlerMap) {
         throw parseResult.error;
       }
 
-      const result = await handler(parseResult.data);
+      // Type assertion to tell TypeScript the types align
+      const result = await handler(parseResult.data as IpcRequest<K>);
 
       const responseSchema = responseSchemas[channel];
       if (responseSchema) {
@@ -119,6 +123,11 @@ export function registerIpcHandlers(handlerMap: IpcHandlerMap) {
 
       return result;
     });
+  }
+
+  // Register all handlers
+  (Object.keys(channelToSchema) as IpcChannel[]).forEach(channel => {
+    registerHandler(channel);
   });
 
   ipcMain.handle(IPC_CHANNELS.HEALTH_PING, () => ({ ok: true, ts: Date.now() }));

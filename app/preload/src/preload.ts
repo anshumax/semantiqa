@@ -1,5 +1,17 @@
 import type { IpcChannel, IpcRequest, IpcResponse } from '@semantiqa/app-config';
 
+interface CustomEventInit<T = unknown> {
+  detail?: T;
+}
+
+declare class CustomEvent<T = unknown> {
+  constructor(type: string, eventInitDict?: CustomEventInit<T>);
+}
+
+declare const window: {
+  dispatchEvent(event: CustomEvent): boolean;
+};
+
 const { contextBridge, ipcRenderer } = require('electron') as typeof import('electron');
 
 const allowedChannels: readonly IpcChannel[] = [
@@ -38,7 +50,9 @@ const api = {
 
 const bridge = {
   publish(event: 'sources:status', payload: unknown) {
-    window.dispatchEvent(new CustomEvent(event, { detail: payload }));
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent(event, { detail: payload }));
+    }
   },
 };
 

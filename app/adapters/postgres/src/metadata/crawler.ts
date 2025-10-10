@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { PostgresAdapter } from '../postgresAdapter';
 
 import { z } from 'zod';
 
@@ -72,8 +72,8 @@ WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
 ORDER BY table_schema, table_name, ordinal_position;
 `;
 
-export async function crawlSchema(pool: Pool): Promise<SchemaSnapshot> {
-  const client = await pool.connect();
+export async function crawlSchema(postgresAdapter: PostgresAdapter): Promise<SchemaSnapshot> {
+  const client = await postgresAdapter.getPool().connect();
   try {
     const tablesResult = await client.query(TABLE_QUERY);
     const columnsResult = await client.query(COLUMN_QUERY);

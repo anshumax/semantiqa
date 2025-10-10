@@ -18,22 +18,22 @@ export class SourceSummaryRepository {
       last_connection_error?: string;
     };
 
-    const rows = this.db
-      .prepare<SourceRow>(
-        `SELECT id,
-                name,
-                kind,
-                status,
-                status_updated_at,
-                last_crawl_at,
-                last_error,
-                last_error_meta,
-                connection_status,
-                last_connected_at,
-                last_connection_error
-           FROM sources`,
-      )
-      .all();
+    const statement = this.db.prepare(
+      `SELECT id,
+              name,
+              kind,
+              status,
+              status_updated_at,
+              last_crawl_at,
+              last_error,
+              last_error_meta,
+              connection_status,
+              last_connected_at,
+              last_connection_error
+         FROM sources`,
+    );
+
+    const rows = statement.all() as SourceRow[];
 
     return rows.map((row) => ({
       id: row.id,

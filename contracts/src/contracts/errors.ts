@@ -9,6 +9,7 @@ export const ErrorCodeSchema = z.enum([
   'VALIDATION_ERROR',
   'AUTH_REQUIRED',
   'NOT_FOUND',
+  'INTERNAL_ERROR',
 ]);
 
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;

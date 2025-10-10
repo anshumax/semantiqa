@@ -1,4 +1,5 @@
-import { createContext, createElement, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+import { IPC_CHANNELS } from '@semantiqa/app-config';
 import type { ExplorerSnapshot, ExplorerSource, ExplorerTreeNode, TableProfile } from '@semantiqa/contracts';
 
 interface ExplorerState {
@@ -8,9 +9,47 @@ interface ExplorerState {
   isConnectSourceOpen: boolean;
   wizardStep: 'choose-kind' | 'configure' | 'review';
   selectedKind: 'postgres' | 'mysql' | 'mongo' | 'duckdb' | null;
-  sourceStatuses: Map<string, ExplorerSnapshot['sources'][number]['status']>;
+  runtimeStatuses: Map<string, RuntimeSourceStatus>;
   inspector: InspectorState;
 }
+
+type UiStatus = 'queued' | 'running' | 'ready' | 'error' | 'warning';
+type CrawlStage = 'queued' | 'running' | 'completed' | 'failed';
+
+export type CrawlStatusEvent = {
+  kind: 'crawl';
+  sourceId: string;
+  status: UiStatus;
+  crawlStatus: ExplorerSnapshot['sources'][number]['status'];
+  stage?: CrawlStage;
+  error?: { message: string; meta?: Record<string, unknown> };
+  updatedAt: number;
+};
+
+export type ConnectionStatusEvent = {
+  kind: 'connection';
+  sourceId: string;
+  status: UiStatus;
+  connectionStatus: ExplorerSnapshot['sources'][number]['connectionStatus'];
+  error?: { message: string; meta?: Record<string, unknown> };
+  updatedAt: number;
+};
+
+export type SourceStatusEvent = CrawlStatusEvent | ConnectionStatusEvent;
+
+export type RuntimeSourceStatus = {
+  crawl?: {
+    stage: CrawlStage;
+    status: ExplorerSnapshot['sources'][number]['status'];
+    error?: { message: string; meta?: Record<string, unknown> };
+    updatedAt: number;
+  };
+  connection?: {
+    status: ExplorerSnapshot['sources'][number]['connectionStatus'];
+    error?: { message: string; meta?: Record<string, unknown> };
+    updatedAt: number;
+  };
+};
 
 interface InspectorState {
   selectedNode: InspectorNode | null;
@@ -55,8 +94,7 @@ type ExplorerAction =
   | {
       type: 'UPDATE_SOURCE_STATUS';
       sourceId: string;
-      status: ExplorerSnapshot['sources'][number]['status'];
-      error?: { message: string; meta?: Record<string, unknown> };
+      payload: SourceStatusEvent;
     };
 
 const initialState: ExplorerState = {
@@ -70,14 +108,14 @@ const initialState: ExplorerState = {
   isConnectSourceOpen: false,
   wizardStep: 'choose-kind',
   selectedKind: null,
-  sourceStatuses: new Map(),
+  runtimeStatuses: new Map(),
   inspector: emptyInspectorState(),
 };
 
 function reducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
   switch (action.type) {
     case 'INGEST_SNAPSHOT': {
-      const mergedSnapshot = mergeSnapshotWithStatus(action.snapshot, state.sourceStatuses);
+      const mergedSnapshot = mergeSnapshotWithStatus(action.snapshot, state.runtimeStatuses);
       const inspector = buildInspectorState({
         snapshot: mergedSnapshot,
         selectedNodeId: state.selectedNodeId,
@@ -89,7 +127,7 @@ function reducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
         isConnectSourceOpen: state.isConnectSourceOpen,
         wizardStep: state.wizardStep,
         selectedKind: state.selectedKind,
-        sourceStatuses: state.sourceStatuses,
+        runtimeStatuses: state.runtimeStatuses,
         inspector,
       };
     }
@@ -119,14 +157,37 @@ function reducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
     case 'RESET_CONNECT_WIZARD':
       return { ...state, wizardStep: 'choose-kind', selectedKind: null };
     case 'UPDATE_SOURCE_STATUS': {
-      const statuses = new Map(state.sourceStatuses);
-      statuses.set(action.sourceId, action.status);
+      const runtimeStatuses = new Map(state.runtimeStatuses);
+      const current = runtimeStatuses.get(action.sourceId) ?? {};
+
+      if (action.payload.kind === 'crawl') {
+        runtimeStatuses.set(action.sourceId, {
+          ...current,
+          crawl: {
+            stage: action.payload.stage ?? deriveStageFromCrawlStatus(action.payload.crawlStatus),
+            status: action.payload.crawlStatus,
+            error: action.payload.error,
+            updatedAt: action.payload.updatedAt,
+          },
+        });
+      } else {
+        runtimeStatuses.set(action.sourceId, {
+          ...current,
+          connection: {
+            status: action.payload.connectionStatus,
+            error: action.payload.error,
+            updatedAt: action.payload.updatedAt,
+          },
+        });
+      }
+
+      const mergedSnapshot = mergeSnapshotWithStatus(state.snapshot, runtimeStatuses);
 
       return {
         ...state,
-        sourceStatuses: statuses,
-        snapshot: mergeSnapshotWithStatus(state.snapshot, statuses, action.sourceId, action.error),
-        inspector: buildInspectorState({ snapshot: state.snapshot, selectedNodeId: state.selectedNodeId }),
+        runtimeStatuses,
+        snapshot: mergedSnapshot,
+        inspector: buildInspectorState({ snapshot: mergedSnapshot, selectedNodeId: state.selectedNodeId }),
       };
     }
     default:
@@ -168,22 +229,21 @@ export function ExplorerStateProvider({
   // Listen for source status updates from main process
   useEffect(() => {
     const handleStatusUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent<{
-        sourceId: string;
-        status: 'connecting' | 'queued' | 'ready' | 'error' | 'needs_attention';
-      }>;
-      if (customEvent.detail) {
-        dispatch({
-          type: 'UPDATE_SOURCE_STATUS',
-          sourceId: customEvent.detail.sourceId,
-          status: customEvent.detail.status,
-        });
+      const detail = (event as CustomEvent<SourceStatusEvent>).detail;
+      if (!detail || !detail.sourceId) {
+        return;
       }
+
+      dispatch({
+        type: 'UPDATE_SOURCE_STATUS',
+        sourceId: detail.sourceId,
+        payload: detail,
+      });
     };
 
-    window.addEventListener('sources:status', handleStatusUpdate);
+    window.addEventListener('sources:status', handleStatusUpdate as EventListener);
     return () => {
-      window.removeEventListener('sources:status', handleStatusUpdate);
+      window.removeEventListener('sources:status', handleStatusUpdate as EventListener);
     };
   }, []);
 
@@ -198,6 +258,13 @@ export function useExplorerState() {
   }
 
   const { state, dispatch } = context;
+  const retryCrawl = useCallback(async (sourceId: string) => {
+    return window.semantiqa?.api.invoke(IPC_CHANNELS.METADATA_CRAWL, { sourceId });
+  }, []);
+  const crawlAll = useCallback(async () => {
+    return window.semantiqa?.api.invoke(IPC_CHANNELS.SOURCES_CRAWL_ALL, undefined as never);
+  }, []);
+
   const actions = useMemo(
     () => ({
       ingestSnapshot: (snapshot: ExplorerSnapshot) => dispatch({ type: 'INGEST_SNAPSHOT', snapshot }),
@@ -209,11 +276,6 @@ export function useExplorerState() {
         dispatch({ type: 'SELECT_SOURCE_KIND', kind }),
       advanceToReview: () => dispatch({ type: 'GO_TO_REVIEW' }),
       resetConnectWizard: () => dispatch({ type: 'RESET_CONNECT_WIZARD' }),
-      updateSourceStatus: (
-        sourceId: string,
-        status: ExplorerSnapshot['sources'][number]['status'],
-        error?: { message: string; meta?: Record<string, unknown> },
-      ) => dispatch({ type: 'UPDATE_SOURCE_STATUS', sourceId, status, error }),
       advanceWizardTo: (step: ExplorerState['wizardStep']) => dispatch({ type: 'ADVANCE_WIZARD', step }),
     }),
     [dispatch],
@@ -227,27 +289,40 @@ export function useExplorerState() {
     wizardStep: state.wizardStep,
     selectedKind: state.selectedKind,
     actions,
+    runtimeStatuses: state.runtimeStatuses,
     inspector: state.inspector,
+    commands: {
+      retryCrawl,
+      crawlAll,
+    },
   };
 }
 
 function mergeSnapshotWithStatus(
   snapshot: ExplorerSnapshot,
-  statuses: Map<string, ExplorerSnapshot['sources'][number]['status']>,
-  changedSourceId?: string,
-  error?: { message: string; meta?: Record<string, unknown> },
+  runtimeStatuses: Map<string, RuntimeSourceStatus>,
 ): ExplorerSnapshot {
   const mergedSources = snapshot.sources.map((source) => {
-    const override = statuses.get(source.id);
-    const isChanged = changedSourceId === source.id;
+    const runtime = runtimeStatuses.get(source.id);
+    const crawl = runtime?.crawl;
+    const connection = runtime?.connection;
+
+    const status = crawl?.status ?? source.status;
+    const connectionStatus = connection?.status ?? source.connectionStatus;
+
+    const lastError = crawl?.error?.message ?? (crawl?.stage === 'failed' ? crawl?.error?.message ?? source.lastError : source.lastError);
+    const lastCrawlAt = crawl?.stage === 'completed' ? new Date(crawl.updatedAt).toISOString() : source.lastCrawlAt;
+    const lastConnectionError = connection?.error?.message ?? source.lastConnectionError;
+    const lastConnectedAt = connection?.status === 'connected' ? new Date(connection.updatedAt).toISOString() : source.lastConnectedAt;
 
     return {
       ...source,
-      status: override ?? source.status,
-      lastError: isChanged && error ? error.message : source.lastError,
-      lastCrawlAt: isChanged && override === 'crawled' ? new Date().toISOString() : source.lastCrawlAt,
-      lastConnectionError: isChanged && error ? error.message : source.lastConnectionError,
-      connectionStatus: source.connectionStatus,
+      status,
+      connectionStatus,
+      lastError,
+      lastCrawlAt,
+      lastConnectionError,
+      lastConnectedAt,
       owners: source.owners ?? [],
       tags: source.tags ?? [],
     } satisfies ExplorerSnapshot['sources'][number];
@@ -257,6 +332,20 @@ function mergeSnapshotWithStatus(
     ...snapshot,
     sources: mergedSources,
   } satisfies ExplorerSnapshot;
+}
+
+export function deriveStageFromCrawlStatus(status: ExplorerSnapshot['sources'][number]['status']): CrawlStage {
+  switch (status) {
+    case 'crawled':
+      return 'completed';
+    case 'crawling':
+      return 'running';
+    case 'error':
+      return 'failed';
+    case 'not_crawled':
+    default:
+      return 'queued';
+  }
 }
 
 function buildInspectorState(params: {

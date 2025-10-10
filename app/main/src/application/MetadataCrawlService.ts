@@ -1,14 +1,36 @@
 import type { SemantiqaError } from '@semantiqa/contracts';
-import type Database from 'better-sqlite3';
+import type { Database as BetterSqliteDatabase } from 'better-sqlite3';
 
-import { PostgresAdapter, crawlSchema as crawlPostgres, profileTables as profilePostgres } from '@semantiqa/adapters-postgres';
-import { MysqlAdapter, crawlSchema as crawlMysql, profileTables as profileMysql } from '@semantiqa/adapters-mysql';
-import { MongoAdapter, crawlMongoSchema, profileCollections as profileMongo } from '@semantiqa/adapters-mongo';
-import { DuckDbAdapter, crawlDuckDbSchema, profileTables as profileDuckDb } from '@semantiqa/adapters-duckdb';
+import {
+  PostgresAdapter,
+  crawlSchema as crawlPostgres,
+  profileTables as profilePostgres,
+} from '@semantiqa/adapter-postgres';
+import {
+  MysqlAdapter,
+  crawlSchema as crawlMysql,
+  profileTables as profileMysql,
+} from '@semantiqa/adapter-mysql';
+import {
+  MongoAdapter,
+  crawlMongoSchema,
+  profileMongoCollections,
+} from '@semantiqa/adapter-mongo';
+import {
+  DuckDbAdapter,
+  crawlDuckDbSchema,
+  profileDuckDbTables,
+} from '@semantiqa/adapter-duckdb';
 import { SourceService } from '@semantiqa/graph-service';
+import type {
+  MongoConnection,
+  MySqlConnection,
+  PostgresConnection,
+  DuckDbConnection,
+} from '@semantiqa/contracts';
 
 export interface MetadataCrawlDeps {
-  openSourcesDb: () => Database;
+  openSourcesDb: () => BetterSqliteDatabase;
   retrieveSecret: (scope: { sourceId: string; key: string }) => Promise<string | null>;
   persistSnapshot: (params: {
     sourceId: string;
@@ -39,7 +61,7 @@ export interface MetadataCrawlDeps {
   };
 }
 
-interface SourceRecord {
+interface MetadataSourceRow {
   id: string;
   name: string;
   kind: 'postgres' | 'mysql' | 'mongo' | 'duckdb';
@@ -63,7 +85,9 @@ export class MetadataCrawlService {
 
       // Load source config
       const db = openSourcesDb();
-      const source = db.prepare<SourceRecord, [string]>('SELECT id, name, kind, config FROM sources WHERE id = ?').get(sourceId);
+      const source = db
+        .prepare('SELECT id, name, kind, config FROM sources WHERE id = ?')
+        .get(sourceId) as MetadataSourceRow | undefined;
 
       if (!source) {
         logger.warn('Source not found', { sourceId });
@@ -77,10 +101,15 @@ export class MetadataCrawlService {
       logger.info('Source loaded', { sourceId, kind: source.kind });
 
       // Parse config
-      const config = JSON.parse(source.config);
+      const config = JSON.parse(source.config ?? '{}') as { connection?: Record<string, unknown> }; 
 
       // Retrieve secrets and merge into connection config
-      const connection = await this.loadConnectionWithSecrets(source.kind, config.connection, sourceId, retrieveSecret);
+      const connection = await this.loadConnectionWithSecrets(
+        source.kind,
+        config.connection ?? {},
+        sourceId,
+        retrieveSecret,
+      );
 
       // Dispatch to adapter-specific crawl + profile + persist
       let snapshot: unknown;
@@ -88,34 +117,34 @@ export class MetadataCrawlService {
 
       switch (source.kind) {
         case 'postgres': {
-          const adapter = new PostgresAdapter({ connection });
+          const adapter = new PostgresAdapter({ connection: connection as PostgresConnection });
           await adapter.healthCheck();
           snapshot = await crawlPostgres(adapter);
-          stats = await profilePostgres(adapter, snapshot, { sampleSize: 1000 });
+          stats = await profilePostgres(adapter);
           await adapter.close();
           break;
         }
         case 'mysql': {
-          const adapter = new MysqlAdapter({ connection });
+          const adapter = new MysqlAdapter({ connection: connection as MySqlConnection });
           await adapter.healthCheck();
           snapshot = await crawlMysql(adapter);
-          stats = await profileMysql(adapter, snapshot, { sampleSize: 1000 });
+          stats = await profileMysql(adapter, { sampleSize: 1000 });
           await adapter.close();
           break;
         }
         case 'mongo': {
-          const adapter = new MongoAdapter({ connection });
+          const adapter = new MongoAdapter({ connection: connection as MongoConnection });
           await adapter.healthCheck();
           snapshot = await crawlMongoSchema(adapter, { sampleSize: 1000 });
-          stats = await profileMongo(adapter, snapshot, { sampleSize: 1000 });
+          stats = await profileMongoCollections(adapter, { sampleSize: 1000 });
           await adapter.close();
           break;
         }
         case 'duckdb': {
-          const adapter = new DuckDbAdapter({ connection });
+          const adapter = new DuckDbAdapter({ connection: { ...connection as DuckDbConnection, readOnly: false } });
           await adapter.healthCheck();
           snapshot = await crawlDuckDbSchema(adapter);
-          stats = await profileDuckDb(adapter, snapshot, { sampleSize: 1000 });
+          stats = await profileDuckDbTables(adapter, { sampleSize: 1000 });
           await adapter.close();
           break;
         }
@@ -164,14 +193,13 @@ export class MetadataCrawlService {
   }
 
   private async loadConnectionWithSecrets(
-    kind: string,
+    kind: MetadataSourceRow['kind'],
     storedConnection: Record<string, unknown>,
     sourceId: string,
     retrieveSecret: MetadataCrawlDeps['retrieveSecret'],
-  ): Promise<Record<string, unknown>> {
-    const connection = { ...storedConnection };
+  ): Promise<PostgresConnection | MySqlConnection | MongoConnection | DuckDbConnection> {
+    const connection = { ...storedConnection } as Record<string, unknown>;
 
-    // Retrieve password for postgres/mysql
     if (kind === 'postgres' || kind === 'mysql') {
       const password = await retrieveSecret({ sourceId, key: 'password' });
       if (password) {
@@ -179,7 +207,6 @@ export class MetadataCrawlService {
       }
     }
 
-    // Retrieve URI for mongo
     if (kind === 'mongo') {
       const uri = await retrieveSecret({ sourceId, key: 'uri' });
       if (uri) {
@@ -187,7 +214,11 @@ export class MetadataCrawlService {
       }
     }
 
-    return connection;
+    if (kind === 'duckdb') {
+      connection.readOnly = (connection.readOnly as boolean | undefined) ?? true;
+    }
+
+    return connection as PostgresConnection | MySqlConnection | MongoConnection | DuckDbConnection;
   }
 }
 

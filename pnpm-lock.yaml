@@ -139,6 +139,18 @@ importers:
 
   app/main:
     dependencies:
+      '@semantiqa/adapter-duckdb':
+        specifier: workspace:^0.1.0
+        version: link:../adapters/duckdb
+      '@semantiqa/adapter-mongo':
+        specifier: workspace:^0.1.0
+        version: link:../adapters/mongo
+      '@semantiqa/adapter-mysql':
+        specifier: workspace:^0.1.0
+        version: link:../adapters/mysql
+      '@semantiqa/adapter-postgres':
+        specifier: workspace:^0.1.0
+        version: link:../adapters/postgres
       '@semantiqa/adapters-runtime':
         specifier: workspace:^0.1.0
         version: link:../../packages/adapters-runtime

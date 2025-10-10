@@ -81,6 +81,7 @@ export const ExplorerSourceSchema = z.object({
   lastConnectedAt: IsoDateTimeSchema.optional(),
   lastConnectionError: z.string().optional(),
   owners: z.array(NonEmptyString).default([]),
+  tags: z.array(NonEmptyString).default([]),
 });
 
 export type ExplorerSource = z.infer<typeof ExplorerSourceSchema>;

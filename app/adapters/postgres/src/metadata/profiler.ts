@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { PostgresAdapter } from '../postgresAdapter';
 
 export interface ColumnProfile {
   column: string;
@@ -29,8 +29,8 @@ WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
 ORDER BY table_schema, table_name, column_name;
 `;
 
-export async function profileTables(pool: Pool): Promise<TableProfile[]> {
-  const client = await pool.connect();
+export async function profileTables(postgresAdapter: PostgresAdapter): Promise<TableProfile[]> {
+  const client = await postgresAdapter.getPool().connect();
 
   try {
     const result = await client.query(PROFILE_QUERY);

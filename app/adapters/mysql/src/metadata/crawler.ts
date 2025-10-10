@@ -1,4 +1,4 @@
-import type { Pool } from 'mysql2/promise';
+import { MysqlAdapter } from '../mysqlAdapter';
 
 import { z } from 'zod';
 
@@ -66,8 +66,8 @@ WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 
 ORDER BY table_schema, table_name, ordinal_position;
 `;
 
-export async function crawlSchema(pool: Pool): Promise<SchemaSnapshot> {
-  const connection = await pool.getConnection();
+export async function crawlSchema(mysqlAdapter: MysqlAdapter): Promise<SchemaSnapshot> {
+  const connection = await mysqlAdapter.getPool().getConnection();
   try {
     const [tablesRows] = await connection.query(TABLE_QUERY);
     const [columnsRows] = await connection.query(COLUMN_QUERY);

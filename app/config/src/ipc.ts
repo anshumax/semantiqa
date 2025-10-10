@@ -3,6 +3,7 @@ import type {
   GraphGetRequest,
   GraphGetResponse,
   MetadataCrawlRequest,
+  MetadataCrawlResponse,
   ModelsDownloadRequest,
   ModelsEnableRequest,
   ModelsListResponse,
@@ -43,7 +44,7 @@ type HandlerMap = {
   };
   'metadata:crawl': {
     request: MetadataCrawlRequest;
-    response: { snapshotId: string } | SemantiqaError;
+    response: MetadataCrawlResponse | SemantiqaError;
   };
   'sources:test-connection': {
     request: { sourceId: string };
@@ -51,7 +52,7 @@ type HandlerMap = {
   };
   'sources:crawl-all': {
     request: void;
-    response: { ok: true } | SemantiqaError;
+    response: { queued: number } | SemantiqaError;
   };
   'search:semantic': {
     request: SearchSemanticRequest;
@@ -87,8 +88,12 @@ type HandlerMap = {
   };
 };
 
-export type IpcRequest<T extends IpcChannel> = HandlerMap[T]['request'];
-export type IpcResponse<T extends IpcChannel> = HandlerMap[T]['response'];
+export type IpcRequest<T extends IpcChannel> = T extends keyof HandlerMap
+  ? HandlerMap[T]['request']
+  : never;
+export type IpcResponse<T extends IpcChannel> = T extends keyof HandlerMap
+  ? HandlerMap[T]['response']
+  : never;
 
 export const IPC_CHANNELS = {
   HEALTH_PING: 'health:ping' as const,

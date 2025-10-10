@@ -1,4 +1,5 @@
-import type { Pool } from 'mysql2/promise';
+
+import { MysqlAdapter } from '../mysqlAdapter';
 
 export interface ColumnProfile {
   column: string;
@@ -37,11 +38,11 @@ function escapeIdentifier(value: string): string {
 }
 
 export async function profileTables(
-  pool: Pool,
+  mysqlAdapter: MysqlAdapter,
   options: MysqlProfileOptions = {},
 ): Promise<TableProfile[]> {
   const sampleSize = options.sampleSize ?? DEFAULT_SAMPLE_SIZE;
-  const connection = await pool.getConnection();
+  const connection = await mysqlAdapter.getPool().getConnection();
 
   try {
     const [columnsRows] = await connection.query(COLUMN_QUERY);

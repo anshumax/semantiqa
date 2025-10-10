@@ -18,10 +18,10 @@ export interface TableProfile {
 
 const COLUMN_QUERY = `
 SELECT
+  CONCAT(table_schema, '.', table_name) AS table_key,
   table_schema,
   table_name,
-  column_name,
-  data_type
+  column_name
 FROM information_schema.columns
 WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
 ORDER BY table_schema, table_name, ordinal_position;
@@ -48,11 +48,19 @@ export async function profileTables(
     const [columnsRows] = await connection.query(COLUMN_QUERY);
     const tables = new Map<string, TableProfile>();
 
-    for (const row of columnsRows as Array<Record<string, unknown>>) {
-      const schema = String(row.table_schema);
-      const name = String(row.table_name);
-      const column = String(row.column_name);
-      const key = `${schema}.${name}`;
+  for (const row of columnsRows as Array<Record<string, unknown>>) {
+    const rawSchema = row.table_schema;
+    const rawName = row.table_name;
+    const rawColumn = row.column_name;
+    if (!rawSchema || !rawName || !rawColumn) {
+      // Skip incomplete rows to avoid generating invalid SQL
+      continue;
+    }
+
+    const schema = String(rawSchema);
+    const name = String(rawName);
+    const column = String(rawColumn);
+    const key = row.table_key ? String(row.table_key) : `${schema}.${name}`;
 
       if (!tables.has(key)) {
         tables.set(key, {

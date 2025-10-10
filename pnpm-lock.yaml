@@ -12,6 +12,9 @@ importers:
         specifier: ^7.9.0
         version: 7.9.0
     devDependencies:
+      '@electron/rebuild':
+        specifier: ^3.7.2
+        version: 3.7.2
       '@types/node':
         specifier: ^20.16.10
         version: 20.19.19

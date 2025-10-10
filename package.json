@@ -15,6 +15,7 @@
     "app:dev": "pnpm --filter @semantiqa/app-renderer run dev & pnpm --filter @semantiqa/app-main run start"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.7.2",
     "@types/node": "^20.16.10",
     "@typescript-eslint/eslint-plugin": "^8.6.0",
     "@typescript-eslint/parser": "^8.6.0",

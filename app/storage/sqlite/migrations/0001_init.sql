@@ -1,15 +1,3 @@
-DROP TABLE IF EXISTS nodes;
-DROP TABLE IF EXISTS edges;
-DROP TABLE IF EXISTS docs;
-DROP TABLE IF EXISTS embeddings;
-DROP TABLE IF EXISTS provenance;
-DROP TABLE IF EXISTS changelog;
-DROP TABLE IF EXISTS models;
-DROP TABLE IF EXISTS settings;
-DROP TABLE IF EXISTS sources;
-
-BEGIN TRANSACTION;
-
 CREATE TABLE IF NOT EXISTS nodes (
   id TEXT PRIMARY KEY,
   type TEXT NOT NULL,
@@ -115,6 +103,4 @@ CREATE TABLE IF NOT EXISTS sources (
   last_connected_at TEXT,
   last_connection_error TEXT
 );
-
-COMMIT;
 

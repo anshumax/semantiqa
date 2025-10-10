@@ -79,7 +79,7 @@ export function runMigrations(dbPath: string, migrationsDir: string): MigrationR
   );
 
   const applyMigration = (migration: Migration) => {
-    const hasExplicitTransaction = /^\s*BEGIN\b/i.test(migration.sql);
+    const hasExplicitTransaction = /\bBEGIN\s+(TRANSACTION|DEFERRED|IMMEDIATE|EXCLUSIVE)?\b/i.test(migration.sql);
 
     if (hasExplicitTransaction) {
       db.exec(migration.sql);

@@ -48,6 +48,24 @@ export class SourceProvisioningService {
     };
     audit(startAuditContext);
 
+    // Check for existing connection before creating
+    const existing = sourceService.findExistingConnection(request);
+    if (existing) {
+      const errorMessage = `A source with the same connection already exists: "${existing.name}" (ID: ${existing.id})`;
+      logger.warn('Duplicate connection detected', { existing, request: { kind: request.kind, name: request.name } });
+      audit({
+        action: 'sources.add.duplicate_rejected',
+        status: 'failure',
+        details: { existing: existing.name, existingId: existing.id, kind: request.kind, name: request.name },
+      });
+      
+      return {
+        code: 'VALIDATION_ERROR',
+        message: errorMessage,
+        details: { existingSourceId: existing.id, existingSourceName: existing.name },
+      } satisfies SemantiqaError;
+    }
+
     let created: { sourceId: string } | null = null;
 
     try {
@@ -120,11 +138,28 @@ export class SourceProvisioningService {
       logger.info('Source provisioned', { sourceId });
       return { sourceId };
     } catch (error) {
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      
+      // Check if this is a duplicate connection error
+      if (errorMessage.includes('source with the same connection already exists')) {
+        logger.warn('Duplicate connection error during creation', { error: errorMessage });
+        audit({
+          action: 'sources.add.duplicate_error',
+          status: 'failure',
+          details: { error: errorMessage, kind: request.kind },
+        });
+        
+        return {
+          code: 'VALIDATION_ERROR',
+          message: errorMessage,
+        } satisfies SemantiqaError;
+      }
+      
       logger.error('Failed to provision source', { error });
       audit({
         action: 'sources.add.failed',
         status: 'failure',
-        details: { error: (error as Error).message ?? 'Unknown error', kind: request.kind },
+        details: { error: errorMessage, kind: request.kind },
       });
 
       if (created) {
@@ -132,19 +167,19 @@ export class SourceProvisioningService {
         await this.updateStatus(created.sourceId, 'error', {
           audit,
           logger,
-          errorMeta: { message: (error as Error).message ?? 'Provisioning failed' },
+          errorMeta: { message: errorMessage },
         });
         await this.updateConnectionStatus(created.sourceId, 'error', {
           audit,
           logger,
-          errorMessage: (error as Error).message ?? 'Provisioning failed',
+          errorMessage: errorMessage,
         });
       }
 
       return {
         code: 'VALIDATION_ERROR',
         message: 'Unable to add source. Check inputs and try again.',
-        details: { error: (error as Error).message ?? 'Unknown error' },
+        details: { error: errorMessage },
       } satisfies SemantiqaError;
     }
   }

@@ -24,6 +24,7 @@ export type IpcChannel =
   | 'metadata:crawl'
   | 'sources:test-connection'
   | 'sources:crawl-all'
+  | 'sources:retry-crawl'
   | 'search:semantic'
   | 'query:run-read-only'
   | 'models:list'
@@ -53,6 +54,10 @@ type HandlerMap = {
   'sources:crawl-all': {
     request: void;
     response: { queued: number } | SemantiqaError;
+  };
+  'sources:retry-crawl': {
+    request: { sourceId: string };
+    response: { queued: boolean } | SemantiqaError;
   };
   'search:semantic': {
     request: SearchSemanticRequest;
@@ -101,6 +106,7 @@ export const IPC_CHANNELS = {
   METADATA_CRAWL: 'metadata:crawl' as const,
   SOURCES_TEST_CONNECTION: 'sources:test-connection' as const,
   SOURCES_CRAWL_ALL: 'sources:crawl-all' as const,
+  SOURCES_RETRY_CRAWL: 'sources:retry-crawl' as const,
   SEARCH_SEMANTIC: 'search:semantic' as const,
   QUERY_RUN_READ_ONLY: 'query:run-read-only' as const,
   MODELS_LIST: 'models:list' as const,
@@ -124,6 +130,9 @@ export type SafeRendererChannels = Pick<
   | 'GRAPH_GET'
   | 'SOURCES_ADD'
   | 'METADATA_CRAWL'
+  | 'SOURCES_RETRY_CRAWL'
+  | 'SOURCES_CRAWL_ALL'
+  | 'SOURCES_TEST_CONNECTION'
 >;
 
 export const RENDERER_CHANNELS = Object.freeze({

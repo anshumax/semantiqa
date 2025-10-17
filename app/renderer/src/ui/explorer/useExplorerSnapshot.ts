@@ -68,7 +68,7 @@ function transformGraph(nodes: GraphNode[], edges: GraphEdge[]): ExplorerSnapsho
       name: node.props.displayName,
       kind: ((node.props as any).kind ?? 'postgres') as ExplorerSnapshot['sources'][number]['kind'],
       owners: node.props.owners,
-      status: mapSourceStatus((node.props as any).status),
+      status: mapSourceStatus((node.props as any).sourceStatus ?? (node.props as any).status),
       connectionStatus: (node.props as any).connectionStatus ?? 'unknown',
       lastCrawlAt: (node.props as any).lastCrawlAt ?? undefined,
       lastError: (node.props as any).lastError ?? undefined,

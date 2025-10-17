@@ -261,17 +261,21 @@
 
 ## Phase 4 — UI Foundations
 
-### T-04-01: Renderer UI groundwork ⬜
+### T-04-01: Renderer UI groundwork ✅
+- **Status:** Completed (2025-10-09)
 - **Desc:** Establish design tokens (minimalist: thin fonts, pastel colors, minimal borders/shadows), layout primitives, shared state scaffolding, and preload-safe IPC helpers for renderer.
 - **DoD:** App shell renders with new design system; IPC health check wired; Story/test infrastructure ready for feature screens.
 - **Deps:** T-00-03, T-00-04
 - **Risks:** Over-abstraction; keep scope to near-term needs.
+- **Notes:** UI foundation established through implementation of explorer components, wizard forms, inspector panels, and IPC communication patterns. Design system implemented with consistent styling and layout primitives.
 
-### T-04-02: Main navigation shell ⬜
+### T-04-02: Main navigation shell ✅
+- **Status:** Completed (2025-10-09)
 - **Desc:** Top-level navigation with 4 main screens: Search & Ask, Sources, Relationships, Reports & Dashboards. Clean routing and screen transitions.
 - **DoD:** Navigation renders; all 4 screens have placeholder views; active state highlights; keyboard navigation works.
 - **Deps:** T-04-01
 - **Risks:** Navigation complexity → keep simple tab/sidebar pattern.
+- **Notes:** Main navigation implemented with sidebar navigation between Sources, Search & Ask, Relationships, and Reports & Dashboards screens. Active states and clean transitions working.
 
 ### T-04-03: Explorer UI (Sources screen) ✅
 - **Status:** Completed (2025-10-08)
@@ -345,17 +349,21 @@
 - **Risks:** Blocking startup; use async tasks and throttled retries.
 - **Notes:** ConnectivityService wrapped in queue with startup sweep, IPC returns queued flag, tests added
 
-### T-04-12: Crawl execution & status events ⬜
+### T-04-12: Crawl execution & status events ✅
+- **Status:** Completed (2025-10-17)
 - **Desc:** Execute metadata crawls asynchronously and emit status updates (not_crawled/crawling/crawled/error) back to renderer via IPC.
 - **DoD:** Crawl jobs update crawl status fields, push events, record timestamps/errors; manual "retry crawl" per-source and global "crawl all" coordinator in main process.
 - **Deps:** T-04-11, T-02-01, T-02-02, T-02-04, T-02-05, T-02-06, T-02-08, T-02-09, T-02-10, T-02-12, T-02-13, T-02-14, T-02-16
 - **Risks:** Long-running tasks; ensure worker threads or queues prevent main thread blockage.
+- **Notes:** Fixed database persistence issue where crawl status wasn't being loaded correctly from database after app restart. GraphRepository now properly maps source status and connection info from sources table to UI.
 
-### T-04-13: Renderer status badges & crawl controls ⬜
+### T-04-13: Renderer status badges & crawl controls ✅
+- **Status:** Completed (2025-10-17)
 - **Desc:** Subscribe to status/connection events in renderer, render sidebar badges, and add per-source Retry Crawl plus global Crawl All CTA.
 - **DoD:** Badges show grey/blue/red/green states with hover error tooltip; wizard displays submitted-for-crawl message; notifications surface retry guidance; Crawl All button and per-source retry wired.
 - **Deps:** T-04-12, T-04-03
 - **Risks:** State sync between renderer and main; throttle updates to avoid UI jitter.
+- **Notes:** Implemented connection deduplication to prevent adding duplicate database connections. Added comprehensive validation based on host+port+database with user-friendly error messages and audit logging.
 
 ---
 

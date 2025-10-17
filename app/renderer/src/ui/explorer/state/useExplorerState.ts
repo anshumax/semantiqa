@@ -259,7 +259,7 @@ export function useExplorerState() {
 
   const { state, dispatch } = context;
   const retryCrawl = useCallback(async (sourceId: string) => {
-    return window.semantiqa?.api.invoke(IPC_CHANNELS.METADATA_CRAWL, { sourceId });
+    return window.semantiqa?.api.invoke(IPC_CHANNELS.SOURCES_RETRY_CRAWL, { sourceId });
   }, []);
   const crawlAll = useCallback(async () => {
     return window.semantiqa?.api.invoke(IPC_CHANNELS.SOURCES_CRAWL_ALL, undefined as never);

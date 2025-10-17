@@ -76,14 +76,26 @@ export class GraphRepository {
       const description = typeof config.description === 'string' ? config.description : undefined;
       const displayName = row.name ?? config.displayName ?? row.id;
 
+      // Map source status to verification status
+      const verificationStatus = row.status === 'crawled' ? 'verified' : 'draft';
+      
       const props = {
         displayName,
         description,
         owners,
         tags,
         sensitivity: 'internal',
-        status: 'draft' as GraphNode['props']['status'],
-      } satisfies GraphNode['props'];
+        status: verificationStatus,
+        // Add source-specific properties
+        sourceStatus: row.status,
+        connectionStatus: row.connection_status,
+        lastCrawlAt: row.last_crawl_at,
+        lastConnectedAt: row.last_connected_at,
+        lastError: row.last_error,
+        lastConnectionError: row.last_connection_error,
+        lastErrorMeta: typeof row.last_error_meta === 'string' ? JSON.parse(row.last_error_meta) : row.last_error_meta,
+        kind: row.kind,
+      };
 
       return {
         id: row.id,

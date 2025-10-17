@@ -20,6 +20,7 @@ const allowedChannels: readonly IpcChannel[] = [
   'metadata:crawl',
   'sources:test-connection',
   'sources:crawl-all',
+  'sources:retry-crawl',
   'search:semantic',
   'query:run-read-only',
   'models:list',

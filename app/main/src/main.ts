@@ -9,6 +9,7 @@ import { SourceProvisioningService } from './application/SourceProvisioningServi
 import { MetadataCrawlService } from './application/MetadataCrawlService';
 import { ConnectivityQueue, ConnectivityService } from './application/ConnectivityService';
 import { CrawlQueue } from './application/CrawlQueue';
+import { ModelManagerService } from './services/ModelManagerService';
 import { logIpcEvent } from './logging/audit';
 import { SourceService, SnapshotRepository } from '@semantiqa/graph-service';
 import { createSqliteFactory, initializeSchema } from '@semantiqa/storage-sqlite';
@@ -323,6 +324,13 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
   // Run connectivity checks on startup (async)
   void connectivityQueue.queueStartupSweep();
 
+  // Model manager service
+  const modelManagerService = new ModelManagerService({
+    openSourcesDb: graphDbFactory,
+    audit,
+    logger: console,
+  });
+
   // Source provisioning service
   const sourceProvisioningService = new SourceProvisioningService({
     openSourcesDb: graphDbFactory,
@@ -351,6 +359,19 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
       const rows = db.prepare('SELECT id FROM sources').all() as Array<{ id: string }>;
       const queued = crawlQueue.enqueueAll(rows.map((row) => row.id));
       return { queued };
+    },
+    [IPC_CHANNELS.SOURCES_RETRY_CRAWL]: async (request) => {
+      const result = crawlQueue.enqueue(request.sourceId);
+      return { queued: result.queued };
+    },
+    [IPC_CHANNELS.MODELS_LIST]: async () => {
+      return modelManagerService.listModels();
+    },
+    [IPC_CHANNELS.MODELS_DOWNLOAD]: async (request) => {
+      return modelManagerService.downloadModel(request);
+    },
+    [IPC_CHANNELS.MODELS_ENABLE]: async (request) => {
+      return modelManagerService.enableModel(request);
     },
   };
 

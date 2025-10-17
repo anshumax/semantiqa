@@ -58,12 +58,86 @@ function sanitizeConnectionConfig(request: SourcesAddRequest): StoredSourceConfi
 export class SourceRepository {
   constructor(private readonly db: Database) {}
 
+  /**
+   * Check if a source with the same connection already exists
+   * Returns the existing source information if found
+   */
+  findExistingConnection(payload: SourcesAddRequest): { id: string; name: string } | null {
+    const config = sanitizeConnectionConfig(payload);
+    
+    // Build the query based on connection type
+    let query = '';
+    let params: Record<string, any> = {};
+    
+    switch (payload.kind) {
+      case 'postgres':
+      case 'mysql': {
+        query = `
+          SELECT id, name FROM sources 
+          WHERE kind = @kind 
+          AND json_extract(config, '$.connection.host') = @host 
+          AND json_extract(config, '$.connection.port') = @port
+          AND json_extract(config, '$.connection.database') = @database
+        `;
+        params = {
+          kind: payload.kind,
+          host: config.connection.host,
+          port: config.connection.port,
+          database: config.connection.database,
+        };
+        break;
+      }
+      case 'mongo': {
+        // For MongoDB, we'll check database name since URI might contain credentials
+        query = `
+          SELECT id, name FROM sources 
+          WHERE kind = 'mongo' 
+          AND json_extract(config, '$.connection.database') = @database
+        `;
+        params = {
+          database: config.connection.database,
+        };
+        break;
+      }
+      case 'duckdb': {
+        // For DuckDB, check the file path
+        query = `
+          SELECT id, name FROM sources 
+          WHERE kind = 'duckdb' 
+          AND json_extract(config, '$.connection.filePath') = @filePath
+        `;
+        params = {
+          filePath: config.connection.filePath,
+        };
+        break;
+      }
+      default: {
+        const exhaustive: never = payload;
+        return exhaustive;
+      }
+    }
+    
+    const stmt = this.db.prepare(query);
+    const existing = stmt.get(params) as { id: string; name: string } | undefined;
+    
+    return existing || null;
+  }
+
   addSource(
     payload: SourcesAddRequest,
     sourceId: string,
     initialCrawlStatus: 'not_crawled' | 'crawling' | 'crawled' | 'error' = 'not_crawled',
     initialConnectionStatus: 'unknown' | 'checking' | 'connected' | 'error' = 'unknown',
   ): { sourceId: string } {
+    // Check for existing connection
+    const existing = this.findExistingConnection(payload);
+    if (existing) {
+      throw new Error(
+        `A source with the same connection already exists: "${existing.name}" (ID: ${existing.id}). ` +
+        'Please use the existing source or remove it first.'
+      );
+    }
+
     const config = sanitizeConnectionConfig(payload);
     const owners = payload.owners ?? [];
     const tags = payload.tags ?? [];

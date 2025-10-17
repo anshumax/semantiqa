@@ -51,5 +51,13 @@ export class SourceService {
     const repo = this.ensureRepository();
     repo.removeSource(sourceId);
   }
+
+  /**
+   * Check if a source with the same connection already exists
+   */
+  findExistingConnection(payload: SourcesAddRequest): { id: string; name: string } | null {
+    const repo = this.ensureRepository();
+    return repo.findExistingConnection(payload);
+  }
 }
 

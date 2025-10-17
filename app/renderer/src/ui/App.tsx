@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AppStateProvider } from './state';
 import { StatusBadge, StatusBadgeLabel, StatusBadgeValue } from './components';
-import { ExplorerShell } from './explorer';
+import { NavigationShell } from './navigation';
 import './App.css';
 import './components/Modal.css';
 
@@ -84,7 +84,7 @@ function RootContent() {
           </StatusBadge>
         </div>
       </header>
-      <ExplorerShell />
+      <NavigationShell />
     </div>
   );
 }

@@ -139,6 +139,27 @@ export function initializeSchema(dbPath: string): void {
     last_connection_error TEXT
   )`);
 
+  // Add indices for connection deduplication and performance
+  // Index for PostgreSQL/MySQL connections on host, port, and database
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_sources_pg_mysql_connection ON sources(
+    kind,
+    json_extract(config, '$.connection.host'),
+    json_extract(config, '$.connection.port'),
+    json_extract(config, '$.connection.database')
+  ) WHERE kind IN ('postgres', 'mysql')`);
+
+  // Index for MongoDB connections on database name
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_sources_mongo_connection ON sources(
+    kind,
+    json_extract(config, '$.connection.database')
+  ) WHERE kind = 'mongo'`);
+
+  // Index for DuckDB connections on file path
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_sources_duckdb_connection ON sources(
+    kind,
+    json_extract(config, '$.connection.filePath')
+  ) WHERE kind = 'duckdb'`);
+
   db.close();
   console.log('Database schema initialized successfully');
 }

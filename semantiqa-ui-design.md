@@ -587,5 +587,275 @@
 
 ---
 
-**This UI design serves as the foundation for Phase 4+ implementation tasks in the roadmap.**
+---
+
+## Canvas-Based Architecture Update (v2.1)
+
+**Date:** October 18, 2025  
+**Status:** Replaces tree-based Sources and separate Relationships screens
+
+### Overview
+
+Major UI architecture change inspired by n8n and modern visual workflow tools. The Sources and Relationships screens are merged into a unified infinite canvas workspace where users can:
+
+- Visualize data sources as draggable blocks
+- Create relationships using visual Bezier curve connections
+- Drill down into table/collection views within the canvas
+- Save and export complete canvas layouts
+
+### Navigation Update
+
+**New 3-Tab Structure:**
+```
+┌──────────────────┐
+│  🔍  Search & Ask │ ← Unchanged
+│  🎨  Sources      │ ← Canvas workspace (was Sources + Relationships)
+│  📈  Reports      │ ← Unchanged
+│                  │
+│  ⚙️   Settings   │ ← Bottom
+└──────────────────┘
+```
+
+### Canvas Workspace Layout
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  Sources                                    [Save Canvas] │ Header
+├────────────────────────────────────────────────────────────┤
+│  Canvas > PostgreSQL DB > public schema      [← Back]     │ Breadcrumb
+├────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐        ┌─────────────┐                  │
+│  │             │~~~~~~~~│             │                  │
+│  │ PostgreSQL  │        │  MongoDB    │   ┌──────────┐   │
+│  │ callnex     │~~~~~~~~│ analytics   │   │ Suggested│   │
+│  │ ● Crawled   │        │ ● Crawled   │   │ Relations│   │
+│  │    [+]      │        │    [+]      │   │          │   │
+│  └─────────────┘        └─────────────┘   │ • user_id│   │
+│                                           │   ↔ userId│   │
+│     ┌─────────────┐                       │ [Accept] │   │
+│     │   DuckDB    │                       │          │   │
+│     │ sales.csv   │       ⊙ Connecting... │ [Dismiss]│   │
+│     │ ◐ Crawling  │                       └──────────┘   │
+│     │    [+]      │                                      │
+│     └─────────────┘                                      │
+│                                                          │
+│  ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴ ∴   │ Dotted BG
+│                                                     [⊕] │ Floating +
+│  [🔍] Mini-map              [−] [□] [+] Zoom Controls    │ Floating UI
+└────────────────────────────────────────────────────────────┘
+```
+
+### Canvas Elements
+
+**Data Source Blocks:**
+```
+┌─────────────────┐
+│ PostgreSQL      │ ← Connection type
+│ callnex         │ ← Database name  
+│ ● Crawled       │ ← Status badge
+│        [+]      │ ← Connection point
+└─────────────────┘
+```
+
+**Visual Relationship Styles:**
+- **Intra-source** (same data source): Dashed lines, same color family
+- **Cross-source** (different sources): Solid lines, distinct colors
+- **Suggested**: Dotted lines with lower opacity
+
+**Drill-down Navigation:**
+- Double-click data source block → Table canvas view
+- Breadcrumb: `Canvas > PostgreSQL DB > public schema`
+- Table blocks show: table name, row count, column count
+
+### Connection Creation Flow
+
+1. **Initiate**: Hover over block → Plus icon appears
+2. **Connect**: Click Plus → Bezier curve follows mouse cursor
+3. **Target**: Hover over target block → Strong outline highlight
+4. **Complete**: Click target → Relationship definition modal opens
+5. **Define**: Dual-column modal for table/column selection
+6. **Save**: Relationship persisted with visual properties
+
+**Relationship Definition Modal:**
+```
+┌──────────────────────────────────────────────────────────┐
+│  Create Relationship                             [✕]     │
+├──────────────────────────────────────────────────────────┤
+│  Source                    Target                        │
+│  ──────────────            ──────────────                │
+│  PostgreSQL callnex        MongoDB analytics             │
+│                                                          │
+│  Table/Collection:         Table/Collection:             │
+│  ┌──────────────────┐      ┌──────────────────┐         │
+│  │ users         ▼ │      │ transactions  ▼ │         │
+│  └──────────────────┘      └──────────────────┘         │
+│                                                          │
+│  Column/Field:             Column/Field:                 │
+│  ┌──────────────────┐      ┌──────────────────┐         │
+│  │ id            ▼ │      │ userId        ▼ │         │
+│  └──────────────────┘      └──────────────────┘         │
+│                                                          │
+│  ✓ users.id (bigint)       ✓ transactions.userId (string)│
+│                                                          │
+│                                     [Cancel] [Create]   │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Canvas State Persistence
+
+**Database Schema:**
+- `canvas_state`: Canvas metadata (zoom, viewport, settings)
+- `canvas_blocks`: Block positions and visual properties
+- `canvas_relationships`: Connection visual styling
+
+**Save Controls:**
+```
+[Save Canvas*]  [Auto-save: ON ▼]  [Canvas Settings ⚙️]
+     ↑ Asterisk indicates unsaved changes
+```
+
+**Export Format (JSON):**
+```json
+{
+  "canvas": {
+    "version": "2.1",
+    "name": "Production Data Sources",
+    "viewport": { "zoom": 1.0, "centerX": 0, "centerY": 0 },
+    "blocks": [
+      {
+        "id": "postgres-callnex",
+        "type": "postgresql",
+        "position": { "x": 100, "y": 150 },
+        "size": { "width": 200, "height": 120 },
+        "connection": {
+          "name": "callnex",
+          "host": "prod-pg.company.com",
+          "database": "callnex"
+        }
+      }
+    ],
+    "relationships": [
+      {
+        "id": "rel-1",
+        "source": "postgres-callnex:users.id",
+        "target": "mongo-analytics:transactions.userId",
+        "visual": {
+          "style": "solid",
+          "color": "#8bb4f7",
+          "path": "M100,150 C150,150 200,200 250,200"
+        }
+      }
+    ]
+  }
+}
+```
+
+### Multi-Database Selection
+
+When connecting to a server with multiple databases:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Multiple Databases Found                                │
+├──────────────────────────────────────────────────────────┤
+│  Select databases to add to canvas:                      │
+│                                                          │
+│  ☑ callnex_production    (247 tables)                   │
+│  ☑ callnex_analytics     (18 tables)                    │
+│  ☐ callnex_staging       (247 tables)                   │
+│  ☐ callnex_test          (15 tables)                    │
+│                                                          │
+│  Each database will appear as a separate block          │
+│  on the canvas.                                          │
+│                                                          │
+│                                   [Cancel] [Add Selected]│
+└──────────────────────────────────────────────────────────┘
+```
+
+### Canvas Floating UI Elements
+
+**Bottom Right - Add Connection:**
+```
+         [⊕]
+    Large circular
+   floating button
+```
+
+**Top Right - Mini-map:**
+```
+┌────────────┐
+│ [▪] [▪]    │ ← Blocks
+│       [▫]  │ ← Viewport
+│   [▪]      │
+└────────────┘
+```
+
+**Bottom Left - Zoom Controls:**
+```
+[−] [□] [+]
+ ↑   ↑   ↑
+ Zoom Reset Zoom
+ Out  View  In
+```
+
+**Left Side - Suggestions Panel (Slide-out):**
+```
+┌──────────────────┐
+│ Suggested Links  │
+│ ──────────────── │
+│ • users.id       │
+│   ↔ userId       │
+│   Confidence: 95%│
+│   [Accept] [Skip]│
+│                  │
+│ • account_id     │
+│   ↔ accountRef   │
+│   Confidence: 78%│
+│   [Accept] [Skip]│
+└──────────────────┘
+```
+
+### Technical Implementation Notes
+
+**Canvas Rendering:**
+- SVG-based for crisp scaling at all zoom levels
+- Viewport culling for performance with large canvases
+- CSS transforms for smooth animations
+- Spatial indexing for collision detection
+
+**Relationship Curves:**
+- Bezier curves calculated between block connection points
+- Dynamic recalculation when blocks move
+- Hover states with relationship details tooltip
+- Click selection for editing
+
+**State Management:**
+- Debounced save operations (500ms delay)
+- Dirty state tracking for unsaved changes indicator
+- Undo/redo support for canvas operations
+- Auto-save preference in user settings
+
+### Cross-Instance Portability
+
+**Export includes:**
+- Complete visual layout (block positions, zoom, viewport)
+- Data source definitions (connection details, no credentials)
+- Relationship mappings with visual properties
+- Canvas metadata (name, description, creation date)
+
+**Import process:**
+1. Load canvas JSON file
+2. Validate schema compatibility
+3. Create data source blocks (requires credential re-entry)
+4. Restore visual layout and relationships
+5. Trigger metadata crawls for new connections
+
+**Security:**
+- Credentials never exported (connection host/port only)
+- Import requires re-authentication for all data sources
+- Audit log entries for all import/export operations
+
+---
+
+**This canvas-based UI design replaces the tree-based Sources screen and separate Relationships screen, providing a unified visual workflow for data source management and relationship definition.**
 

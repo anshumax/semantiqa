@@ -13,7 +13,7 @@
 
 ## Progress Summary
 
-**Overall Progress:** 38/77 tasks completed (49%)
+**Overall Progress:** 27/83 tasks completed (32%)
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
@@ -21,17 +21,17 @@
 | Phase 1: Storage & Audit | ✅ Complete | 2/2 |
 | Phase 2: Connections & Metadata | ✅ Complete | 16/16 |
 | Phase 3: Embeddings & Search | ✅ Complete | 3/3 |
-| Phase 4: UI Foundations | 🔄 In Progress | 11/13 |
+| Phase 4: UI Foundations (Canvas) | ⬜ Not Started | 1/15 |
 | Phase 5: Model Manager | ⬜ Not Started | 0/4 |
 | Phase 6: Summaries & Docs | ⬜ Not Started | 0/3 |
-| Phase 7: Semantic Relationships | ⬜ Not Started | 0/5 |
+| Phase 7: Canvas-Integrated Relationships | ⬜ Not Started | 0/5 |
 | Phase 8: Federated Query | ⬜ Not Started | 0/7 |
 | Phase 9: Reports & Dashboards | ⬜ Not Started | 0/6 |
-| Phase 10: Graph & Lineage | ⬜ Not Started | 0/4 |
-| Phase 11: Export & Packaging | ⬜ Not Started | 0/4 |
+| Phase 10: Advanced Graph Features | ⬜ Not Started | 0/4 |
+| Phase 11: Export & Packaging | ⬜ Not Started | 0/5 |
 | Phase 12: Golden Tests | ⬜ Not Started | 0/4 |
 
-**Next Up:** Complete T-04-12 (Crawl execution & status events) and T-04-13 (Renderer status badges)
+**Next Up:** Complete Phase 4 canvas infrastructure starting with T-04-02 (3-tab navigation) and T-04-03 (canvas foundation)
 
 ---
 
@@ -259,7 +259,7 @@
 
 ---
 
-## Phase 4 — UI Foundations
+## Phase 4 — UI Foundations (Canvas-Based)
 
 ### T-04-01: Renderer UI groundwork ✅
 - **Status:** Completed (2025-10-09)
@@ -269,101 +269,111 @@
 - **Risks:** Over-abstraction; keep scope to near-term needs.
 - **Notes:** UI foundation established through implementation of explorer components, wizard forms, inspector panels, and IPC communication patterns. Design system implemented with consistent styling and layout primitives.
 
-### T-04-02: Main navigation shell ✅
-- **Status:** Completed (2025-10-09)
-- **Desc:** Top-level navigation with 4 main screens: Search & Ask, Sources, Relationships, Reports & Dashboards. Clean routing and screen transitions.
-- **DoD:** Navigation renders; all 4 screens have placeholder views; active state highlights; keyboard navigation works.
-- **Deps:** T-04-01
+### T-04-02: Canvas database schema ⬜
+- **Status:** Not Started
+- **Desc:** Extend SQLite schema for canvas storage. Tables for canvas metadata, block positions, relationship visual properties, and canvas versions. Design for export/import compatibility.
+- **DoD:** `canvas_state` table with JSON columns for layout data; `canvas_blocks` table for data source positioning; `canvas_relationships` table for visual connection properties; migration script updates existing installations; schema supports full export/import; foreign key constraints maintain data integrity.
+- **Deps:** T-01-01, T-04-01
+- **Risks:** Schema complexity → balance normalization vs JSON flexibility; migration safety → backup existing data before schema changes.
+
+### T-04-03: Main navigation shell (3-tab) ⬜
+- **Status:** Not Started
+- **Desc:** Top-level navigation with 3 main screens: Search & Ask, Sources (Canvas), Reports & Dashboards. Sources screen becomes unified canvas for data sources and relationships.
+- **DoD:** Navigation renders; all 3 screens have placeholder views; active state highlights; keyboard navigation works; Sources tab loads canvas view.
+- **Deps:** T-04-02
 - **Risks:** Navigation complexity → keep simple tab/sidebar pattern.
-- **Notes:** Main navigation implemented with sidebar navigation between Sources, Search & Ask, Relationships, and Reports & Dashboards screens. Active states and clean transitions working.
+- **Notes:** Updated from 4-tab to 3-tab navigation, merging Sources and Relationships into unified canvas.
 
-### T-04-03: Explorer UI (Sources screen) ✅
-- **Status:** Completed (2025-10-08)
-- **Desc:** Sources → schema tree → tables/fields browsing with loading/error/empty states and selection plumbing.
-- **DoD:** Renderer loads snapshots via IPC, renders tree and workspace placeholders, and handles retry flows.
-- **Deps:** T-04-02, T-02-04, T-02-08, T-02-12, T-02-16, T-03-03
-- **Risks:** Performance on large catalogs; require virtualized tree later if needed.
-- **Notes:** Implemented renderer explorer shell with tree sidebar, snapshot loader, IPC contract wiring, and loading/error states
+### T-04-04: Canvas infrastructure foundation ⬜
+- **Status:** Not Started  
+- **Desc:** Core canvas rendering engine with infinite scroll, zoom/pan controls, dotted background pattern, and viewport management. SVG-based rendering for crisp scaling.
+- **DoD:** Empty canvas renders with dotted background; mouse wheel zoom (0.1x - 3x); pan with middle-click or space+drag; viewport bounds tracked; zoom level persisted; smooth animations.
+- **Deps:** T-04-03
+- **Risks:** Performance on large canvases → implement viewport culling; browser compatibility → test across Chromium versions.
 
-### T-04-04: Inspector UI ✅
-- **Status:** Completed (2025-10-09)
-- **Desc:** Inspector panel framing with metadata rendering, edit scaffolds, and audit-safe actions ready for service wiring.
-- **DoD:** Selected entity displays detail panel, update hooks stubbed, masking/resilience patterns align with contracts.
-- **Deps:** T-04-03, T-01-01, T-01-02
-- **Risks:** Requires backend DTO finalization before enabling edits.
-- **Notes:** Added inspector panel with derived metadata, breadcrumbs, and profiling details driven by `useExplorerState` and new `InspectorPanel`
+### T-04-05: Canvas block system ⬜
+- **Status:** Not Started
+- **Desc:** Draggable data source blocks with connection name, database name, status indicators, and visual styling. Auto-layout for initial positioning, manual drag for user arrangement.
+- **DoD:** Blocks render with rounded corners and subtle shadows; display connection name + database name; draggable with snap-to-grid option; position persisted to SQLite; visual feedback on hover/selection; status badges (connecting/connected/error/crawling/crawled).
+- **Deps:** T-04-03
+- **Risks:** Block collision detection → implement spatial indexing if needed; drag performance → use transform3d for GPU acceleration.
 
-### T-04-05: Results grid with masking (framework) ✅
-- **Status:** Completed (2025-10-09)
-- **Desc:** Grid shell, masking state management, and query wiring hooks prepared for upcoming execution flows.
-- **DoD:** Placeholder grid renders within workspace, mask toggles store state, IPC wiring stubs in place.
-- **Deps:** T-04-03, T-01-01
-- **Risks:** Real query integration may demand virtualization/perf work.
-- **Notes:** Established workspace layout with results placeholder, masking controls scaffolding, and future IPC integration points
+### T-04-06: Canvas navigation and drill-down ⬜
+- **Status:** Not Started
+- **Desc:** Double-click data source blocks to drill down to table/collection view. Breadcrumb navigation, back button, and smooth transition animations between canvas levels.
+- **DoD:** Double-click opens table canvas; breadcrumb shows "Canvas > PostgreSQL DB > public schema"; back button returns to parent; table blocks show table names + row counts; smooth zoom transitions; navigation history tracked.
+- **Deps:** T-04-04, T-02-04, T-02-08, T-02-12, T-02-16
+- **Risks:** Navigation complexity → limit to 2 levels (sources → tables); animation performance → use CSS transforms.
 
-### T-04-06: Connect Source entry point (UI) ✅
-- **Status:** Completed (2025-10-09)
-- **Desc:** Add the primary "Connect Source" action to the Sources screen header/empty state and open a modal scaffold that hosts the wizard.
-- **DoD:** CTA renders in empty and populated states, launches the modal, and respects keyboard/mouse dismissal patterns.
-- **Deps:** T-04-03, T-04-05
-- **Risks:** CTA hierarchy or layout crowding; keep visual weight minimal.
-- **Notes:** Sidebar CTA and empty-state wiring now open the wizard via state machine
+### T-04-07: Canvas floating UI elements ⬜
+- **Status:** Not Started
+- **Desc:** Floating Plus button (bottom-right), mini-map (top-right), zoom controls (bottom-left), and canvas reset button. Overlay elements that don't interfere with canvas interactions.
+- **DoD:** Plus button opens connection wizard; mini-map shows viewport location on large canvases; zoom controls work with buttons and keyboard (+/-/0 to reset); canvas reset centers and fits all blocks; elements positioned absolutely and don't scroll with canvas.
+- **Deps:** T-04-04
+- **Risks:** Z-index conflicts → establish layer hierarchy; touch device support → ensure button sizes meet accessibility guidelines.
 
-### T-04-07: Connection wizard scaffolding ✅
-- **Status:** Completed (2025-10-09)
-- **Desc:** Implement the multi-step wizard (choose kind, configure, review) with validation plumbing for Postgres/MySQL/Mongo/DuckDB.
-- **DoD:** Wizard advances between steps, enforces required fields per adapter, and surfaces inline validation and keyboard navigation.
-- **Deps:** T-04-06, T-02-01, T-02-05, T-02-09, T-02-13
-- **Risks:** Form sprawl; contain scope with per-kind field definitions.
-- **Notes:** Multi-step wizard with validation, step indicator, and IPC submission plumbing
+### T-04-08: Visual relationship connections ⬜
+- **Status:** Not Started
+- **Desc:** Render Bezier curves between connected blocks. Different visual styles for intra-source (same color family, dashed) vs cross-source (different colors, solid) relationships. Connection hover states and selection.
+- **DoD:** Curves render smoothly between block connection points; intra-source relationships use consistent color with source block; cross-source relationships use distinct colors; hover shows relationship details tooltip; click selects relationship for editing; curves update when blocks move.
+- **Deps:** T-04-04
+- **Risks:** Curve calculation complexity → use library (e.g., react-flow); performance with many relationships → implement connection culling.
 
-### T-04-08: Source provisioning backend service ✅
-- **Status:** Completed (2025-10-09)
-- **Desc:** Implement main-process service to persist new sources, securely store secrets, emit audit events, and trigger metadata crawl.
-- **DoD:** IPC handler calls backend service, source persisted in SQLite within a transaction, secrets stored via keytar `sourceId:key`, audit trail captured, crawl trigger invoked; unit tests cover happy path and failure rollback.
-- **Deps:** T-04-07, T-00-04, T-01-01
-- **Risks:** Schema drift; ensure migrations and contracts stay aligned.
-- **Notes:** Provisioning service integrated with messaging, status broadcast, crawl trigger, and added unit coverage
+### T-04-09: Connection creation UI flow ⬜
+- **Status:** Not Started
+- **Desc:** Plus button on blocks initiates connection mode. Bezier curve follows mouse cursor from source block. Click target block to complete connection. Visual feedback during connection creation.
+- **DoD:** Plus icon appears on block hover; click enters connection mode; cursor shows connecting state; Bezier curve dynamically follows mouse; target blocks highlight on hover; click target opens relationship definition modal; ESC cancels connection mode.
+- **Deps:** T-04-07
+- **Risks:** UX complexity → provide clear visual cues; mobile support → adapt for touch interactions.
 
-### T-04-09: Credential storage & IPC handshake ✅
-- **Status:** Completed (2025-10-09)
-- **Desc:** Wire wizard submission to preload IPC, enforce typed error handling, persist credentials via OS keychain, and audit the attempt.
-- **DoD:** Submission stores secrets outside the renderer, returns typed success/error, and records audit events with redacted payloads; tests cover keytar fallback paths.
-- **Deps:** T-04-08
-- **Risks:** Keytar installation issues on Windows/macOS; guard with diagnostics and retries.
-- **Notes:** Preload/main IPC hardened with secure channel usage, keychain storage rollback handled, status events carry error context
+### T-04-10: Relationship definition modal ⬜
+- **Status:** Not Started
+- **Desc:** Dual-column modal for selecting tables and columns when creating relationships. Left column for source, right for target. Dropdowns for table/collection selection, then column/key selection.
+- **DoD:** Modal opens after selecting connection target; two columns clearly labeled "Source" and "Target"; table dropdowns populated from respective data sources; column dropdowns populate after table selection; visual feedback shows selected items; Save button persists relationship; Cancel returns to canvas.
+- **Deps:** T-04-08, T-07-01
+- **Risks:** Modal complexity → keep focused on one-to-one relationships only; data loading → implement caching for table/column lists.
 
-### T-04-10: Source status persistence ✅
-- **Status:** Completed (2025-10-09)
-- **Desc:** Extend SQLite schema and repositories to record per-source status, timestamps, connection results, and error metadata.
-- **DoD:** New schema applied (clean re-init); status + connection fields updated via repository/service helpers; `graph:get` includes `status`, `lastCrawlAt`, `lastError`, `connectionStatus`, `lastConnectedAt`, `lastConnectionError`.
-- **Deps:** T-04-09, T-01-01
-- **Risks:** Requires full DB rebuild on schema change; ensure init script drops/creates tables.
-- **Notes:** SQLite schema and repositories now persist crawl/connection status fields with unit coverage
+### T-04-11: Comprehensive canvas state persistence ⬜
+- **Status:** Not Started
+- **Desc:** Persist complete canvas state to SQLite: block positions, sizes, colors, zoom level, viewport center, relationship curves, visual styles, and canvas metadata. Design for full export/import capability.
+- **DoD:** Canvas state table with JSON schema validation; block positions/styles saved on change; relationship visual properties persisted; zoom/pan/viewport state saved; canvas metadata (name, description, created/modified dates); restoration maintains exact visual appearance; database schema supports full canvas export.
+- **Deps:** T-04-05, T-01-01, T-04-07
+- **Risks:** Schema complexity → use JSON columns with validation; large canvas data → implement compression; version compatibility → include schema version in canvas data.
 
-### T-04-11: Connection test & startup health check ✅
-- **Status:** Completed (2025-10-09)
-- **Desc:** Implement worker to test connectivity during wizard ("Test Connection" CTA) and on application startup for existing sources.
-- **DoD:** Wizard exposes Test Connection button with results; app startup runs connection checks, status updated in DB, renderer displays "Checking connectivity" → success/error states.
-- **Deps:** T-04-10
-- **Risks:** Blocking startup; use async tasks and throttled retries.
-- **Notes:** ConnectivityService wrapped in queue with startup sweep, IPC returns queued flag, tests added
+### T-04-12: Connect Source wizard (canvas integration) ⬜
+- **Status:** Not Started
+- **Desc:** Integrate existing connection wizard with canvas paradigm. When multiple databases detected, show selection UI for which databases to add as separate canvas blocks.
+- **DoD:** Plus button opens existing wizard; multi-database selection step added after connection test; each selected database creates separate canvas block; blocks positioned automatically with spacing; wizard success message mentions canvas placement.
+- **Deps:** T-04-06, T-04-07 (original wizard), T-04-10
+- **Risks:** Wizard flow complexity → keep multi-database selection optional and intuitive.
 
-### T-04-12: Crawl execution & status events ✅
-- **Status:** Completed (2025-10-17)
-- **Desc:** Execute metadata crawls asynchronously and emit status updates (not_crawled/crawling/crawled/error) back to renderer via IPC.
-- **DoD:** Crawl jobs update crawl status fields, push events, record timestamps/errors; manual "retry crawl" per-source and global "crawl all" coordinator in main process.
-- **Deps:** T-04-11, T-02-01, T-02-02, T-02-04, T-02-05, T-02-06, T-02-08, T-02-09, T-02-10, T-02-12, T-02-13, T-02-14, T-02-16
-- **Risks:** Long-running tasks; ensure worker threads or queues prevent main thread blockage.
-- **Notes:** Fixed database persistence issue where crawl status wasn't being loaded correctly from database after app restart. GraphRepository now properly maps source status and connection info from sources table to UI.
+### T-04-13: Inspector UI (canvas integration) ⬜
+- **Status:** Not Started
+- **Desc:** Inspector panel that appears when blocks or relationships are selected on canvas. Shows metadata, connection details, table stats, and relationship information. Slide-out panel design.
+- **DoD:** Right-click or select block opens inspector; shows source metadata, connection status, table count, last crawl time; relationship selection shows join details; panel slides in/out smoothly; can edit relationship mappings.
+- **Deps:** T-04-04, T-01-01, T-01-02
+- **Risks:** Panel layout complexity → keep information hierarchy clear; performance → lazy load detailed stats.
 
-### T-04-13: Renderer status badges & crawl controls ✅
-- **Status:** Completed (2025-10-17)
-- **Desc:** Subscribe to status/connection events in renderer, render sidebar badges, and add per-source Retry Crawl plus global Crawl All CTA.
-- **DoD:** Badges show grey/blue/red/green states with hover error tooltip; wizard displays submitted-for-crawl message; notifications surface retry guidance; Crawl All button and per-source retry wired.
-- **Deps:** T-04-12, T-04-03
-- **Risks:** State sync between renderer and main; throttle updates to avoid UI jitter.
-- **Notes:** Implemented connection deduplication to prevent adding duplicate database connections. Added comprehensive validation based on host+port+database with user-friendly error messages and audit logging.
+### T-04-14: Source provisioning backend service (canvas aware) ⬜
+- **Status:** Not Started
+- **Desc:** Backend service to persist new sources with canvas positioning. Handle multi-database connections by creating separate canvas blocks for each selected database.
+- **DoD:** IPC handler persists source with canvas coordinates; multi-database sources create multiple blocks; auto-layout calculates initial positions; audit trail includes canvas actions; service integrates with existing crawl triggers.
+- **Deps:** T-04-11, T-00-04, T-01-01
+- **Risks:** Canvas state complexity → ensure database schema supports positioning data; multi-database edge cases → handle connection failures gracefully.
+
+### T-04-15: Canvas status visualization ⬜
+- **Status:** Not Started
+- **Desc:** Real-time status updates on canvas blocks. Connection status, crawl progress, error states, and success indicators. Animated progress for crawling state.
+- **DoD:** Blocks show connection status with color coding; crawling state shows progress indicator; error states display warning icons; hover shows detailed status tooltip; status updates push from main process to renderer in real-time.
+- **Deps:** T-04-13, existing crawl infrastructure
+- **Risks:** Real-time updates complexity → implement WebSocket or IPC event streaming; visual overload → keep status indicators subtle.
+
+### T-04-16: Canvas save controls & change tracking ⬜
+- **Status:** Not Started
+- **Desc:** Manual save functionality with change tracking. "Save Canvas" button, unsaved changes indicator, auto-save options, and canvas versioning/history.
+- **DoD:** Save button in canvas toolbar; visual indicator for unsaved changes (dirty state); auto-save toggle in preferences; save operations update canvas metadata (last saved, version); confirmation dialog prevents data loss on navigation; keyboard shortcut (Ctrl+S) support.
+- **Deps:** T-04-10, T-04-06
+- **Risks:** Change detection complexity → implement efficient dirty state tracking; auto-save frequency → balance performance vs data safety.
 
 ---
 
@@ -417,37 +427,37 @@
 
 ---
 
-## Phase 7 — Cross-Source Semantic Relationships (NEW)
+## Phase 7 — Canvas-Integrated Semantic Relationships
 
 ### T-07-01: Semantic relationship schema & repository ⬜
-- **Desc:** Create `semantic_relationships` table with src/dst field references, confidence scores, metadata; CRUD repository.
-- **DoD:** Table created; unique constraints on src/dst pairs; repo methods tested with fixtures.
+- **Desc:** Create `semantic_relationships` table with src/dst field references, confidence scores, metadata, and canvas visual properties (curve style, color). CRUD repository with canvas integration.
+- **DoD:** Table created with canvas fields (visual_style, color_override, curve_path); unique constraints on src/dst pairs; repo methods tested with fixtures; supports visual property persistence.
 - **Deps:** T-01-01
-- **Risks:** Schema evolution → migration versioning.
+- **Risks:** Schema evolution → migration versioning; canvas data complexity → keep visual properties optional.
 
-### T-07-02: Relationship auto-detection service ⬜
-- **Desc:** Analyze field names, types, cardinality, and stats to suggest cross-source relationships (e.g., `user_id` ↔ `userId`).
-- **DoD:** 10 fixture scenarios return expected suggestions with confidence scores; false positives <20%.
-- **Deps:** T-07-01, T-02-04, T-02-08, T-02-12, T-02-16
-- **Risks:** Name variance → fuzzy matching + user override.
+### T-07-02: Relationship auto-detection service (canvas aware) ⬜
+- **Desc:** Analyze field names, types, cardinality, and stats to suggest cross-source relationships. Return suggestions with confidence scores and recommended visual styling.
+- **DoD:** 10 fixture scenarios return expected suggestions with confidence scores; false positives <20%; suggestions include visual style recommendations (intra-source vs cross-source); background service runs after crawls complete.
+- **Deps:** T-07-01, T-02-04, T-02-08, T-02-12, T-02-16, T-04-04
+- **Risks:** Name variance → fuzzy matching + user override; performance → run in background worker.
 
-### T-07-03: Relationships UI (list & graph view) ⬜
-- **Desc:** Dedicated Relationships screen with list of mappings, auto-suggestions, and graph visualization showing cross-source links.
-- **DoD:** List shows all relationships with source/field details; graph renders nodes and edges; suggestions displayed separately.
-- **Deps:** T-04-02, T-07-01, T-07-02
-- **Risks:** Graph complexity → limit to 2-hop views; lazy load.
+### T-07-03: Relationship suggestions panel ⬜
+- **Desc:** Side panel in canvas showing auto-detected relationship suggestions. Users can accept, reject, or modify suggestions before creating connections.
+- **DoD:** Panel slides out from left with suggested relationships; shows source/target tables, suggested columns, confidence score; Accept button creates visual connection; Reject removes suggestion; Modify opens relationship definition modal.
+- **Deps:** T-07-02, T-04-09, T-04-12
+- **Risks:** Panel space constraints → implement pagination for many suggestions; suggestion quality → allow confidence threshold tuning.
 
-### T-07-04: Relationship editor (add/edit/delete) ⬜
-- **Desc:** UI to manually create, edit, or remove semantic relationships; confirm suggestions; set confidence overrides.
-- **DoD:** Modal or inline editor persists changes; audit logged; graph updates in real-time.
-- **Deps:** T-07-03, T-01-02
-- **Risks:** UX complexity → multi-step wizard for clarity.
+### T-07-04: Relationship validation service ⬜
+- **Desc:** Validate relationships on save: check that fields exist, types are compatible, prevent cycles, flag potential data quality issues. Integrated with canvas creation flow.
+- **DoD:** Invalid relationships rejected with clear errors in modal; warnings shown for type mismatches; cycle detection prevents circular relationships; validation runs during canvas connection creation.
+- **Deps:** T-04-09, T-07-01
+- **Risks:** Type coercion edge cases → document limitations; validation performance → cache field metadata.
 
-### T-07-05: Relationship validation ⬜
-- **Desc:** Validate relationships on save: check that fields exist, types are compatible, prevent cycles, flag potential data quality issues.
-- **DoD:** Invalid relationships rejected with clear errors; warnings shown for type mismatches.
-- **Deps:** T-07-04
-- **Risks:** Type coercion edge cases → document limitations.
+### T-07-05: Relationship management (edit/delete from canvas) ⬜
+- **Desc:** Edit or delete existing relationships directly from canvas. Right-click connections for context menu, or use inspector panel for detailed editing.
+- **DoD:** Right-click connection shows context menu with Edit/Delete options; Delete removes connection with confirmation; Edit opens relationship definition modal pre-populated with current values; changes update canvas visually in real-time.
+- **Deps:** T-04-12, T-07-04, T-01-02
+- **Risks:** UX complexity → provide clear visual feedback for relationship states; undo functionality → implement relationship change history.
 
 ---
 
@@ -537,55 +547,61 @@
 
 ---
 
-## Phase 10 — Graph & Lineage (Table/Collection-level)
+## Phase 10 — Advanced Graph Features (Canvas-Enhanced)
 
-### T-10-01: Graph repo & API (extended) ⬜
-- **Desc:** CRUD nodes/edges; filters; stats; unique edge constraint; support SEMANTIC_LINK edge type for cross-source relationships.
-- **DoD:** Create/update JOINS_TO/DERIVES_FROM/SEMANTIC_LINK; persistence verified.
-- **Deps:** T-01-01, T-07-01
-- **Risks:** Dup edges → DB unique index.
+### T-10-01: Graph repo & API (extended for canvas) ⬜
+- **Desc:** CRUD nodes/edges with canvas positioning; filters; stats; unique edge constraint; support SEMANTIC_LINK edge type for cross-source relationships with visual properties.
+- **DoD:** Create/update JOINS_TO/DERIVES_FROM/SEMANTIC_LINK with canvas coordinates; persistence includes visual properties; API supports canvas queries (nodes in viewport, relationship paths).
+- **Deps:** T-01-01, T-07-01, T-04-10
+- **Risks:** Dup edges → DB unique index; canvas data growth → implement spatial indexing.
 
-### T-10-02: Graph UI (Cytoscape, enhanced) ⬜
-- **Desc:** Canvas layouts; drag-to-link; inspector relationship editor; highlight semantic links with distinct styling.
-- **DoD:** Add/remove/edit edges visually; semantic relationships render distinctly; audit entries on save.
-- **Deps:** T-10-01, T-04-04, T-07-03
-- **Risks:** Hairball → 1–2 hop focus + lazy expand.
+### T-10-02: "Where used?" neighborhood (canvas integration) ⬜
+- **Desc:** Query neighbors by edge types; filter by type; show cross-source dependencies via semantic links. Integrate with canvas to highlight relationship paths visually.
+- **DoD:** Selecting entity highlights consumers/producers on canvas; filter controls show/hide relationship types; multi-hop path visualization; tests pass with canvas mock data.
+- **Deps:** T-10-01, T-04-07
+- **Risks:** Visual complexity with many relationships → implement relationship filtering and focus modes.
 
-### T-10-03: "Where used?" neighborhood (cross-source) ⬜
-- **Desc:** Query neighbors by edge types; filter by type; show cross-source dependencies via semantic links.
-- **DoD:** Selecting entity shows consumers/producers across all sources; tests pass.
-- **Deps:** T-10-01
-- **Risks:** None.
+### T-10-03: Lineage from SQL files (canvas aware) ⬜
+- **Desc:** Parse local SQL (dbt/ETL) → table-level DERIVES_FROM; provenance; visualize lineage connections on canvas with distinct styling.
+- **DoD:** Fixture SQL → expected edges with canvas positions; lineage relationships render as dashed connections; provenance recorded with file references; SQL parsing works for PG/MySQL/DuckDB.
+- **Deps:** T-10-01, T-04-07
+- **Risks:** SQL dialects → start PG/MySQL, add DuckDB later; file monitoring → implement file watcher for SQL changes.
 
-### T-10-04: Lineage from SQL files (relational) ⬜
-- **Desc:** Parse local SQL (dbt/ETL) → table-level DERIVES_FROM; provenance.
-- **DoD:** Fixture SQL → expected edges; provenance recorded.
-- **Deps:** T-10-01
-- **Risks:** Dialects → start PG/MySQL, add DuckDB later.
+### T-10-04: Canvas performance optimization ⬜
+- **Desc:** Optimize canvas rendering for large graphs with many relationships. Implement viewport culling, relationship bundling, and lazy loading of connection details.
+- **DoD:** Canvas performs smoothly with 50+ data sources and 200+ relationships; viewport culling only renders visible elements; relationship details load on-demand; zoom/pan remains responsive.
+- **Deps:** T-04-07, T-07-05
+- **Risks:** Performance testing → create synthetic large datasets; rendering complexity → may require WebGL for very large canvases.
 
 ---
 
 ## Phase 11 — Export & Packaging
 
-### T-11-01: Data dictionary export (enhanced) ⬜
-- **Desc:** Export Markdown/PDF per source/domain with owners, PII flags, verified status, semantic relationships.
-- **DoD:** Files save locally; relationship maps included; counts validated; audit entry logged.
-- **Deps:** T-04-04, T-06-03, T-07-01
-- **Risks:** None.
+### T-11-01: Canvas export/import system ⬜
+- **Desc:** Export complete canvas state as portable JSON package. Import canvas from another Semantiqa instance. Include data sources, relationships, visual layout, and metadata.
+- **DoD:** Export creates JSON file with canvas state, data source definitions (no credentials), relationship mappings, visual properties; Import recreates identical canvas layout; validation ensures data integrity; handles version compatibility; credential mapping workflow for imported data sources.
+- **Deps:** T-04-10, T-04-15, T-07-01
+- **Risks:** Credential security → never export credentials, require re-authentication; schema evolution → implement migration for older canvas exports; large canvas size → optimize JSON structure.
 
-### T-11-02: Report export ⬜
+### T-11-02: Data dictionary export (enhanced) ⬜
+- **Desc:** Export Markdown/PDF per source/domain with owners, PII flags, verified status, semantic relationships, and canvas layout diagrams.
+- **DoD:** Files save locally; relationship maps included with visual layout; canvas diagram rendered as image; counts validated; audit entry logged; export includes canvas context.
+- **Deps:** T-04-10, T-06-03, T-07-01
+- **Risks:** Canvas rendering → implement headless canvas capture; layout complexity → simplify diagram for print format.
+
+### T-11-03: Report export ⬜
 - **Desc:** Export report results as CSV/Excel; include query plan and metadata in separate sheet/section.
 - **DoD:** Export button on report detail saves file; metadata sheet included; audit logged.
 - **Deps:** T-09-03
 - **Risks:** Large datasets → warn on size; apply caps.
 
-### T-11-03: Dashboard export ⬜
+### T-11-04: Dashboard export ⬜
 - **Desc:** Export dashboard as PDF with all visualizations rendered; include refresh timestamps and metadata.
 - **DoD:** PDF export button generates multi-page document; charts render correctly; metadata footer on each page.
 - **Deps:** T-09-06
 - **Risks:** Rendering complexity → use headless chart capture; defer to post-MVP if complex.
 
-### T-11-04: Signed installers & offline updates ⬜
+### T-11-05: Signed installers & offline updates ⬜
 - **Desc:** Build signed installers (Win/macOS); auto-update off; offline patches.
 - **DoD:** Install on locked-down Windows/macOS; runs w/o admin; patch flow tested.
 - **Deps:** T-00-03
@@ -642,11 +658,19 @@
 - T-03-01, all T-02 persist tasks → T-03-02
 - T-03-02 → T-03-03
 
-### Phase 4
+### Phase 4 (Canvas Infrastructure)
 - T-00-03, T-00-04 → T-04-01
-- T-04-01 → T-04-02
-- T-04-02 → T-04-03, T-04-07
-- Wizard flow: T-04-06 → T-04-07 → T-04-08 → T-04-09 → T-04-10 → T-04-11 → T-04-12 → T-04-13
+- T-01-01, T-04-01 → T-04-02 (database schema)
+- T-04-02 → T-04-03 (navigation)
+- T-04-03 → T-04-04 (canvas foundation)
+- T-04-04 → T-04-05 (blocks), T-04-07 (floating UI)
+- T-04-05 → T-04-06 (drill-down), T-04-08 (relationships), T-04-13 (inspector)
+- T-04-07, existing wizard → T-04-12 (wizard integration)
+- T-04-08 → T-04-09 (connection flow) → T-04-10 (relationship modal)
+- T-04-06, T-01-01, T-04-08 → T-04-11 (state persistence)
+- T-04-11, T-04-07 → T-04-16 (save controls)
+- T-04-12, T-00-04, T-01-01 → T-04-14 (provisioning service)
+- T-04-14 → T-04-15 (status visualization)
 
 ### Phase 5
 - T-00-01 → T-05-01
@@ -659,12 +683,12 @@
 - T-05-04, T-04-04 → T-06-02
 - T-04-04, T-01-01 → T-06-03
 
-### Phase 7
+### Phase 7 (Canvas-Integrated Relationships)
 - T-01-01 → T-07-01
-- T-07-01, all T-02 persist → T-07-02
-- T-04-02, T-07-01, T-07-02 → T-07-03
-- T-07-03, T-01-02 → T-07-04
-- T-07-04 → T-07-05
+- T-07-01, all T-02 persist, T-04-05 → T-07-02
+- T-07-02, T-04-10, T-04-13 → T-07-03 (suggestions panel)
+- T-04-10, T-07-01 → T-07-04 (validation service)
+- T-04-13, T-07-04, T-01-02 → T-07-05 (relationship management)
 
 ### Phase 8
 - T-07-01, T-03-03 → T-08-01
@@ -682,16 +706,18 @@
 - T-09-03, T-01-01 → T-09-04
 - T-09-04 → T-09-05 → T-09-06
 
-### Phase 10
-- T-01-01, T-07-01 → T-10-01
-- T-10-01, T-04-04, T-07-03 → T-10-02
-- T-10-01 → T-10-03, T-10-04
+### Phase 10 (Advanced Graph Features)
+- T-01-01, T-07-01, T-04-11 → T-10-01
+- T-10-01, T-04-08 → T-10-02 (neighborhood visualization)
+- T-10-01, T-04-08 → T-10-03 (lineage visualization)
+- T-04-08, T-07-05 → T-10-04 (performance optimization)
 
-### Phase 11
-- T-04-04, T-06-03, T-07-01 → T-11-01
-- T-09-03 → T-11-02
-- T-09-06 → T-11-03
-- T-00-03 → T-11-04
+### Phase 11 (Export & Packaging)
+- T-04-11, T-04-16, T-07-01 → T-11-01 (canvas export/import)
+- T-04-11, T-06-03, T-07-01 → T-11-02 (data dictionary)
+- T-09-03 → T-11-03 (report export)
+- T-09-06 → T-11-04 (dashboard export)
+- T-00-03 → T-11-05 (installers)
 
 ### Phase 12
 - T-08-04 → T-12-01
@@ -701,4 +727,4 @@
 
 ---
 
-**v2.0 is now the authoritative MVP roadmap with phase-based numbering, cross-source relationships, federated queries, and reports/dashboards as first-class features.**
+**v2.1 is now the authoritative MVP roadmap with canvas-based UI, integrated relationship management, and visual workflow design inspired by modern tools like n8n. The canvas replaces separate Sources and Relationships screens with a unified infinite workspace.**

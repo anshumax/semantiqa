@@ -59,6 +59,49 @@
   flex: 1;
   position: relative;
   overflow: hidden;
+  transition: transform 0.3s ease-in-out, opacity 0.2s ease;
+}
+
+.canvas-workspace__content--transitioning {
+  pointer-events: none;
+}
+
+.canvas-workspace__content--drill-down {
+  animation: drill-down-transition 0.3s ease-in-out;
+}
+
+.canvas-workspace__content--drill-up {
+  animation: drill-up-transition 0.3s ease-in-out;
+}
+
+@keyframes drill-down-transition {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes drill-up-transition {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .canvas-workspace__instructions {

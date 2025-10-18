@@ -13,7 +13,7 @@
 
 ## Progress Summary
 
-**Overall Progress:** 27/83 tasks completed (32%)
+**Overall Progress:** 30/83 tasks completed (36%)
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
@@ -21,7 +21,7 @@
 | Phase 1: Storage & Audit | ✅ Complete | 2/2 |
 | Phase 2: Connections & Metadata | ✅ Complete | 16/16 |
 | Phase 3: Embeddings & Search | ✅ Complete | 3/3 |
-| Phase 4: UI Foundations (Canvas) | ⬜ Not Started | 1/15 |
+|| Phase 4: UI Foundations (Canvas) | 🔄 In Progress | 4/15 |
 | Phase 5: Model Manager | ⬜ Not Started | 0/4 |
 | Phase 6: Summaries & Docs | ⬜ Not Started | 0/3 |
 | Phase 7: Canvas-Integrated Relationships | ⬜ Not Started | 0/5 |
@@ -269,30 +269,30 @@
 - **Risks:** Over-abstraction; keep scope to near-term needs.
 - **Notes:** UI foundation established through implementation of explorer components, wizard forms, inspector panels, and IPC communication patterns. Design system implemented with consistent styling and layout primitives.
 
-### T-04-02: Canvas database schema ⬜
-- **Status:** Not Started
+### T-04-02: Canvas database schema ✅
+- **Status:** Completed (2025-10-18)
 - **Desc:** Extend SQLite schema for canvas storage. Tables for canvas metadata, block positions, relationship visual properties, and canvas versions. Design for export/import compatibility.
 - **DoD:** `canvas_state` table with JSON columns for layout data; `canvas_blocks` table for data source positioning; `canvas_relationships` table for visual connection properties; migration script updates existing installations; schema supports full export/import; foreign key constraints maintain data integrity.
 - **Deps:** T-01-01, T-04-01
 - **Risks:** Schema complexity → balance normalization vs JSON flexibility; migration safety → backup existing data before schema changes.
 
-### T-04-03: Main navigation shell (3-tab) ⬜
-- **Status:** Not Started
+### T-04-03: Main navigation shell (3-tab) ✅
+- **Status:** Completed (2025-10-18)
 - **Desc:** Top-level navigation with 3 main screens: Search & Ask, Sources (Canvas), Reports & Dashboards. Sources screen becomes unified canvas for data sources and relationships.
 - **DoD:** Navigation renders; all 3 screens have placeholder views; active state highlights; keyboard navigation works; Sources tab loads canvas view.
 - **Deps:** T-04-02
 - **Risks:** Navigation complexity → keep simple tab/sidebar pattern.
 - **Notes:** Updated from 4-tab to 3-tab navigation, merging Sources and Relationships into unified canvas.
 
-### T-04-04: Canvas infrastructure foundation ⬜
-- **Status:** Not Started  
+### T-04-04: Canvas infrastructure foundation ✅
+- **Status:** Completed (2025-10-18)
 - **Desc:** Core canvas rendering engine with infinite scroll, zoom/pan controls, dotted background pattern, and viewport management. SVG-based rendering for crisp scaling.
 - **DoD:** Empty canvas renders with dotted background; mouse wheel zoom (0.1x - 3x); pan with middle-click or space+drag; viewport bounds tracked; zoom level persisted; smooth animations.
 - **Deps:** T-04-03
 - **Risks:** Performance on large canvases → implement viewport culling; browser compatibility → test across Chromium versions.
 
-### T-04-05: Canvas block system ⬜
-- **Status:** Not Started
+### T-04-05: Canvas block system ✅
+- **Status:** Completed (2025-10-18)
 - **Desc:** Draggable data source blocks with connection name, database name, status indicators, and visual styling. Auto-layout for initial positioning, manual drag for user arrangement.
 - **DoD:** Blocks render with rounded corners and subtle shadows; display connection name + database name; draggable with snap-to-grid option; position persisted to SQLite; visual feedback on hover/selection; status badges (connecting/connected/error/crawling/crawled).
 - **Deps:** T-04-03

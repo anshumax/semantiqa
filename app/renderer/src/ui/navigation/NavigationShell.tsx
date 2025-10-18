@@ -3,7 +3,7 @@ import { ExplorerShell } from '../explorer';
 import { ModelsScreen } from '../models';
 import './NavigationShell.css';
 
-type NavigationScreen = 'search-ask' | 'sources' | 'relationships' | 'reports-dashboards';
+type NavigationScreen = 'search-ask' | 'sources' | 'reports-dashboards';
 
 export function NavigationShell() {
   const [activeScreen, setActiveScreen] = useState<NavigationScreen>('sources');
@@ -43,20 +43,8 @@ export function NavigationShell() {
               onKeyDown={(e) => handleKeyDown(e, 'sources')}
               aria-current={activeScreen === 'sources' ? 'page' : undefined}
             >
-              <span className="nav-item__icon" aria-hidden="true">🗂️</span>
+              <span className="nav-item__icon" aria-hidden="true">🎨</span>
               <span className="nav-item__label">Sources</span>
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              className={`nav-item ${activeScreen === 'relationships' ? 'nav-item--active' : ''}`}
-              onClick={() => handleNavigate('relationships')}
-              onKeyDown={(e) => handleKeyDown(e, 'relationships')}
-              aria-current={activeScreen === 'relationships' ? 'page' : undefined}
-            >
-              <span className="nav-item__icon" aria-hidden="true">🔗</span>
-              <span className="nav-item__label">Relationships</span>
             </button>
           </li>
           <li>
@@ -76,8 +64,7 @@ export function NavigationShell() {
 
       <main className="navigation-shell__content">
         {activeScreen === 'search-ask' && <SearchAskScreen />}
-        {activeScreen === 'sources' && <ExplorerShell />}
-        {activeScreen === 'relationships' && <RelationshipsScreen />}
+        {activeScreen === 'sources' && <CanvasWorkspaceScreen />}
         {activeScreen === 'reports-dashboards' && <ReportsDashboardsScreen />}
       </main>
     </div>
@@ -106,21 +93,30 @@ function SearchAskScreen() {
   );
 }
 
-function RelationshipsScreen() {
+function CanvasWorkspaceScreen() {
   return (
     <div className="placeholder-screen">
       <div className="placeholder-screen__content">
-        <h1>Relationships</h1>
-        <p>Cross-source semantic relationships and graph visualization will be available here.</p>
+        <h1>Canvas Workspace</h1>
+        <p>Unified canvas for data sources and relationships - inspired by n8n visual workflow design.</p>
         <div className="placeholder-screen__features">
-          <h2>Features (Coming Soon)</h2>
+          <h2>Canvas Features (Coming Soon)</h2>
           <ul>
-            <li>Auto-detected field mappings across sources</li>
-            <li>Manual relationship editor</li>
-            <li>Graph visualization of entity relationships</li>
-            <li>Relationship validation and conflict detection</li>
-            <li>Lineage and dependency tracking</li>
+            <li>Infinite canvas with dotted background</li>
+            <li>Draggable data source blocks with status indicators</li>
+            <li>Visual relationship connections with Bezier curves</li>
+            <li>Double-click drill-down (sources → tables)</li>
+            <li>n8n-style connection creation flow</li>
+            <li>Floating UI elements (Plus button, mini-map, zoom controls)</li>
+            <li>Auto-layout algorithms and manual positioning</li>
+            <li>Canvas state persistence and export/import</li>
+            <li>Real-time collaboration and change tracking</li>
           </ul>
+        </div>
+        <div style={{ marginTop: '2rem', padding: '1rem', border: '1px solid rgba(214, 216, 224, 0.12)', borderRadius: '8px' }}>
+          <h3>Current Sources Explorer (Temporary)</h3>
+          <p>The existing tree-based Sources explorer is shown below until the canvas is implemented:</p>
+          <ExplorerShell />
         </div>
       </div>
     </div>

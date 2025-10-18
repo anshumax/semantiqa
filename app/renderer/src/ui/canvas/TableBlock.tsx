@@ -34,6 +34,7 @@ export function TableBlock({
   const blockRef = useRef<HTMLDivElement>(null);
 
   const getTableIcon = () => {
+    if (!table?.type) return '🗂️';
     switch (table.type) {
       case 'view':
         return '👁️';
@@ -60,7 +61,7 @@ export function TableBlock({
   };
 
   const formatRowCount = (count?: number) => {
-    if (!count) return '—';
+    if (!count || count === 0) return '—';
     if (count < 1000) return count.toString();
     if (count < 1000000) return `${(count / 1000).toFixed(1)}K`;
     return `${(count / 1000000).toFixed(1)}M`;
@@ -149,7 +150,7 @@ export function TableBlock({
       onContextMenu={handleContextMenu}
       tabIndex={0}
       role="button"
-      aria-label={`${table.type} ${table.name}`}
+      aria-label={`${table?.type || 'table'} ${table?.name || 'unknown'}`}
     >
       {/* Selection outline */}
       {selected && <div className="table-block__selection-outline" />}

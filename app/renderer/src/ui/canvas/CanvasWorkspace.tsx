@@ -184,10 +184,23 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
           {state.currentLevel === 'sources' ? (
             <DemoCanvasBlocks onDrillDown={drillDown} />
           ) : (
-            <DemoTableBlocks 
-              sourceKind={state.sourceKind as any} 
-              sourceName={state.sourceName || 'Unknown'}
-            />
+            state.sourceKind ? (
+              <DemoTableBlocks 
+                sourceKind={state.sourceKind as any} 
+                sourceName={state.sourceName || 'Unknown'}
+              />
+            ) : (
+              <div style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                color: '#666',
+                textAlign: 'center'
+              }}>
+                No tables to display
+              </div>
+            )
           )}
         </Canvas>
         
@@ -296,19 +309,23 @@ function DemoCanvasBlocks({ onDrillDown }: { onDrillDown: (context: DrillDownCon
         <CanvasBlock
           key={source.id}
           id={source.id}
-          kind={source.kind}
-          name={source.name}
-          database={source.database}
-          status={source.status}
-          tableCount={source.tableCount}
-          x={source.x}
-          y={source.y}
-          width={200}
-          height={120}
-          error={source.error}
+          position={{ x: source.x, y: source.y }}
+          size={{ width: 200, height: 120 }}
+          dataSource={{
+            id: source.id,
+            name: source.name,
+            kind: source.kind,
+            connectionStatus: source.status === 'connected' ? 'connected' : 
+                            source.status === 'error' ? 'error' : 'unknown',
+            crawlStatus: source.status === 'crawling' ? 'crawling' : 
+                        source.status === 'connected' ? 'crawled' : 'not_crawled',
+            databaseName: source.database,
+            tableCount: source.tableCount,
+            lastError: source.error,
+          }}
           selected={false}
-          onPositionChange={(id, newX, newY) => {
-            console.log(`Block ${id} moved to (${newX}, ${newY})`);
+          onPositionChange={(id, position) => {
+            console.log(`Block ${id} moved to (${position.x}, ${position.y})`);
           }}
           onClick={(id) => {
             console.log(`Block ${id} clicked`);
@@ -316,7 +333,7 @@ function DemoCanvasBlocks({ onDrillDown }: { onDrillDown: (context: DrillDownCon
           onDoubleClick={(id) => {
             console.log(`Block ${id} double-clicked - drilling down`);
             const sourceData = demoDataSources.find(s => s.id === id);
-            if (sourceData) {
+            if (sourceData && sourceData.kind && sourceData.name && sourceData.database) {
               const drillContext: DrillDownContext = {
                 sourceId: sourceData.id,
                 sourceName: sourceData.name,

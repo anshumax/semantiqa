@@ -8,6 +8,14 @@ import { CanvasFloatingUI, FloatingElement } from './CanvasFloatingUI';
 import { FloatingPlusButton } from './FloatingPlusButton';
 import { ZoomControls } from './ZoomControls';
 import { CanvasMiniMap } from './CanvasMiniMap';
+import { RelationshipRenderer } from './RelationshipRenderer';
+import { 
+  VisualRelationship, 
+  getRelationshipType, 
+  getStyleForRelationship,
+  RelationshipInteractionEvent
+} from './relationshipTypes';
+import { getConnectionPointPosition, calculateOptimalConnectionPoints } from './curveUtils';
 import { CanvasViewport } from './types';
 import { DrillDownContext, createDefaultTransition } from './navigationTypes';
 import './CanvasWorkspace.css';
@@ -99,6 +107,26 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     // TODO: Integrate with actual connection wizard when available
   }, []);
   
+  // Relationship interaction handler
+  const handleRelationshipInteraction = useCallback((event: RelationshipInteractionEvent) => {
+    console.log('Relationship interaction:', event.type, event.relationshipId);
+    
+    switch (event.type) {
+      case 'hover':
+        console.log('Hovering over relationship:', event.relationshipId);
+        break;
+      case 'click':
+        console.log('Clicked relationship:', event.relationshipId);
+        break;
+      case 'double-click':
+        console.log('Double-clicked relationship - open editor:', event.relationshipId);
+        break;
+      case 'context-menu':
+        console.log('Right-clicked relationship - show menu:', event.relationshipId);
+        break;
+    }
+  }, []);
+  
   // Keyboard shortcuts for zoom controls
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -182,7 +210,14 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         >
           {/* Render different content based on current level */}
           {state.currentLevel === 'sources' ? (
-            <DemoCanvasBlocks onDrillDown={drillDown} />
+            <>
+              <DemoCanvasBlocks onDrillDown={drillDown} />
+              {/* Render relationships between data sources */}
+              <RelationshipRenderer 
+                relationships={createDemoRelationships()}
+                onRelationshipInteraction={handleRelationshipInteraction}
+              />
+            </>
           ) : (
             state.sourceKind ? (
               <DemoTableBlocks 
@@ -256,6 +291,127 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       </div>
     </div>
   );
+}
+
+// Function to create demo relationships between data sources
+function createDemoRelationships(): VisualRelationship[] {
+  const relationships: VisualRelationship[] = [];
+  
+  // Relationship 1: PostgreSQL to MongoDB (cross-source)
+  const pgToMongo: VisualRelationship = {
+    id: 'pg-to-mongo-1',
+    sourceBlockId: 'demo-pg-1',
+    targetBlockId: 'demo-mongo-1',
+    sourceKind: 'postgres',
+    targetKind: 'mongo',
+    type: 'cross-source',
+    sourcePoint: {
+      id: 'pg-right-1',
+      blockId: 'demo-pg-1',
+      position: getConnectionPointPosition(
+        { x: -100, y: -60 },
+        { width: 200, height: 120 },
+        'right'
+      ),
+      anchor: 'right'
+    },
+    targetPoint: {
+      id: 'mongo-left-1',
+      blockId: 'demo-mongo-1',
+      position: getConnectionPointPosition(
+        { x: 150, y: -60 },
+        { width: 200, height: 120 },
+        'left'
+      ),
+      anchor: 'left'
+    },
+    style: getStyleForRelationship('cross-source', 'postgres'),
+    metadata: {
+      label: 'User Sync',
+      description: 'User data synchronization between PostgreSQL and MongoDB',
+      cardinality: '1:N'
+    }
+  };
+  
+  // Relationship 2: MongoDB to DuckDB (cross-source)
+  const mongoToDuck: VisualRelationship = {
+    id: 'mongo-to-duck-1',
+    sourceBlockId: 'demo-mongo-1',
+    targetBlockId: 'demo-duckdb-1',
+    sourceKind: 'mongo',
+    targetKind: 'duckdb',
+    type: 'cross-source',
+    sourcePoint: {
+      id: 'mongo-bottom-1',
+      blockId: 'demo-mongo-1',
+      position: getConnectionPointPosition(
+        { x: 150, y: -60 },
+        { width: 200, height: 120 },
+        'bottom'
+      ),
+      anchor: 'bottom'
+    },
+    targetPoint: {
+      id: 'duck-top-1',
+      blockId: 'demo-duckdb-1',
+      position: getConnectionPointPosition(
+        { x: 25, y: 100 },
+        { width: 200, height: 120 },
+        'top'
+      ),
+      anchor: 'top'
+    },
+    style: getStyleForRelationship('cross-source', 'mongo'),
+    metadata: {
+      label: 'Analytics ETL',
+      description: 'Extract analytics data from MongoDB to DuckDB warehouse',
+      cardinality: 'N:1'
+    }
+  };
+  
+  // Relationship 3: PostgreSQL to MySQL (cross-source, with error styling)
+  const pgToMysql: VisualRelationship = {
+    id: 'pg-to-mysql-1',
+    sourceBlockId: 'demo-pg-1',
+    targetBlockId: 'demo-mysql-1',
+    sourceKind: 'postgres',
+    targetKind: 'mysql',
+    type: 'cross-source',
+    sourcePoint: {
+      id: 'pg-left-1',
+      blockId: 'demo-pg-1',
+      position: getConnectionPointPosition(
+        { x: -100, y: -60 },
+        { width: 200, height: 120 },
+        'left'
+      ),
+      anchor: 'left'
+    },
+    targetPoint: {
+      id: 'mysql-right-1',
+      blockId: 'demo-mysql-1',
+      position: getConnectionPointPosition(
+        { x: -150, y: 120 },
+        { width: 200, height: 120 },
+        'right'
+      ),
+      anchor: 'right'
+    },
+    style: {
+      ...getStyleForRelationship('cross-source', 'postgres'),
+      strokeColor: '#f87171', // Error red
+      strokeDasharray: '8,4',
+      opacity: 0.7
+    },
+    metadata: {
+      label: 'Legacy Sync (Error)',
+      description: 'Legacy data sync - currently experiencing connection issues',
+      cardinality: '1:1'
+    }
+  };
+  
+  relationships.push(pgToMongo, mongoToDuck, pgToMysql);
+  return relationships;
 }
 
 // Demo canvas blocks using CanvasBlock component

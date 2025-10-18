@@ -13,7 +13,7 @@
 
 ## Progress Summary
 
-**Overall Progress:** 31/83 tasks completed (37%)
+**Overall Progress:** 32/83 tasks completed (39%)
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
@@ -21,7 +21,7 @@
 | Phase 1: Storage & Audit | ✅ Complete | 2/2 |
 | Phase 2: Connections & Metadata | ✅ Complete | 16/16 |
 | Phase 3: Embeddings & Search | ✅ Complete | 3/3 |
-|| Phase 4: UI Foundations (Canvas) | 🔄 In Progress | 5/15 |
+|| Phase 4: UI Foundations (Canvas) | 🔄 In Progress | 6/15 |
 | Phase 5: Model Manager | ⬜ Not Started | 0/4 |
 | Phase 6: Summaries & Docs | ⬜ Not Started | 0/3 |
 | Phase 7: Canvas-Integrated Relationships | ⬜ Not Started | 0/5 |
@@ -305,8 +305,8 @@
 - **Deps:** T-04-04, T-02-04, T-02-08, T-02-12, T-02-16
 - **Risks:** Navigation complexity → limit to 2 levels (sources → tables); animation performance → use CSS transforms.
 
-### T-04-07: Canvas floating UI elements ⬜
-- **Status:** Not Started
+### T-04-07: Canvas floating UI elements ✅
+- **Status:** Completed (2025-10-18)
 - **Desc:** Floating Plus button (bottom-right), mini-map (top-right), zoom controls (bottom-left), and canvas reset button. Overlay elements that don't interfere with canvas interactions.
 - **DoD:** Plus button opens connection wizard; mini-map shows viewport location on large canvases; zoom controls work with buttons and keyboard (+/-/0 to reset); canvas reset centers and fits all blocks; elements positioned absolutely and don't scroll with canvas.
 - **Deps:** T-04-04

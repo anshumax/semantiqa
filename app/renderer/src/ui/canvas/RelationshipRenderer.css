@@ -1,0 +1,171 @@
+.relationship-renderer {
+  pointer-events: auto;
+  user-select: none;
+  overflow: visible;
+}
+
+/* Relationship curves */
+.relationship-curve {
+  cursor: pointer;
+}
+
+.relationship-curve--hovered {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.relationship-curve--selected {
+  filter: drop-shadow(0 0 6px currentColor) brightness(1.2);
+}
+
+/* Interaction area for easier clicking */
+.relationship-interaction-area {
+  cursor: pointer;
+  opacity: 0;
+}
+
+.relationship-interaction-area:hover {
+  opacity: 0.1;
+  stroke: currentColor !important;
+}
+
+/* Relationship labels */
+.relationship-label {
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-weight: 500;
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+}
+
+/* Arrow markers */
+marker path {
+  transition: fill 0.2s ease;
+}
+
+/* Relationship type specific styles */
+.relationship-curve[data-type="intra-source"] {
+  opacity: 0.8;
+}
+
+.relationship-curve[data-type="cross-source"] {
+  opacity: 0.9;
+}
+
+.relationship-curve[data-type="derived"] {
+  opacity: 0.7;
+}
+
+.relationship-curve[data-type="joins-to"] {
+  opacity: 0.6;
+}
+
+/* Animation for relationship appearance */
+.relationship-curve {
+  animation: relationship-fade-in 0.3s ease-out;
+}
+
+@keyframes relationship-fade-in {
+  0% {
+    opacity: 0;
+    stroke-width: 0;
+  }
+  100% {
+    opacity: var(--final-opacity, 1);
+    stroke-width: var(--final-stroke-width, 2);
+  }
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .relationship-label {
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .relationship-curve {
+    stroke-width: calc(var(--stroke-width, 2) + 1) !important;
+  }
+  
+  .relationship-curve--hovered {
+    filter: drop-shadow(0 0 6px currentColor) brightness(1.5);
+  }
+  
+  .relationship-curve--selected {
+    filter: drop-shadow(0 0 8px currentColor) brightness(1.8);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .relationship-curve,
+  .relationship-label,
+  marker path {
+    transition: none;
+    animation: none;
+  }
+  
+  .relationship-curve--hovered,
+  .relationship-curve--selected {
+    filter: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .relationship-renderer {
+    opacity: 0.6;
+  }
+  
+  .relationship-curve--hovered,
+  .relationship-curve--selected {
+    filter: none;
+  }
+  
+  .relationship-label {
+    opacity: 1 !important;
+  }
+}
+
+/* Touch device improvements */
+@media (hover: none) {
+  .relationship-interaction-area {
+    stroke-width: 16px !important;
+  }
+  
+  .relationship-curve:hover {
+    filter: none;
+  }
+}
+
+/* Relationship tooltips (when integrated with tooltip system) */
+.relationship-tooltip {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 1000;
+  pointer-events: none;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+}
+
+.relationship-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.9);
+}
+
+[data-theme="dark"] .relationship-tooltip {
+  background: rgba(255, 255, 255, 0.9);
+  color: #000;
+}
+
+[data-theme="dark"] .relationship-tooltip::before {
+  border-top-color: rgba(255, 255, 255, 0.9);
+}

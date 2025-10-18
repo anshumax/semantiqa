@@ -1,0 +1,163 @@
+.canvas-mini-map {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8px);
+  position: relative;
+  cursor: crosshair;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.canvas-mini-map:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.canvas-mini-map:focus {
+  outline: none;
+  border-color: var(--color-accent-blue, #3b82f6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Background pattern */
+.canvas-mini-map__background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.15) 1px, transparent 0);
+  background-size: 8px 8px;
+  opacity: 0.3;
+}
+
+/* Content area (where blocks can be placed) */
+.canvas-mini-map__content {
+  position: absolute;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 2px;
+}
+
+/* Viewport indicator (current view) */
+.canvas-mini-map__viewport {
+  position: absolute;
+  background: rgba(59, 130, 246, 0.2);
+  border: 2px solid var(--color-accent-blue, #3b82f6);
+  border-radius: 3px;
+  pointer-events: none;
+  transition: all 0.1s ease;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+/* Zoom level display */
+.canvas-mini-map__zoom {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #666;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 1px 4px;
+  border-radius: 2px;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+/* Dark theme */
+[data-theme="dark"] .canvas-mini-map {
+  background: rgba(30, 30, 30, 0.9);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .canvas-mini-map__background {
+  background: 
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.2) 1px, transparent 0);
+}
+
+[data-theme="dark"] .canvas-mini-map__content {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+[data-theme="dark"] .canvas-mini-map__viewport {
+  background: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .canvas-mini-map__zoom {
+  color: #ccc;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .canvas-mini-map {
+    transform: scale(0.8);
+    transform-origin: top right;
+  }
+
+  .canvas-mini-map__zoom {
+    font-size: 8px;
+    bottom: 1px;
+    right: 2px;
+    padding: 1px 3px;
+  }
+}
+
+/* Touch improvements */
+@media (hover: none) {
+  .canvas-mini-map:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .canvas-mini-map {
+    border-width: 2px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .canvas-mini-map__content {
+    border-width: 2px;
+  }
+
+  .canvas-mini-map__viewport {
+    border-width: 3px;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .canvas-mini-map,
+  .canvas-mini-map__viewport {
+    transition: none;
+  }
+}
+
+/* Animation for appearing */
+.canvas-mini-map {
+  animation: mini-map-enter 0.2s ease-out;
+}
+
+@keyframes mini-map-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Show/hide based on content */
+.canvas-mini-map--hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+}

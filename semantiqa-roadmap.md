@@ -13,7 +13,7 @@
 
 ## Progress Summary
 
-**Overall Progress:** 30/83 tasks completed (36%)
+**Overall Progress:** 31/83 tasks completed (37%)
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
@@ -21,7 +21,7 @@
 | Phase 1: Storage & Audit | ✅ Complete | 2/2 |
 | Phase 2: Connections & Metadata | ✅ Complete | 16/16 |
 | Phase 3: Embeddings & Search | ✅ Complete | 3/3 |
-|| Phase 4: UI Foundations (Canvas) | 🔄 In Progress | 4/15 |
+|| Phase 4: UI Foundations (Canvas) | 🔄 In Progress | 5/15 |
 | Phase 5: Model Manager | ⬜ Not Started | 0/4 |
 | Phase 6: Summaries & Docs | ⬜ Not Started | 0/3 |
 | Phase 7: Canvas-Integrated Relationships | ⬜ Not Started | 0/5 |
@@ -298,8 +298,8 @@
 - **Deps:** T-04-03
 - **Risks:** Block collision detection → implement spatial indexing if needed; drag performance → use transform3d for GPU acceleration.
 
-### T-04-06: Canvas navigation and drill-down ⬜
-- **Status:** Not Started
+### T-04-06: Canvas navigation and drill-down ✅
+- **Status:** Completed (2025-10-18)
 - **Desc:** Double-click data source blocks to drill down to table/collection view. Breadcrumb navigation, back button, and smooth transition animations between canvas levels.
 - **DoD:** Double-click opens table canvas; breadcrumb shows "Canvas > PostgreSQL DB > public schema"; back button returns to parent; table blocks show table names + row counts; smooth zoom transitions; navigation history tracked.
 - **Deps:** T-04-04, T-02-04, T-02-08, T-02-12, T-02-16

@@ -1,0 +1,109 @@
+/* Floating UI container - covers the entire canvas area */
+.canvas-floating-ui {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none; /* Allow canvas interactions through */
+  z-index: 100; /* Above canvas content but below modals */
+  overflow: hidden;
+}
+
+/* Individual floating elements */
+.floating-element {
+  position: absolute;
+  pointer-events: auto; /* Re-enable interactions for floating elements */
+  z-index: 10;
+}
+
+/* Positioning presets */
+.floating-element--top-left {
+  top: 16px;
+  left: 16px;
+}
+
+.floating-element--top-right {
+  top: 16px;
+  right: 16px;
+}
+
+.floating-element--bottom-left {
+  bottom: 16px;
+  left: 16px;
+}
+
+.floating-element--bottom-right {
+  bottom: 16px;
+  right: 16px;
+}
+
+.floating-element--center {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Base styling for floating UI elements */
+.floating-element {
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+}
+
+/* Hover effects for interactive elements */
+.floating-element:hover {
+  transform: translateY(-1px);
+}
+
+.floating-element--bottom-right:hover,
+.floating-element--bottom-left:hover {
+  transform: translateY(-2px);
+}
+
+.floating-element--center:hover {
+  transform: translate(-50%, -50%) translateY(-1px);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .floating-element--top-left,
+  .floating-element--top-right {
+    top: 12px;
+  }
+  
+  .floating-element--top-left {
+    left: 12px;
+  }
+  
+  .floating-element--top-right {
+    right: 12px;
+  }
+  
+  .floating-element--bottom-left,
+  .floating-element--bottom-right {
+    bottom: 12px;
+  }
+  
+  .floating-element--bottom-left {
+    left: 12px;
+  }
+  
+  .floating-element--bottom-right {
+    right: 12px;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .floating-element {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Print styles - hide floating UI */
+@media print {
+  .canvas-floating-ui {
+    display: none;
+  }
+}

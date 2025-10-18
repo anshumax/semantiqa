@@ -4,6 +4,10 @@ import { CanvasBlock } from './CanvasBlock';
 import { TableBlock } from './TableBlock';
 import { CanvasBreadcrumbs } from './CanvasBreadcrumbs';
 import { CanvasNavigationProvider, useCanvasNavigation } from './CanvasNavigationContext';
+import { CanvasFloatingUI, FloatingElement } from './CanvasFloatingUI';
+import { FloatingPlusButton } from './FloatingPlusButton';
+import { ZoomControls } from './ZoomControls';
+import { CanvasMiniMap } from './CanvasMiniMap';
 import { CanvasViewport } from './types';
 import { DrillDownContext, createDefaultTransition } from './navigationTypes';
 import './CanvasWorkspace.css';
@@ -66,6 +70,67 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       centerY: 0,
     });
   }, []);
+  
+  // Zoom control handlers
+  const handleZoomIn = useCallback(() => {
+    setViewport(prev => ({
+      ...prev,
+      zoom: Math.min(prev.zoom * 1.2, 3.0)
+    }));
+  }, []);
+  
+  const handleZoomOut = useCallback(() => {
+    setViewport(prev => ({
+      ...prev,
+      zoom: Math.max(prev.zoom / 1.2, 0.1)
+    }));
+  }, []);
+  
+  const handleZoomReset = useCallback(() => {
+    setViewport(prev => ({
+      ...prev,
+      zoom: 1.0
+    }));
+  }, []);
+  
+  // Plus button handler (placeholder)
+  const handleAddDataSource = useCallback(() => {
+    console.log('Add data source clicked - will open connection wizard');
+    // TODO: Integrate with actual connection wizard when available
+  }, []);
+  
+  // Keyboard shortcuts for zoom controls
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if no input/textarea is focused
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement?.tagName === 'INPUT' || 
+                           activeElement?.tagName === 'TEXTAREA' ||
+                           activeElement?.contentEditable === 'true';
+                           
+      if (isInputFocused) return;
+      
+      switch (e.key) {
+        case '+':
+        case '=':
+          e.preventDefault();
+          handleZoomIn();
+          break;
+        case '-':
+        case '_':
+          e.preventDefault();
+          handleZoomOut();
+          break;
+        case '0':
+          e.preventDefault();
+          handleZoomReset();
+          break;
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleZoomIn, handleZoomOut, handleZoomReset]);
 
   const handleBreadcrumbNavigation = useCallback((level: string, path: string[]) => {
     const transition = createDefaultTransition('drill-up');
@@ -125,6 +190,35 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
             />
           )}
         </Canvas>
+        
+        {/* Floating UI overlay */}
+        <CanvasFloatingUI>
+          {/* Plus button - bottom right */}
+          <FloatingElement position="bottom-right">
+            <FloatingPlusButton 
+              onClick={handleAddDataSource}
+              tooltip="Add new data source"
+            />
+          </FloatingElement>
+          
+          {/* Zoom controls - bottom left */}
+          <FloatingElement position="bottom-left">
+            <ZoomControls
+              zoom={viewport.zoom}
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              onZoomReset={handleZoomReset}
+            />
+          </FloatingElement>
+          
+          {/* Mini-map - top right */}
+          <FloatingElement position="top-right">
+            <CanvasMiniMap
+              viewport={viewport}
+              onViewportChange={setViewport}
+            />
+          </FloatingElement>
+        </CanvasFloatingUI>
       </div>
 
       {/* Instructions overlay */}

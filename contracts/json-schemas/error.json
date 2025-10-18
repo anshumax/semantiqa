@@ -9,7 +9,8 @@
         "TIMEOUT",
         "VALIDATION_ERROR",
         "AUTH_REQUIRED",
-        "NOT_FOUND"
+        "NOT_FOUND",
+        "INTERNAL_ERROR"
       ]
     },
     "message": {
@@ -23,5 +24,6 @@
     "message"
   ],
   "additionalProperties": false,
-  "definitions": {}
+  "definitions": {},
+  "$schema": "http://json-schema.org/draft-07/schema#"
 }

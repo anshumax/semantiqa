@@ -11,8 +11,7 @@
     },
     "maxRows": {
       "type": "integer",
-      "exclusiveMinimum": true,
-      "minimum": 0,
+      "exclusiveMinimum": 0,
       "maximum": 10000,
       "default": 500
     }
@@ -22,5 +21,6 @@
     "sql"
   ],
   "additionalProperties": false,
-  "definitions": {}
+  "definitions": {},
+  "$schema": "http://json-schema.org/draft-07/schema#"
 }

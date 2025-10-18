@@ -1,4 +1,5 @@
 export * from './audit';
+export * from './canvas';
 export * from './common';
 export * from './errors';
 export * from './graph';

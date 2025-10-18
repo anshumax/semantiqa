@@ -85,8 +85,7 @@
             },
             "limit": {
               "type": "integer",
-              "exclusiveMinimum": true,
-              "minimum": 0,
+              "exclusiveMinimum": 0,
               "maximum": 50,
               "default": 10
             }
@@ -100,8 +99,7 @@
     },
     "total": {
       "type": "integer",
-      "exclusiveMinimum": true,
-      "minimum": 0
+      "exclusiveMinimum": 0
     }
   },
   "required": [
@@ -109,5 +107,6 @@
     "query"
   ],
   "additionalProperties": false,
-  "definitions": {}
+  "definitions": {},
+  "$schema": "http://json-schema.org/draft-07/schema#"
 }

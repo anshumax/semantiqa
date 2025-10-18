@@ -30,8 +30,7 @@
             },
             "maxJoins": {
               "type": "integer",
-              "exclusiveMinimum": true,
-              "minimum": 0,
+              "exclusiveMinimum": 0,
               "maximum": 5
             }
           },
@@ -47,5 +46,6 @@
     "question"
   ],
   "additionalProperties": false,
-  "definitions": {}
+  "definitions": {},
+  "$schema": "http://json-schema.org/draft-07/schema#"
 }

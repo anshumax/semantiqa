@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ExplorerShell } from '../explorer';
 import { ModelsScreen } from '../models';
+import { CanvasWorkspace } from '../canvas';
 import './NavigationShell.css';
 
 type NavigationScreen = 'search-ask' | 'sources' | 'reports-dashboards';
@@ -94,33 +95,7 @@ function SearchAskScreen() {
 }
 
 function CanvasWorkspaceScreen() {
-  return (
-    <div className="placeholder-screen">
-      <div className="placeholder-screen__content">
-        <h1>Canvas Workspace</h1>
-        <p>Unified canvas for data sources and relationships - inspired by n8n visual workflow design.</p>
-        <div className="placeholder-screen__features">
-          <h2>Canvas Features (Coming Soon)</h2>
-          <ul>
-            <li>Infinite canvas with dotted background</li>
-            <li>Draggable data source blocks with status indicators</li>
-            <li>Visual relationship connections with Bezier curves</li>
-            <li>Double-click drill-down (sources → tables)</li>
-            <li>n8n-style connection creation flow</li>
-            <li>Floating UI elements (Plus button, mini-map, zoom controls)</li>
-            <li>Auto-layout algorithms and manual positioning</li>
-            <li>Canvas state persistence and export/import</li>
-            <li>Real-time collaboration and change tracking</li>
-          </ul>
-        </div>
-        <div style={{ marginTop: '2rem', padding: '1rem', border: '1px solid rgba(214, 216, 224, 0.12)', borderRadius: '8px' }}>
-          <h3>Current Sources Explorer (Temporary)</h3>
-          <p>The existing tree-based Sources explorer is shown below until the canvas is implemented:</p>
-          <ExplorerShell />
-        </div>
-      </div>
-    </div>
-  );
+  return <CanvasWorkspace />;
 }
 
 function ReportsDashboardsScreen() {

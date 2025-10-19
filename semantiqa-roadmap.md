@@ -21,7 +21,7 @@
 | Phase 1: Storage & Audit | ✅ Complete | 2/2 |
 | Phase 2: Connections & Metadata | ✅ Complete | 16/16 |
 | Phase 3: Embeddings & Search | ✅ Complete | 3/3 |
-|| Phase 4: UI Foundations (Canvas) | 🔄 In Progress | 6/15 |
+|| Phase 4: UI Foundations (Canvas) | 🔄 In Progress | 7/15 |
 | Phase 5: Model Manager | ⬜ Not Started | 0/4 |
 | Phase 6: Summaries & Docs | ⬜ Not Started | 0/3 |
 | Phase 7: Canvas-Integrated Relationships | ⬜ Not Started | 0/5 |
@@ -319,12 +319,13 @@
 - **Deps:** T-04-04
 - **Risks:** Curve calculation complexity → use library (e.g., react-flow); performance with many relationships → implement connection culling.
 
-### T-04-09: Connection creation UI flow ⬜
-- **Status:** Not Started
+### T-04-09: Connection creation UI flow ✅
+- **Status:** Completed (2025-10-19)
 - **Desc:** Plus button on blocks initiates connection mode. Bezier curve follows mouse cursor from source block. Click target block to complete connection. Visual feedback during connection creation.
 - **DoD:** Plus icon appears on block hover; click enters connection mode; cursor shows connecting state; Bezier curve dynamically follows mouse; target blocks highlight on hover; click target opens relationship definition modal; ESC cancels connection mode.
 - **Deps:** T-04-07
 - **Risks:** UX complexity → provide clear visual cues; mobile support → adapt for touch interactions.
+- **Notes:** Enhanced connection dots with Plus icons, improved cursor feedback with custom cursors, target block highlighting with visual animations, ESC cancellation, and ConnectionModal integration all working.
 
 ### T-04-10: Relationship definition modal ⬜
 - **Status:** Not Started

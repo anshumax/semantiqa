@@ -16,15 +16,13 @@
   font-size: 13px;
 }
 
-.table-block:hover {
+.table-block:hover:not(.table-block--dragging) {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-  transform: translateY(-1px);
 }
 
 .table-block--dragging {
   cursor: grabbing;
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
-  transform: translateY(-2px);
   z-index: 1000;
 }
 

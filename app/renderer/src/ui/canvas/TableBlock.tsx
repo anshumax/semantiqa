@@ -86,10 +86,12 @@ export function TableBlock({
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return;
 
-    const canvas = blockRef.current?.closest('.canvas');
-    const canvasRect = canvas?.getBoundingClientRect();
+    // Get the canvas content container to calculate relative position
+    const canvasContent = blockRef.current?.closest('.canvas__content');
+    const canvasRect = canvasContent?.getBoundingClientRect();
     if (!canvasRect) return;
 
+    // Calculate new position relative to canvas content, accounting for drag offset
     const newX = e.clientX - canvasRect.left - dragOffset.x;
     const newY = e.clientY - canvasRect.top - dragOffset.y;
 
@@ -138,8 +140,7 @@ export function TableBlock({
       ref={blockRef}
       className={`table-block ${isDragging ? 'table-block--dragging' : ''} ${selected ? 'table-block--selected' : ''}`}
       style={{
-        left: `${x}px`,
-        top: `${y}px`,
+        transform: `translate(${x}px, ${y}px)`,
         width: `${width}px`,
         height: `${height}px`,
         background: getSourceKindColor(),

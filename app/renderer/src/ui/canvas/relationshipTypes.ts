@@ -84,11 +84,11 @@ export interface RelationshipInteractionEvent {
 export const RELATIONSHIP_STYLE_PRESETS: Record<RelationshipType, RelationshipStyle> = {
   'intra-source': {
     strokeWidth: 2,
-    strokeColor: '#8bb4f7',
+    strokeColor: 'rgba(139, 180, 247, 0.6)',
     strokeDasharray: '5,5',
     opacity: 0.8,
-    hoverColor: '#5b9bf4',
-    selectedColor: '#3b82f6',
+    hoverColor: 'rgba(91, 155, 244, 0.8)',
+    selectedColor: 'rgba(59, 130, 246, 1)',
     curve: {
       type: 'bezier',
       curvature: 0.4,
@@ -97,10 +97,10 @@ export const RELATIONSHIP_STYLE_PRESETS: Record<RelationshipType, RelationshipSt
   },
   'cross-source': {
     strokeWidth: 2.5,
-    strokeColor: '#f87171',
+    strokeColor: 'rgba(248, 113, 113, 0.6)',
     opacity: 0.9,
-    hoverColor: '#ef4444',
-    selectedColor: '#dc2626',
+    hoverColor: 'rgba(239, 68, 68, 0.8)',
+    selectedColor: 'rgba(220, 38, 38, 1)',
     curve: {
       type: 'bezier',
       curvature: 0.6,

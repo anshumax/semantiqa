@@ -60,10 +60,10 @@ export function Canvas({
     });
   }, [viewport, onViewportChange, minZoom, maxZoom]);
 
-  // Handle pan start (middle mouse button or space + drag)
+  // Handle pan start (Ctrl/Cmd + left mouse button)
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
-    // Middle mouse button or space key + left mouse button
-    if (event.button === 1 || (event.button === 0 && event.getModifierState('')) || event.shiftKey) {
+    // Only pan with Ctrl/Cmd + left mouse button
+    if (event.button === 0 && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       setIsDragging(true);
       setDragStart({ x: event.clientX, y: event.clientY });
@@ -102,6 +102,47 @@ export function Canvas({
     }
   }, [isDragging]);
 
+  // Handle wheel events with proper preventDefault
+  useEffect(() => {
+    const handleWheelEvent = (event: WheelEvent) => {
+      if (!canvasRef.current) return;
+      
+      const rect = canvasRef.current.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left - rect.width / 2;
+      const mouseY = event.clientY - rect.top - rect.height / 2;
+
+      // Calculate zoom delta
+      const zoomDelta = event.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.min(maxZoom, Math.max(minZoom, viewport.zoom * zoomDelta));
+      
+      if (newZoom === viewport.zoom) return;
+
+      // Zoom towards mouse position
+      const zoomRatio = newZoom / viewport.zoom;
+      const newCenterX = viewport.centerX - (mouseX - viewport.centerX) * (zoomRatio - 1);
+      const newCenterY = viewport.centerY - (mouseY - viewport.centerY) * (zoomRatio - 1);
+
+      onViewportChange({
+        zoom: newZoom,
+        centerX: newCenterX,
+        centerY: newCenterY,
+      });
+      
+      event.preventDefault();
+    };
+    
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.addEventListener('wheel', handleWheelEvent, { passive: false });
+    }
+    
+    return () => {
+      if (canvas) {
+        canvas.removeEventListener('wheel', handleWheelEvent);
+      }
+    };
+  }, [viewport, onViewportChange, minZoom, maxZoom]);
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -136,7 +177,6 @@ export function Canvas({
     <div 
       className={`canvas ${className}`}
       ref={canvasRef}
-      onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

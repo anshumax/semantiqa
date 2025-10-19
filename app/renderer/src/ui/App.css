@@ -28,7 +28,7 @@
   font-size: 0.75rem;
 }
 .app-frame {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--gradient-app);
@@ -45,8 +45,9 @@
   box-shadow: 0 24px 48px rgba(5, 6, 10, 0.48);
 }
 
-.app-frame__header + .app-shell {
+.app-frame__header + .navigation-shell {
   flex: 1;
+  min-height: 0;
 }
 
 .app-shell {

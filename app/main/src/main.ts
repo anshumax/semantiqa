@@ -10,6 +10,7 @@ import { MetadataCrawlService } from './application/MetadataCrawlService';
 import { ConnectivityQueue, ConnectivityService } from './application/ConnectivityService';
 import { CrawlQueue } from './application/CrawlQueue';
 import { ModelManagerService } from './services/ModelManagerService';
+import { CanvasService } from './services/CanvasService';
 import { logIpcEvent } from './logging/audit';
 import { SourceService, SnapshotRepository } from '@semantiqa/graph-service';
 import { createSqliteFactory, initializeSchema } from '@semantiqa/storage-sqlite';
@@ -349,6 +350,9 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     createSourceService: () => new SourceService({ openDatabase: graphDbFactory }),
   });
 
+  // Canvas service
+  const canvasService = new CanvasService(graphDbFactory());
+
   const handlerMap: IpcHandlerMap = {
     [IPC_CHANNELS.GRAPH_GET]: (request) => graphSnapshotService.getSnapshot(request),
     [IPC_CHANNELS.SOURCES_ADD]: (request) => sourceProvisioningService.createSource(request),
@@ -373,6 +377,9 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     [IPC_CHANNELS.MODELS_ENABLE]: async (request) => {
       return modelManagerService.enableModel(request);
     },
+    [IPC_CHANNELS.CANVAS_GET]: (request) => canvasService.getCanvas(request),
+    [IPC_CHANNELS.CANVAS_UPDATE]: (request) => canvasService.updateCanvas(request),
+    [IPC_CHANNELS.CANVAS_SAVE]: (request) => canvasService.saveCanvas(request),
   };
 
   registerIpcHandlers(handlerMap);

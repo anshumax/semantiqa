@@ -16,6 +16,14 @@ import type {
   SemantiqaError,
   SourcesAddRequest,
 } from '@semantiqa/contracts';
+import type {
+  CanvasGetRequest,
+  CanvasGetResponse,
+  CanvasUpdateRequest,
+  CanvasUpdateResponse,
+  CanvasSaveRequest,
+  CanvasSaveResponse,
+} from '@semantiqa/contracts';
 
 export type IpcChannel =
   | 'health:ping'
@@ -32,7 +40,10 @@ export type IpcChannel =
   | 'models:enable'
   | 'nlsql:generate'
   | 'audit:list'
-  | 'graph:get';
+  | 'graph:get'
+  | 'canvas:get'
+  | 'canvas:update'
+  | 'canvas:save';
 
 type HandlerMap = {
   'health:ping': {
@@ -91,6 +102,18 @@ type HandlerMap = {
     request: GraphGetRequest;
     response: GraphGetResponse | SemantiqaError;
   };
+  'canvas:get': {
+    request: CanvasGetRequest;
+    response: CanvasGetResponse | SemantiqaError;
+  };
+  'canvas:update': {
+    request: CanvasUpdateRequest;
+    response: CanvasUpdateResponse | SemantiqaError;
+  };
+  'canvas:save': {
+    request: CanvasSaveRequest;
+    response: CanvasSaveResponse | SemantiqaError;
+  };
 };
 
 export type IpcRequest<T extends IpcChannel> = T extends keyof HandlerMap
@@ -115,6 +138,9 @@ export const IPC_CHANNELS = {
   NLSQL_GENERATE: 'nlsql:generate' as const,
   AUDIT_LIST: 'audit:list' as const,
   GRAPH_GET: 'graph:get' as const,
+  CANVAS_GET: 'canvas:get' as const,
+  CANVAS_UPDATE: 'canvas:update' as const,
+  CANVAS_SAVE: 'canvas:save' as const,
 } satisfies Record<string, IpcChannel>;
 
 export type SafeRendererChannels = Pick<
@@ -133,6 +159,9 @@ export type SafeRendererChannels = Pick<
   | 'SOURCES_RETRY_CRAWL'
   | 'SOURCES_CRAWL_ALL'
   | 'SOURCES_TEST_CONNECTION'
+  | 'CANVAS_GET'
+  | 'CANVAS_UPDATE'
+  | 'CANVAS_SAVE'
 >;
 
 export const RENDERER_CHANNELS = Object.freeze({

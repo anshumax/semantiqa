@@ -26,6 +26,14 @@ import {
   SemantiqaErrorSchema,
   SourcesAddRequestSchema,
 } from '@semantiqa/contracts';
+import {
+  CanvasGetRequestSchema,
+  CanvasGetResponseSchema,
+  CanvasUpdateRequestSchema,
+  CanvasUpdateResponseSchema,
+  CanvasSaveRequestSchema,
+  CanvasSaveResponseSchema,
+} from '@semantiqa/contracts';
 
 import { logIpcEvent } from '../logging/audit';
 
@@ -44,6 +52,9 @@ const channelToSchema: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'nlsql:generate': NlSqlGenerateRequestSchema,
   'audit:list': AuditListRequestSchema,
   'graph:get': GraphGetRequestSchema,
+  'canvas:get': CanvasGetRequestSchema,
+  'canvas:update': CanvasUpdateRequestSchema,
+  'canvas:save': CanvasSaveRequestSchema,
 };
 
 const okResponse = z.object({ ok: z.literal(true) });
@@ -63,6 +74,9 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'nlsql:generate': z.union([NlSqlGenerateResponseSchema, SemantiqaErrorSchema]),
   'audit:list': z.union([auditResponse, SemantiqaErrorSchema]),
   'graph:get': z.union([GraphGetResponseSchema, SemantiqaErrorSchema]),
+  'canvas:get': z.union([CanvasGetResponseSchema, SemantiqaErrorSchema]),
+  'canvas:update': z.union([CanvasUpdateResponseSchema, SemantiqaErrorSchema]),
+  'canvas:save': z.union([CanvasSaveResponseSchema, SemantiqaErrorSchema]),
 };
 
 export type IpcHandlerMap = {

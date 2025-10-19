@@ -24,9 +24,9 @@
   border-radius: 12px;
   backdrop-filter: blur(16px);
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
-  max-width: 500px;
+  max-width: 800px;
   width: 90%;
-  max-height: 80vh;
+  max-height: 85vh;
   overflow: hidden;
   animation: modal-slide-in 0.3s ease-out;
 }
@@ -187,11 +187,177 @@
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
+/* Loading state */
+.connection-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.connection-loading__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(59, 130, 246, 0.8);
+  border-radius: 50%;
+  animation: spinner 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spinner {
+  to { transform: rotate(360deg); }
+}
+
+.connection-loading p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+}
+
+/* Relationship definition */
+.relationship-definition {
+  margin-top: 24px;
+}
+
+.relationship-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-bottom: 24px;
+}
+
+.relationship-column h4 {
+  margin: 0 0 20px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Form elements */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.form-select {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.form-select option {
+  background: rgba(26, 29, 36, 1);
+  color: rgba(255, 255, 255, 0.9);
+  padding: 8px;
+}
+
+/* Relationship preview */
+.relationship-preview {
+  padding: 16px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  margin-top: 24px;
+}
+
+.relationship-preview__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(59, 130, 246, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.relationship-preview__text {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+.relationship-preview__text strong {
+  color: rgba(255, 255, 255, 1);
+}
+
+.relationship-preview__text em {
+  color: rgba(59, 130, 246, 0.9);
+  font-style: normal;
+}
+
+/* Validation warnings */
+.validation-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-top: 16px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.validation-warning--warning {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: rgba(245, 158, 11, 0.9);
+}
+
+.validation-warning--info {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: rgba(59, 130, 246, 0.9);
+}
+
+.validation-warning__icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.validation-warning__message {
+  color: rgba(255, 255, 255, 0.9);
+}
+
 /* Mobile adjustments */
 @media (max-width: 768px) {
   .connection-modal {
     width: 95%;
     margin: 16px;
+    max-width: none;
   }
   
   .connection-info {
@@ -201,6 +367,11 @@
   
   .connection-arrow {
     transform: rotate(90deg);
+  }
+  
+  .relationship-columns {
+    grid-template-columns: 1fr;
+    gap: 24px;
   }
   
   .connection-modal__footer {

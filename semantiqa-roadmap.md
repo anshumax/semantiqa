@@ -13,7 +13,7 @@
 
 ## Progress Summary
 
-**Overall Progress:** 32/83 tasks completed (39%)
+**Overall Progress:** 33/83 tasks completed (40%)
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
@@ -21,7 +21,7 @@
 | Phase 1: Storage & Audit | ✅ Complete | 2/2 |
 | Phase 2: Connections & Metadata | ✅ Complete | 16/16 |
 | Phase 3: Embeddings & Search | ✅ Complete | 3/3 |
-|| Phase 4: UI Foundations (Canvas) | 🔄 In Progress | 7/15 |
+|| Phase 4: UI Foundations (Canvas) | 🔄 In Progress | 10/15 |
 | Phase 5: Model Manager | ⬜ Not Started | 0/4 |
 | Phase 6: Summaries & Docs | ⬜ Not Started | 0/3 |
 | Phase 7: Canvas-Integrated Relationships | ⬜ Not Started | 0/5 |
@@ -31,7 +31,7 @@
 | Phase 11: Export & Packaging | ⬜ Not Started | 0/5 |
 | Phase 12: Golden Tests | ⬜ Not Started | 0/4 |
 
-**Next Up:** Complete Phase 4 canvas infrastructure starting with T-04-02 (3-tab navigation) and T-04-03 (canvas foundation)
+**Next Up:** Complete Phase 4 canvas infrastructure with T-04-12 (Connect Source wizard integration), T-04-13 (Inspector UI), and T-04-14 (Source provisioning service)
 
 ---
 
@@ -312,12 +312,13 @@
 - **Deps:** T-04-04
 - **Risks:** Z-index conflicts → establish layer hierarchy; touch device support → ensure button sizes meet accessibility guidelines.
 
-### T-04-08: Visual relationship connections ⬜
-- **Status:** Not Started
+### T-04-08: Visual relationship connections ✅
+- **Status:** Completed (2025-10-19)
 - **Desc:** Render Bezier curves between connected blocks. Different visual styles for intra-source (same color family, dashed) vs cross-source (different colors, solid) relationships. Connection hover states and selection.
 - **DoD:** Curves render smoothly between block connection points; intra-source relationships use consistent color with source block; cross-source relationships use distinct colors; hover shows relationship details tooltip; click selects relationship for editing; curves update when blocks move.
 - **Deps:** T-04-04
 - **Risks:** Curve calculation complexity → use library (e.g., react-flow); performance with many relationships → implement connection culling.
+- **Notes:** Implemented visual relationship renderer with Bezier curves, state management for user-created relationships, distinct styling (green dashed lines for user relationships), hover/selection states, and integration with relationship definition modal. Relationships now appear immediately after creation.
 
 ### T-04-09: Connection creation UI flow ✅
 - **Status:** Completed (2025-10-19)
@@ -327,19 +328,21 @@
 - **Risks:** UX complexity → provide clear visual cues; mobile support → adapt for touch interactions.
 - **Notes:** Enhanced connection dots with Plus icons, improved cursor feedback with custom cursors, target block highlighting with visual animations, ESC cancellation, and ConnectionModal integration all working.
 
-### T-04-10: Relationship definition modal ⬜
-- **Status:** Not Started
+### T-04-10: Relationship definition modal ✅
+- **Status:** Completed (2025-10-19)
 - **Desc:** Dual-column modal for selecting tables and columns when creating relationships. Left column for source, right for target. Dropdowns for table/collection selection, then column/key selection.
 - **DoD:** Modal opens after selecting connection target; two columns clearly labeled "Source" and "Target"; table dropdowns populated from respective data sources; column dropdowns populate after table selection; visual feedback shows selected items; Save button persists relationship; Cancel returns to canvas.
 - **Deps:** T-04-08, T-07-01
 - **Risks:** Modal complexity → keep focused on one-to-one relationships only; data loading → implement caching for table/column lists.
+- **Notes:** Implemented dual-column relationship definition modal with table/column selection, data validation, type compatibility warnings, relationship preview, and integration with connection creation workflow.
 
-### T-04-11: Comprehensive canvas state persistence ⬜
-- **Status:** Not Started
+### T-04-11: Comprehensive canvas state persistence ✅
+- **Status:** Completed (2025-10-19)
 - **Desc:** Persist complete canvas state to SQLite: block positions, sizes, colors, zoom level, viewport center, relationship curves, visual styles, and canvas metadata. Design for full export/import capability.
 - **DoD:** Canvas state table with JSON schema validation; block positions/styles saved on change; relationship visual properties persisted; zoom/pan/viewport state saved; canvas metadata (name, description, created/modified dates); restoration maintains exact visual appearance; database schema supports full canvas export.
 - **Deps:** T-04-05, T-01-01, T-04-07
 - **Risks:** Schema complexity → use JSON columns with validation; large canvas data → implement compression; version compatibility → include schema version in canvas data.
+- **Notes:** Implemented comprehensive canvas persistence with CanvasStateRepository for SQLite storage, CanvasService for IPC handling, useCanvasPersistence React hook with auto-save, and full CRUD operations for canvas state, blocks, and relationships. Includes optimized viewport/position updates and transaction support.
 
 ### T-04-12: Connect Source wizard (canvas integration) ⬜
 - **Status:** Not Started

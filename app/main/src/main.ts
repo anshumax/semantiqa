@@ -321,8 +321,8 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     logger: console,
   });
 
-  // Run connectivity checks on startup (async)
-  void connectivityQueue.queueStartupSweep();
+  // Run connectivity checks on startup (async) - DISABLED: No demo sources
+  // void connectivityQueue.queueStartupSweep();
 
   // Model manager service
   const modelManagerService = new ModelManagerService({

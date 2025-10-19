@@ -55,6 +55,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
   });
   
   const [pendingConnection, setPendingConnection] = useState<PendingConnection | null>(null);
+  const [userRelationships, setUserRelationships] = useState<VisualRelationship[]>([]);
   const [connectionModal, setConnectionModal] = useState<{
     isOpen: boolean;
     sourceBlock?: { id: string; name: string; kind: string };
@@ -197,6 +198,84 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       targetPosition: null,
     });
   }, []);
+  
+  // Handle saving a relationship definition from the modal
+  const handleSaveRelationship = useCallback((relationship: {
+    sourceTable: string;
+    sourceColumn: string;
+    targetTable: string;
+    targetColumn: string;
+  }) => {
+    console.log('💾 Saving relationship:', relationship);
+    
+    if (!pendingConnection || !connectionModal.sourceBlock || !connectionModal.targetBlock) {
+      console.error('Missing required data for relationship creation');
+      return;
+    }
+    
+    // Create a new visual relationship from the form data
+    const newRelationship: VisualRelationship = {
+      id: `user-rel-${Date.now()}`,
+      sourceBlockId: connectionModal.sourceBlock.id,
+      targetBlockId: connectionModal.targetBlock.id,
+      sourceKind: connectionModal.sourceBlock.kind as any,
+      targetKind: connectionModal.targetBlock.kind as any,
+      type: 'cross-source',
+      sourcePoint: {
+        id: `${connectionModal.sourceBlock.id}-connection-point`,
+        blockId: connectionModal.sourceBlock.id,
+        position: pendingConnection.sourcePosition,
+        anchor: determineAnchorFromPosition(pendingConnection.sourcePosition, pendingConnection.targetPosition)
+      },
+      targetPoint: {
+        id: `${connectionModal.targetBlock.id}-connection-point`,
+        blockId: connectionModal.targetBlock.id,
+        position: pendingConnection.targetPosition,
+        anchor: determineAnchorFromPosition(pendingConnection.targetPosition, pendingConnection.sourcePosition)
+      },
+      style: {
+        strokeColor: 'rgba(34, 197, 94, 0.8)', // Green for user-created
+        hoverColor: 'rgba(34, 197, 94, 1)',
+        selectedColor: 'rgba(34, 197, 94, 1)',
+        strokeWidth: 2,
+        strokeDasharray: '5,5', // Dashed to distinguish from demo relationships
+        opacity: 0.9,
+        curve: {
+          curvature: 0.3,
+          controlPointOffset: 80
+        }
+      },
+      metadata: {
+        label: `${relationship.sourceTable}.${relationship.sourceColumn} → ${relationship.targetTable}.${relationship.targetColumn}`,
+        description: `User-defined relationship between ${connectionModal.sourceBlock.name} and ${connectionModal.targetBlock.name}`,
+        cardinality: '1:1' // Default, could be configurable later
+      }
+    };
+    
+    // Add the new relationship to state
+    setUserRelationships(prev => [...prev, newRelationship]);
+    
+    // For demo purposes, show success in console
+    console.log('✅ Relationship created successfully between:', {
+      source: `${connectionModal.sourceBlock?.name}.${relationship.sourceTable}.${relationship.sourceColumn}`,
+      target: `${connectionModal.targetBlock?.name}.${relationship.targetTable}.${relationship.targetColumn}`
+    });
+    
+    // TODO: This is where we would persist the relationship to the backend
+    // In the future, this would call an IPC method like:
+    // await window.semantiqa?.api.invoke('relationships:create', {
+    //   sourceBlockId: connectionModal.sourceBlock?.id,
+    //   targetBlockId: connectionModal.targetBlock?.id,
+    //   sourceTable: relationship.sourceTable,
+    //   sourceColumn: relationship.sourceColumn,
+    //   targetTable: relationship.targetTable,
+    //   targetColumn: relationship.targetColumn,
+    // });
+    
+    // Close modal and clean up state
+    setConnectionModal({ isOpen: false });
+    setPendingConnection(null);
+  }, [connectionModal.sourceBlock, connectionModal.targetBlock, pendingConnection]);
   
   const handleCompleteConnection = useCallback(() => {
     if (connectionState.sourceBlockId && connectionState.targetBlockId && 
@@ -437,25 +516,22 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
             {/* Render different content based on current level */}
             {state.currentLevel === 'sources' ? (
               <>
-                <DemoCanvasBlocks 
-                  onDrillDown={drillDown}
-                  isConnectionMode={connectionState.isConnecting}
-                  connectionSourceId={connectionState.sourceBlockId}
-                  connectionTargetId={connectionState.targetBlockId}
-                  onConnectionStart={handleConnectionStart}
-                  onConnectionTarget={handleConnectionTarget}
-                  onConnectionTargetLeave={handleConnectionTargetLeave}
-                  onRelationshipInteraction={handleRelationshipInteraction}
-                />
+                {/* Empty state for data sources - will be populated by actual data */}
+                <div style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  color: '#999',
+                  textAlign: 'center',
+                  fontSize: '1.1rem'
+                }}>
+                  <div>No data sources configured</div>
+                  <div style={{ fontSize: '0.9rem', marginTop: '0.5rem', opacity: 0.7 }}>Click the + button to add your first data source</div>
+                </div>
                 {/* Dynamic connection line */}
                 <DynamicConnectionLine connectionState={connectionState} />
               </>
-            ) : (
-            state.sourceKind ? (
-              <DemoTableBlocks 
-                sourceKind={state.sourceKind as any} 
-                sourceName={state.sourceName || 'Unknown'}
-              />
             ) : (
               <div style={{
                 position: 'absolute',
@@ -467,8 +543,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
               }}>
                 No tables to display
               </div>
-            )
-          )}
+            )}
           </div>
         </Canvas>
         
@@ -554,457 +629,24 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         }}
         sourceBlock={connectionModal.sourceBlock}
         targetBlock={connectionModal.targetBlock}
+        onSaveRelationship={handleSaveRelationship}
       />
     </div>
   );
 }
 
-// Function to create demo relationships between data sources
-function createDemoRelationships(blockPositions: Record<string, { x: number; y: number }>): VisualRelationship[] {
-  const relationships: VisualRelationship[] = [];
+// Helper function to determine anchor based on relative positions
+function determineAnchorFromPosition(
+  sourcePos: CanvasPosition, 
+  targetPos: CanvasPosition
+): 'top' | 'right' | 'bottom' | 'left' {
+  const dx = targetPos.x - sourcePos.x;
+  const dy = targetPos.y - sourcePos.y;
   
-  // Relationship 1: PostgreSQL to MongoDB (cross-source)
-  const pgPos = blockPositions['demo-pg-1'] || { x: -100, y: -60 };
-  const mongoPos = blockPositions['demo-mongo-1'] || { x: 150, y: -60 };
-  
-  const pgToMongo: VisualRelationship = {
-    id: 'pg-to-mongo-1',
-    sourceBlockId: 'demo-pg-1',
-    targetBlockId: 'demo-mongo-1',
-    sourceKind: 'postgres',
-    targetKind: 'mongo',
-    type: 'cross-source',
-    sourcePoint: {
-      id: 'pg-right-1',
-      blockId: 'demo-pg-1',
-      position: getConnectionPointPosition(
-        pgPos,
-        { width: 200, height: 120 },
-        'right'
-      ),
-      anchor: 'right'
-    },
-    targetPoint: {
-      id: 'mongo-left-1',
-      blockId: 'demo-mongo-1',
-      position: getConnectionPointPosition(
-        mongoPos,
-        { width: 200, height: 120 },
-        'left'
-      ),
-      anchor: 'left'
-    },
-    style: getStyleForRelationship('cross-source', 'postgres'),
-    metadata: {
-      label: 'User Sync',
-      description: 'User data synchronization between PostgreSQL and MongoDB',
-      cardinality: '1:N'
-    }
-  };
-  
-  // Relationship 2: MongoDB to DuckDB (cross-source)
-  const duckPos = blockPositions['demo-duckdb-1'] || { x: 25, y: 100 };
-  
-  const mongoToDuck: VisualRelationship = {
-    id: 'mongo-to-duck-1',
-    sourceBlockId: 'demo-mongo-1',
-    targetBlockId: 'demo-duckdb-1',
-    sourceKind: 'mongo',
-    targetKind: 'duckdb',
-    type: 'cross-source',
-    sourcePoint: {
-      id: 'mongo-bottom-1',
-      blockId: 'demo-mongo-1',
-      position: getConnectionPointPosition(
-        mongoPos,
-        { width: 200, height: 120 },
-        'bottom'
-      ),
-      anchor: 'bottom'
-    },
-    targetPoint: {
-      id: 'duck-top-1',
-      blockId: 'demo-duckdb-1',
-      position: getConnectionPointPosition(
-        duckPos,
-        { width: 200, height: 120 },
-        'top'
-      ),
-      anchor: 'top'
-    },
-    style: getStyleForRelationship('cross-source', 'mongo'),
-    metadata: {
-      label: 'Analytics ETL',
-      description: 'Extract analytics data from MongoDB to DuckDB warehouse',
-      cardinality: 'N:1'
-    }
-  };
-  
-  // Relationship 3: PostgreSQL to MySQL (cross-source, with error styling)
-  const mysqlPos = blockPositions['demo-mysql-1'] || { x: -150, y: 120 };
-  
-  const pgToMysql: VisualRelationship = {
-    id: 'pg-to-mysql-1',
-    sourceBlockId: 'demo-pg-1',
-    targetBlockId: 'demo-mysql-1',
-    sourceKind: 'postgres',
-    targetKind: 'mysql',
-    type: 'cross-source',
-    sourcePoint: {
-      id: 'pg-left-1',
-      blockId: 'demo-pg-1',
-      position: getConnectionPointPosition(
-        pgPos,
-        { width: 200, height: 120 },
-        'left'
-      ),
-      anchor: 'left'
-    },
-    targetPoint: {
-      id: 'mysql-right-1',
-      blockId: 'demo-mysql-1',
-      position: getConnectionPointPosition(
-        mysqlPos,
-        { width: 200, height: 120 },
-        'right'
-      ),
-      anchor: 'right'
-    },
-    style: {
-      ...getStyleForRelationship('cross-source', 'postgres'),
-      strokeColor: '#f87171', // Error red
-      strokeDasharray: '8,4',
-      opacity: 0.7
-    },
-    metadata: {
-      label: 'Legacy Sync (Error)',
-      description: 'Legacy data sync - currently experiencing connection issues',
-      cardinality: '1:1'
-    }
-  };
-  
-  relationships.push(pgToMongo, mongoToDuck, pgToMysql);
-  return relationships;
-}
-
-// Demo canvas blocks using CanvasBlock component
-interface DemoCanvasBlocksProps {
-  onDrillDown: (context: DrillDownContext) => void;
-  isConnectionMode?: boolean;
-  connectionSourceId?: string | null;
-  connectionTargetId?: string | null;
-  onConnectionStart?: (blockId: string, position: CanvasPosition) => void;
-  onConnectionTarget?: (blockId: string, position: CanvasPosition) => void;
-  onConnectionTargetLeave?: () => void;
-  onRelationshipInteraction: (event: RelationshipInteractionEvent) => void;
-}
-
-// Demo data sources (moved to module level for access in callbacks)
-const demoDataSources = [
-    {
-      id: 'demo-pg-1',
-      kind: 'postgres' as const,
-      name: 'Production DB',
-      database: 'ecommerce_prod',
-      status: 'connected' as const,
-      tableCount: 23,
-    },
-    {
-      id: 'demo-mongo-1',
-      kind: 'mongo' as const,
-      name: 'User Analytics',
-      database: 'analytics',
-      status: 'connected' as const,
-      tableCount: 7,
-    },
-    {
-      id: 'demo-duckdb-1',
-      kind: 'duckdb' as const,
-      name: 'Data Warehouse',
-      database: 'warehouse.duckdb',
-      status: 'connected' as const,
-      tableCount: 15,
-    },
-    {
-      id: 'demo-mysql-1',
-      kind: 'mysql' as const,
-      name: 'Legacy System',
-      database: 'legacy_crm',
-      status: 'error' as const,
-      error: 'Connection timeout',
-    },
-  ];
-
-function DemoCanvasBlocks({ 
-  onDrillDown,
-  isConnectionMode = false,
-  connectionSourceId = null,
-  connectionTargetId = null,
-  onConnectionStart,
-  onConnectionTarget,
-  onConnectionTargetLeave,
-  onRelationshipInteraction
-}: DemoCanvasBlocksProps) {
-  const [blockPositions, setBlockPositions] = useState<Record<string, { x: number; y: number }>>(() => {
-    // Initial positions
-    return {
-      'demo-pg-1': { x: -100, y: -60 },
-      'demo-mongo-1': { x: 150, y: -60 },
-      'demo-duckdb-1': { x: 25, y: 100 },
-      'demo-mysql-1': { x: -150, y: 120 },
-    };
-  });
-  
-  const handlePositionChange = useCallback((id: string, position: CanvasPosition) => {
-    setBlockPositions(prev => ({
-      ...prev,
-      [id]: position
-    }));
-    // Block position updated
-  }, []);
-
-  return (
-    <>
-      {demoDataSources.map((source) => {
-        const isConnectionTarget = connectionTargetId === source.id;
-        const isSourceBlock = connectionSourceId === source.id;
-        const position = blockPositions[source.id] || { x: 0, y: 0 };
-        
-        return (
-          <CanvasBlock
-            key={source.id}
-            id={source.id}
-            position={position}
-            size={{ width: 200, height: 120 }}
-            dataSource={{
-              id: source.id,
-              name: source.name,
-              kind: source.kind,
-              connectionStatus: source.status === 'connected' ? 'connected' : 
-                              source.status === 'error' ? 'error' : 'unknown',
-              crawlStatus: source.status === 'crawling' ? 'crawling' : 
-                          source.status === 'connected' ? 'crawled' : 'not_crawled',
-              databaseName: source.database,
-              tableCount: source.tableCount,
-              lastError: source.error,
-            }}
-            selected={false}
-            isConnectionMode={isConnectionMode}
-            isConnectionTarget={isConnectionTarget}
-            onPositionChange={handlePositionChange}
-            onClick={(id) => {
-              console.log(`Block ${id} clicked`);
-            }}
-            onDoubleClick={(id) => {
-              console.log(`Block ${id} double-clicked - drilling down`);
-              const sourceData = demoDataSources.find(s => s.id === id);
-              if (sourceData && sourceData.kind && sourceData.name && sourceData.database) {
-                const drillContext: DrillDownContext = {
-                  sourceId: sourceData.id,
-                  sourceName: sourceData.name,
-                  sourceKind: sourceData.kind,
-                  database: sourceData.database,
-                  tables: generateDemoTables(sourceData.kind, sourceData.database),
-                };
-                onDrillDown(drillContext);
-              }
-            }}
-            onContextMenu={(id) => {
-              console.log(`Block ${id} right-clicked - show context menu`);
-            }}
-            onConnectionStart={onConnectionStart}
-            onConnectionTarget={onConnectionTarget}
-            onConnectionTargetLeave={onConnectionTargetLeave}
-          />
-        );
-      })}
-
-      {/* Render relationships between data sources */}
-      <RelationshipRenderer 
-        relationships={createDemoRelationships(blockPositions)}
-        onRelationshipInteraction={onRelationshipInteraction}
-      />
-    </>
-  );
-}
-
-// Demo table blocks for drill-down view
-function DemoTableBlocks({ sourceKind, sourceName }: { sourceKind: 'postgres' | 'mysql' | 'mongo' | 'duckdb'; sourceName: string }) {
-  const demoTables = generateDemoTables(sourceKind, 'demo_db');
-  const [tablePositions, setTablePositions] = useState(() => {
-    // Auto-layout tables in a grid
-    const positions: Record<string, { x: number; y: number }> = {};
-    const cols = 3;
-    demoTables.forEach((table, index) => {
-      const row = Math.floor(index / cols);
-      const col = index % cols;
-      positions[table.id] = {
-        x: col * 220 - 200,
-        y: row * 140 - 60,
-      };
-    });
-    return positions;
-  });
-
-  const handleTablePositionChange = useCallback((tableId: string, newX: number, newY: number) => {
-    setTablePositions(prev => ({
-      ...prev,
-      [tableId]: { x: newX, y: newY }
-    }));
-  }, []);
-
-  return (
-    <>
-      {demoTables.map((table) => {
-        const position = tablePositions[table.id] || { x: 0, y: 0 };
-        return (
-          <TableBlock
-            key={table.id}
-            table={table}
-            x={position.x}
-            y={position.y}
-            width={180}
-            height={100}
-            sourceKind={sourceKind}
-            selected={false}
-            onPositionChange={handleTablePositionChange}
-            onClick={(tableId) => {
-              console.log(`Table ${tableId} clicked`);
-            }}
-            onDoubleClick={(tableId) => {
-              console.log(`Table ${tableId} double-clicked - future: show columns`);
-            }}
-            onContextMenu={(tableId, event) => {
-              console.log(`Table ${tableId} right-clicked`);
-            }}
-          />
-        );
-      })}
-    </>
-  );
-}
-
-// Helper function to generate demo tables based on source type
-function generateDemoTables(sourceKind: 'postgres' | 'mysql' | 'mongo' | 'duckdb', database: string) {
-  const baseId = `${sourceKind}_${database}`;
-  
-  switch (sourceKind) {
-    case 'postgres':
-      return [
-        {
-          id: `${baseId}_users`,
-          name: 'users',
-          type: 'table' as const,
-          rowCount: 15420,
-          schema: 'public',
-          description: 'User account information'
-        },
-        {
-          id: `${baseId}_orders`,
-          name: 'orders', 
-          type: 'table' as const,
-          rowCount: 89320,
-          schema: 'public',
-          description: 'Customer orders'
-        },
-        {
-          id: `${baseId}_products`,
-          name: 'products',
-          type: 'table' as const,
-          rowCount: 2340,
-          schema: 'public'
-        },
-        {
-          id: `${baseId}_order_items`,
-          name: 'order_items',
-          type: 'table' as const,
-          rowCount: 234560,
-          schema: 'public'
-        },
-        {
-          id: `${baseId}_user_activity_view`,
-          name: 'user_activity_view',
-          type: 'view' as const,
-          rowCount: 15420,
-          schema: 'analytics',
-          description: 'Aggregated user activity metrics'
-        }
-      ];
-      
-    case 'mysql':
-      return [
-        {
-          id: `${baseId}_customers`,
-          name: 'customers',
-          type: 'table' as const,
-          rowCount: 5680,
-          schema: 'crm'
-        },
-        {
-          id: `${baseId}_contacts`,
-          name: 'contacts',
-          type: 'table' as const,
-          rowCount: 12340,
-          schema: 'crm'
-        },
-        {
-          id: `${baseId}_leads`,
-          name: 'leads',
-          type: 'table' as const,
-          rowCount: 3210,
-          schema: 'crm'
-        }
-      ];
-      
-    case 'mongo':
-      return [
-        {
-          id: `${baseId}_events`,
-          name: 'events',
-          type: 'collection' as const,
-          rowCount: 1200000,
-          description: 'User interaction events'
-        },
-        {
-          id: `${baseId}_sessions`,
-          name: 'sessions',
-          type: 'collection' as const,
-          rowCount: 450000
-        },
-        {
-          id: `${baseId}_users_profile`,
-          name: 'users_profile',
-          type: 'collection' as const,
-          rowCount: 89000,
-          description: 'Extended user profile data'
-        }
-      ];
-      
-    case 'duckdb':
-      return [
-        {
-          id: `${baseId}_sales_data`,
-          name: 'sales_data',
-          type: 'table' as const,
-          rowCount: 500000,
-          description: 'Historical sales records'
-        },
-        {
-          id: `${baseId}_customer_metrics`,
-          name: 'customer_metrics',
-          type: 'table' as const,
-          rowCount: 25000
-        },
-        {
-          id: `${baseId}_financial_summary`,
-          name: 'financial_summary',
-          type: 'view' as const,
-          rowCount: 12,
-          description: 'Monthly financial aggregates'
-        }
-      ];
-      
-    default:
-      return [];
+  // Determine which direction is stronger
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx > 0 ? 'right' : 'left';
+  } else {
+    return dy > 0 ? 'bottom' : 'top';
   }
 }

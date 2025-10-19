@@ -11,6 +11,7 @@ import { CanvasMiniMap } from './CanvasMiniMap';
 import { RelationshipRenderer } from './RelationshipRenderer';
 import { DynamicConnectionLine } from './DynamicConnectionLine';
 import { ConnectionModal } from './ConnectionModal';
+import { CanvasConnectWizard } from './CanvasConnectWizard';
 import { 
   VisualRelationship, 
   getRelationshipType, 
@@ -43,6 +44,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
   });
   
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showConnectWizard, setShowConnectWizard] = useState(false);
   
   // Connection creation state
   const [connectionState, setConnectionState] = useState<ConnectionCreationState>({
@@ -127,11 +129,12 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
   
   // Plus button handler with user feedback
   const handleAddDataSource = useCallback(() => {
-    console.log('Add data source clicked - will open connection wizard');
-    // TODO: Integrate with actual connection wizard when available
-    
-    // Provide temporary user feedback while wizard is not implemented
-    alert('Add Data Source functionality will open a connection wizard.\n\nThis feature is currently being developed.');
+    console.log('Add data source clicked - opening canvas connection wizard');
+    setShowConnectWizard(true);
+  }, []);
+  
+  const handleWizardClose = useCallback(() => {
+    setShowConnectWizard(false);
   }, []);
   
   // Relationship interaction handler
@@ -616,8 +619,13 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         </div>
       )}
       
+      {/* Canvas Connect Wizard Modal */}
+      {showConnectWizard && (
+        <CanvasConnectWizard onClose={handleWizardClose} />
+      )}
+      
       {/* Connection Configuration Modal */}
-      <ConnectionModal 
+      <ConnectionModal
         isOpen={connectionModal.isOpen}
         onClose={() => {
           setConnectionModal({ isOpen: false });

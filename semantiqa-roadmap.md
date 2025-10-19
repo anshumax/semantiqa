@@ -13,7 +13,7 @@
 
 ## Progress Summary
 
-**Overall Progress:** 33/83 tasks completed (40%)
+**Overall Progress:** 34/83 tasks completed (41%)
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
@@ -21,7 +21,7 @@
 | Phase 1: Storage & Audit | ✅ Complete | 2/2 |
 | Phase 2: Connections & Metadata | ✅ Complete | 16/16 |
 | Phase 3: Embeddings & Search | ✅ Complete | 3/3 |
-|| Phase 4: UI Foundations (Canvas) | 🔄 In Progress | 10/15 |
+|| Phase 4: UI Foundations (Canvas) | 🔄 In Progress | 11/15 |
 | Phase 5: Model Manager | ⬜ Not Started | 0/4 |
 | Phase 6: Summaries & Docs | ⬜ Not Started | 0/3 |
 | Phase 7: Canvas-Integrated Relationships | ⬜ Not Started | 0/5 |
@@ -31,7 +31,7 @@
 | Phase 11: Export & Packaging | ⬜ Not Started | 0/5 |
 | Phase 12: Golden Tests | ⬜ Not Started | 0/4 |
 
-**Next Up:** Complete Phase 4 canvas infrastructure with T-04-12 (Connect Source wizard integration), T-04-13 (Inspector UI), and T-04-14 (Source provisioning service)
+**Next Up:** Complete Phase 4 canvas infrastructure with T-04-13 (Inspector UI) and T-04-14 (Source provisioning service)
 
 ---
 
@@ -344,10 +344,13 @@
 - **Risks:** Schema complexity → use JSON columns with validation; large canvas data → implement compression; version compatibility → include schema version in canvas data.
 - **Notes:** Implemented comprehensive canvas persistence with CanvasStateRepository for SQLite storage, CanvasService for IPC handling, useCanvasPersistence React hook with auto-save, and full CRUD operations for canvas state, blocks, and relationships. Includes optimized viewport/position updates and transaction support.
 
-### T-04-12: Connect Source wizard (canvas integration) ⬜
-- **Status:** Not Started
+### T-04-12: Connect Source wizard (canvas integration) ✅
+- **Status:** Completed (2025-10-19)
 - **Desc:** Integrate existing connection wizard with canvas paradigm. When multiple databases detected, show selection UI for which databases to add as separate canvas blocks.
 - **DoD:** Plus button opens existing wizard; multi-database selection step added after connection test; each selected database creates separate canvas block; blocks positioned automatically with spacing; wizard success message mentions canvas placement.
+- **Deps:** T-04-07, T-04-11
+- **Risks:** UX complexity with multi-database flows → keep wizard steps simple and clear.
+- **Notes:** Created CanvasConnectWizard (704 lines) with multi-database selection UI, auto-positioning with collision detection, integration with canvas persistence system, and comprehensive styling. Plus button now opens canvas-specific wizard instead of placeholder alert.
 - **Deps:** T-04-06, T-04-07 (original wizard), T-04-10
 - **Risks:** Wizard flow complexity → keep multi-database selection optional and intuitive.
 

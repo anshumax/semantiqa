@@ -11,6 +11,7 @@ import { ConnectivityQueue, ConnectivityService } from './application/Connectivi
 import { CrawlQueue } from './application/CrawlQueue';
 import { ModelManagerService } from './services/ModelManagerService';
 import { CanvasService } from './services/CanvasService';
+import { TablesService } from './services/TablesService';
 import { logIpcEvent } from './logging/audit';
 import { SourceService, SnapshotRepository } from '@semantiqa/graph-service';
 import { createSqliteFactory, initializeSchema } from '@semantiqa/storage-sqlite';
@@ -353,6 +354,55 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
   // Canvas service
   const canvasService = new CanvasService(graphDbFactory());
 
+  // Tables service
+  const tablesService = new TablesService({
+    openSourcesDb: graphDbFactory,
+  });
+
+  // Ensure canvas has blocks for existing sources (one-time seeding on startup)
+  try {
+    const db = graphDbFactory();
+    const existingBlocksStmt = db.prepare(
+      "SELECT source_id FROM canvas_blocks WHERE canvas_id = 'default'"
+    );
+    const existingBlockSourceIds = new Set(
+      (existingBlocksStmt.all() as Array<{ source_id: string }>).map((r) => r.source_id),
+    );
+
+    const sourcesStmt = db.prepare("SELECT id FROM sources");
+    const sources = sourcesStmt.all() as Array<{ id: string }>;
+
+    const insertBlockStmt = db.prepare(
+      `INSERT OR IGNORE INTO canvas_blocks (
+        id, canvas_id, source_id, position_x, position_y, width, height, z_index,
+        color_theme, is_selected, is_minimized, created_at, updated_at
+      ) VALUES (
+        @id, 'default', @source_id, @x, @y, 200, 120, 0,
+        'auto', 0, 0, @ts, @ts
+      )`,
+    );
+
+    let index = 0;
+    const spacingX = 260;
+    const spacingY = 180;
+    const perRow = 4;
+    const now = new Date().toISOString();
+
+    for (const { id: sourceId } of sources) {
+      if (existingBlockSourceIds.has(sourceId)) continue;
+      const row = Math.floor(index / perRow);
+      const col = index % perRow;
+      const x = 100 + col * spacingX;
+      const y = 100 + row * spacingY;
+      const blockId = `block-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+      insertBlockStmt.run({ id: blockId, source_id: sourceId, x, y, ts: now });
+      index++;
+    }
+  } catch (seedErr) {
+    console.warn('Canvas seeding skipped/failed:', seedErr);
+  }
+
   const handlerMap: IpcHandlerMap = {
     [IPC_CHANNELS.GRAPH_GET]: (request) => graphSnapshotService.getSnapshot(request),
     [IPC_CHANNELS.SOURCES_ADD]: (request) => sourceProvisioningService.createSource(request),
@@ -380,6 +430,7 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     [IPC_CHANNELS.CANVAS_GET]: (request) => canvasService.getCanvas(request),
     [IPC_CHANNELS.CANVAS_UPDATE]: (request) => canvasService.updateCanvas(request),
     [IPC_CHANNELS.CANVAS_SAVE]: (request) => canvasService.saveCanvas(request),
+    [IPC_CHANNELS.TABLES_LIST]: (request: { sourceId: string }) => tablesService.listTables(request.sourceId),
   };
 
   registerIpcHandlers(handlerMap);

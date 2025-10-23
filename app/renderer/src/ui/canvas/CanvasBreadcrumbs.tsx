@@ -45,7 +45,7 @@ export function CanvasBreadcrumbs({
       <ol className="canvas-breadcrumbs__list">
         {breadcrumbs.map((breadcrumb, index) => {
           const isLast = index === breadcrumbs.length - 1;
-          const isClickable = !isLast && index < breadcrumbs.length - 1;
+          const isClickable = !isLast; // All breadcrumbs except the last one are clickable
 
           return (
             <li key={`${breadcrumb.level}-${index}`} className="canvas-breadcrumbs__item">

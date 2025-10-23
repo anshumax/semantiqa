@@ -46,6 +46,7 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
 
   // Load canvas data
   const loadCanvas = useCallback(async () => {
+    console.log('🟣 Loading canvas data...');
     setState((prev) => ({ status: 'loading', data: prev.data }));
 
     try {
@@ -54,30 +55,53 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
         includeBlocks: true,
         includeRelationships: true,
       };
+      
+      console.log('🟣 Sending canvas:get request:', request);
 
       const response = (await window.semantiqa?.api.invoke(
         IPC_CHANNELS.CANVAS_GET,
         request
       )) as CanvasGetResponse | undefined;
+      
+      console.log('🟣 Canvas response:', response);
 
       if (!response) {
+        console.error('🔥 No response from canvas:get');
         throw new Error('Failed to load canvas data');
       }
 
       const data: CanvasData = {
         canvas: response.canvas,
-        blocks: response.blocks,
-        relationships: response.relationships,
+        blocks: response.blocks || [],
+        relationships: response.relationships || [],
       };
+      
+      console.log('🟣 Canvas loaded successfully:', {
+        blockCount: data.blocks.length,
+        relationshipCount: data.relationships.length
+      });
 
       setState({ status: 'ready', data });
       setPendingChanges(false);
     } catch (error) {
-      setState((prev) => ({
-        status: 'error',
-        data: prev.data,
-        error: error instanceof Error ? error : new Error('Unknown canvas error'),
-      }));
+      console.error('🔥 Canvas load failed:', error);
+      
+      // Create empty canvas data as fallback
+      const fallbackData: CanvasData = {
+        canvas: {
+          id: canvasId,
+          name: 'Default Canvas',
+          viewport: { zoom: 1, centerX: 0, centerY: 0 },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        blocks: [],
+        relationships: [],
+      };
+      
+      console.log('🟡 Using fallback canvas data');
+      setState({ status: 'ready', data: fallbackData });
+      setPendingChanges(false);
     }
   }, [canvasId]);
 
@@ -88,14 +112,30 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
     relationships?: Partial<CanvasRelationship>[];
     skipAutoSave?: boolean;
   }) => {
-    if (state.status !== 'ready') return;
+    console.log('🟨 updateCanvas called with:', updates);
+    console.log('🟨 Current state status:', state.status);
+    
+    if (state.status !== 'ready') {
+      console.error('🔥 Cannot update canvas - state is not ready:', state.status);
+      return;
+    }
 
     try {
       const request: CanvasUpdateRequest = {
         canvasId,
         canvas: updates.canvas,
-        blocks: updates.blocks?.map(block => ({ id: block.id || '', ...block })),
-        relationships: updates.relationships?.map(rel => ({ id: rel.id || '', ...rel })),
+        blocks: updates.blocks?.map(block => {
+          if (!block.id) {
+            throw new Error('Block ID is required for canvas updates');
+          }
+          return { ...block, id: block.id };
+        }),
+        relationships: updates.relationships?.map(rel => {
+          if (!rel.id) {
+            throw new Error('Relationship ID is required for canvas updates');
+          }
+          return { ...rel, id: rel.id };
+        }),
       };
 
       const response = (await window.semantiqa?.api.invoke(
@@ -206,16 +246,37 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
 
   // Create block
   const createBlock = useCallback(async (block: Omit<CanvasBlock, 'id' | 'canvasId' | 'createdAt' | 'updatedAt'>) => {
+    console.log('🟪 createBlock called with:', block);
+    console.log('🟪 Current canvas state:', state.status);
+    console.log('🟪 Current block count:', state.data?.blocks?.length || 0);
+    
+    if (state.status !== 'ready') {
+      const errorMsg = `Cannot create block - canvas state is ${state.status}`;
+      console.error('🔥', errorMsg);
+      throw new Error(errorMsg);
+    }
+    
     const newBlock: Partial<CanvasBlock> = {
       id: `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       canvasId,
       ...block,
     };
+    
+    console.log('🟪 Generated block with ID:', newBlock.id);
+    console.log('🟪 Complete block object:', newBlock);
 
-    await updateCanvas({
-      blocks: [newBlock],
-    });
-  }, [canvasId, updateCanvas]);
+    try {
+      console.log('🟪 Calling updateCanvas with blocks:', [newBlock]);
+      await updateCanvas({
+        blocks: [newBlock],
+      });
+      console.log('✅ createBlock completed successfully - block should now exist');
+    } catch (error) {
+      console.error('🔥 createBlock failed:', error);
+      console.error('🔥 Error details:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }, [canvasId, updateCanvas, state.status, state.data]);
 
   // Delete block
   const deleteBlock = useCallback(async (blockId: string) => {

@@ -117,20 +117,20 @@ export class CanvasStateRepository {
     const canvas: CanvasState = {
       id: canvasRow.id,
       name: canvasRow.name,
-      description: canvasRow.description,
+      description: canvasRow.description || undefined,
       viewport: {
         zoom: canvasRow.viewport_zoom,
         centerX: canvasRow.viewport_center_x,
         centerY: canvasRow.viewport_center_y,
       },
       gridSize: canvasRow.grid_size,
-      snapToGrid: canvasRow.snap_to_grid,
-      autoSave: canvasRow.auto_save,
+      snapToGrid: Boolean(canvasRow.snap_to_grid),
+      autoSave: Boolean(canvasRow.auto_save),
       theme: canvasRow.theme as 'dark' | 'light',
       canvasVersion: canvasRow.canvas_version,
       createdAt: canvasRow.created_at,
       updatedAt: canvasRow.updated_at,
-      lastSavedAt: canvasRow.last_saved_at,
+      lastSavedAt: canvasRow.last_saved_at || undefined,
     };
 
     const blocks: CanvasBlock[] = blockRows.map(row => ({
@@ -143,7 +143,7 @@ export class CanvasStateRepository {
       colorTheme: row.color_theme as any,
       isSelected: Boolean(row.is_selected),
       isMinimized: Boolean(row.is_minimized),
-      customTitle: row.custom_title,
+      customTitle: row.custom_title || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
@@ -162,7 +162,7 @@ export class CanvasStateRepository {
       visualStyle: row.visual_style as any,
       lineColor: row.line_color,
       lineWidth: row.line_width,
-      curvePath: row.curve_path,
+      curvePath: row.curve_path || undefined,
       isIntraSource: Boolean(row.is_intra_source),
       isSelected: Boolean(row.is_selected),
       createdAt: row.created_at,
@@ -466,13 +466,29 @@ export class CanvasStateRepository {
   }
 
   /**
-   * Initialize default canvas if it doesn't exist
+   * Initialize default canvas if it doesn't exist, or fix incomplete entries
    */
   ensureDefaultCanvas(): void {
+    const now = new Date().toISOString();
+    
+    // Use INSERT OR REPLACE to handle both new and incomplete existing entries
     const statement = this.db.prepare(`
-      INSERT OR IGNORE INTO canvas_state (id, name) VALUES ('default', 'Main Canvas')
+      INSERT OR REPLACE INTO canvas_state (
+        id, name, description, viewport_zoom, viewport_center_x, viewport_center_y,
+        grid_size, snap_to_grid, auto_save, theme, canvas_version,
+        created_at, updated_at, last_saved_at
+      ) VALUES (
+        'default', 'Main Canvas', 'The main canvas workspace', 1.0, 0, 0,
+        20, 1, 1, 'dark', '1.0.0',
+        COALESCE((SELECT created_at FROM canvas_state WHERE id = 'default'), @created_at),
+        @updated_at, @last_saved_at
+      )
     `);
     
-    statement.run();
+    statement.run({
+      created_at: now,
+      updated_at: now,
+      last_saved_at: now,
+    });
   }
 }

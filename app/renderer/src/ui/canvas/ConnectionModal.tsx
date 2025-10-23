@@ -35,6 +35,16 @@ export interface ConnectionModalProps {
     name: string;
     kind: string;
   };
+  sourceTable?: {
+    id: string;
+    name: string;
+    sourceId: string;
+  };
+  targetTable?: {
+    id: string;
+    name: string;
+    sourceId: string;
+  };
   onSaveRelationship?: (relationship: RelationshipDefinition) => void;
 }
 
@@ -43,6 +53,8 @@ export function ConnectionModal({
   onClose, 
   sourceBlock, 
   targetBlock,
+  sourceTable,
+  targetTable,
   onSaveRelationship
 }: ConnectionModalProps) {
   const [sourceTables, setSourceTables] = useState<TableInfo[]>([]);
@@ -55,10 +67,28 @@ export function ConnectionModal({
 
   // Load tables and columns when modal opens or blocks change
   useEffect(() => {
-    if (isOpen && sourceBlock && targetBlock) {
-      loadTablesAndColumns();
+    if (isOpen) {
+      if (sourceBlock && targetBlock) {
+        loadTablesAndColumns();
+      } else if (sourceTable && targetTable) {
+        loadTableColumns();
+      }
     }
-  }, [isOpen, sourceBlock, targetBlock]);
+  }, [isOpen, sourceBlock, targetBlock, sourceTable, targetTable]);
+
+  // Preselect source table when provided
+  useEffect(() => {
+    if (sourceTable && isOpen) {
+      setSelectedSourceTable(sourceTable.id);
+    }
+  }, [sourceTable, isOpen]);
+
+  // Preselect target table when provided
+  useEffect(() => {
+    if (targetTable && isOpen) {
+      setSelectedTargetTable(targetTable.id);
+    }
+  }, [targetTable, isOpen]);
 
   const loadTablesAndColumns = async () => {
     if (!sourceBlock || !targetBlock) return;
@@ -96,6 +126,32 @@ export function ConnectionModal({
     }
   };
 
+  const loadTableColumns = async () => {
+    if (!sourceTable || !targetTable) return;
+    
+    setLoading(true);
+    try {
+      // For table-to-table connections, both tables are from the same source
+      const request: GraphGetRequest = { 
+        filter: { 
+          scope: 'schema',
+          sourceIds: [sourceTable.sourceId]
+        } 
+      };
+      const response = await window.semantiqa?.api.invoke(IPC_CHANNELS.GRAPH_GET, request) as GraphGetResponse;
+      
+      // Process tables and columns
+      const allTables = extractTablesAndColumns(response.nodes, response.edges || []);
+      setSourceTables(allTables);
+      setTargetTables(allTables);
+      
+    } catch (error) {
+      console.error('Failed to load table columns:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Extract tables and their columns from graph data
   const extractTablesAndColumns = (nodes: GraphNode[], edges: any[]): TableInfo[] => {
     const tables = nodes.filter(node => node.type === 'table' || node.type === 'collection');
@@ -111,12 +167,12 @@ export function ConnectionModal({
     
     return tables.map(table => ({
       id: table.id,
-      name: table.props.displayName,
+      name: table.props.name || table.props.displayName || table.id,
       columns: columns
         .filter(col => childToParent.get(col.id) === table.id)
         .map(col => ({
           id: col.id,
-          name: col.props.displayName,
+          name: col.props.name || col.props.displayName || col.id,
           type: (col.props as any).dataType || 'unknown'
         }))
     }));
@@ -254,6 +310,25 @@ export function ConnectionModal({
               </div>
             </div>
           )}
+
+          {/* Table connection info */}
+          {sourceTable && targetTable && (
+            <div className="connection-info">
+              <div className="connection-endpoint">
+                <div className="connection-endpoint__label">Source Table</div>
+                <div className="connection-endpoint__name">{sourceTable.name}</div>
+                <div className="connection-endpoint__type">TABLE</div>
+              </div>
+              
+              <div className="connection-arrow">→</div>
+              
+              <div className="connection-endpoint">
+                <div className="connection-endpoint__label">Target Table</div>
+                <div className="connection-endpoint__name">{targetTable.name}</div>
+                <div className="connection-endpoint__type">TABLE</div>
+              </div>
+            </div>
+          )}
           
           {loading ? (
             <div className="connection-loading">
@@ -268,17 +343,24 @@ export function ConnectionModal({
                   
                   <div className="form-group">
                     <label htmlFor="source-table">Table/Collection</label>
-                    <select 
-                      id="source-table"
-                      value={selectedSourceTable}
-                      onChange={(e) => setSelectedSourceTable(e.target.value)}
-                      className="form-select"
-                    >
-                      <option value="">Select table...</option>
-                      {sourceTables.map(table => (
-                        <option key={table.id} value={table.id}>{table.name}</option>
-                      ))}
-                    </select>
+                    {sourceTable ? (
+                      <div className="form-display">
+                        <div className="form-display__value">{sourceTable.name}</div>
+                        <div className="form-display__note">Preselected from source table</div>
+                      </div>
+                    ) : (
+                      <select 
+                        id="source-table"
+                        value={selectedSourceTable}
+                        onChange={(e) => setSelectedSourceTable(e.target.value)}
+                        className="form-select"
+                      >
+                        <option value="">Select table...</option>
+                        {sourceTables.map(table => (
+                          <option key={table.id} value={table.id}>{table.name}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   
                   <div className="form-group">
@@ -305,17 +387,24 @@ export function ConnectionModal({
                   
                   <div className="form-group">
                     <label htmlFor="target-table">Table/Collection</label>
-                    <select 
-                      id="target-table"
-                      value={selectedTargetTable}
-                      onChange={(e) => setSelectedTargetTable(e.target.value)}
-                      className="form-select"
-                    >
-                      <option value="">Select table...</option>
-                      {targetTables.map(table => (
-                        <option key={table.id} value={table.id}>{table.name}</option>
-                      ))}
-                    </select>
+                    {targetTable ? ( // Conditional rendering for preselected table
+                      <div className="form-display">
+                        <div className="form-display__value">{targetTable.name}</div>
+                        <div className="form-display__note">Preselected from target table</div>
+                      </div>
+                    ) : (
+                      <select 
+                        id="target-table"
+                        value={selectedTargetTable}
+                        onChange={(e) => setSelectedTargetTable(e.target.value)}
+                        className="form-select"
+                      >
+                        <option value="">Select table...</option>
+                        {targetTables.map(table => (
+                          <option key={table.id} value={table.id}>{table.name}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   
                   <div className="form-group">

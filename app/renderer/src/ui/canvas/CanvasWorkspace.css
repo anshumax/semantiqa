@@ -105,59 +105,7 @@
   }
 }
 
-.canvas-workspace__content--connecting {
-  cursor: crosshair;
-  background: radial-gradient(circle at center, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
-}
-
-.canvas-workspace__content--connecting * {
-  cursor: crosshair !important;
-}
-
-/* Custom connection cursor when targeting */
-.canvas-workspace__content--connecting.canvas-workspace__content--has-target {
-  cursor: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgb(34, 197, 94)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>') 12 12, crosshair;
-}
-
-/* Custom cursor for connection mode */
-.canvas-workspace__content--connecting * {
-  cursor: crosshair !important;
-}
-
-/* Connection mode status indicator */
-.canvas-workspace__content--connecting::after {
-  content: '🔗 Creating connection...';
-  position: absolute;
-  top: 80px;
-  right: 20px;
-  background: rgba(59, 130, 246, 0.9);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-  z-index: 1001;
-  animation: connection-status-fade-in 0.3s ease-out;
-  pointer-events: none;
-}
-
-@keyframes connection-status-fade-in {
-  0% {
-    opacity: 0;
-    transform: translateY(-10px) scale(0.9);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.canvas-workspace__content--connecting .canvas-workspace__instructions {
-  opacity: 0.3;
-  pointer-events: none;
-}
+/* Old connection mode styles removed - ReactFlow handles connections natively */
 
 .canvas-workspace__instructions {
   position: absolute;

@@ -55,6 +55,7 @@ const channelToSchema: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'canvas:get': CanvasGetRequestSchema,
   'canvas:update': CanvasUpdateRequestSchema,
   'canvas:save': CanvasSaveRequestSchema,
+  'tables:list': z.object({ sourceId: z.string() }),
 };
 
 const okResponse = z.object({ ok: z.literal(true) });
@@ -77,6 +78,18 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'canvas:get': z.union([CanvasGetResponseSchema, SemantiqaErrorSchema]),
   'canvas:update': z.union([CanvasUpdateResponseSchema, SemantiqaErrorSchema]),
   'canvas:save': z.union([CanvasSaveResponseSchema, SemantiqaErrorSchema]),
+  'tables:list': z.union([
+    z.object({ 
+      tables: z.array(z.object({ 
+        id: z.string(), 
+        name: z.string(), 
+        type: z.string(), 
+        schema: z.string(), 
+        rowCount: z.number() 
+      })) 
+    }), 
+    SemantiqaErrorSchema
+  ]),
 };
 
 export type IpcHandlerMap = {

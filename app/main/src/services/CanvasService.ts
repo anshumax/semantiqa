@@ -26,16 +26,66 @@ export class CanvasService {
   async getCanvas(request: CanvasGetRequest): Promise<CanvasGetResponse> {
     const { canvasId = 'default', includeBlocks = true, includeRelationships = true } = request;
 
+    console.log('🟪 CanvasService.getCanvas called with:', { canvasId, includeBlocks, includeRelationships });
+    
     const canvasData = this.canvasRepo.getCanvas(canvasId);
     if (!canvasData) {
+      console.error('🔥 Canvas not found in database:', canvasId);
       throw new Error(`Canvas with id '${canvasId}' not found`);
     }
 
-    return {
+    console.log('🟪 Repository returned:', {
+      canvasId: canvasData.canvas.id,
+      blockCount: canvasData.blocks.length,
+      relationshipCount: canvasData.relationships.length,
+      blocks: canvasData.blocks.map(b => ({ id: b.id, sourceId: b.sourceId, position: b.position }))
+    });
+
+    // Enrich blocks with source information
+    const enrichedBlocks = includeBlocks ? canvasData.blocks.map(block => {
+      // Get source info from database including status
+      const sourceStmt = this.db.prepare(`
+        SELECT id, name, kind, connection_status, status, last_error
+        FROM sources WHERE id = ?
+      `);
+      const source = sourceStmt.get(block.sourceId) as { 
+        id: string; 
+        name: string; 
+        kind: string;
+        connection_status?: string;
+        status?: string;
+        last_error?: string;
+      } | undefined;
+      
+      return {
+        ...block,
+        source: source ? {
+          id: source.id,
+          name: source.name,
+          kind: source.kind as 'postgres' | 'mysql' | 'mongo' | 'duckdb',
+          connectionStatus: source.connection_status as 'unknown' | 'checking' | 'connected' | 'error',
+          crawlStatus: source.status as 'not_crawled' | 'crawling' | 'crawled' | 'error',
+          lastError: source.last_error || undefined,
+        } : { 
+          id: block.sourceId, 
+          name: 'Unknown Source', 
+          kind: 'postgres' as const,
+          connectionStatus: 'unknown' as const,
+          crawlStatus: 'not_crawled' as const,
+        }
+      };
+    }) : [];
+
+    const response = {
       canvas: canvasData.canvas,
-      blocks: includeBlocks ? canvasData.blocks : [],
+      blocks: enrichedBlocks,
       relationships: includeRelationships ? canvasData.relationships : [],
     };
+    
+    console.log('🟪 Returning response with blockCount:', response.blocks.length);
+    console.log('🟪 Enriched blocks:', response.blocks.map(b => ({ id: b.id, sourceName: b.source?.name, sourceKind: b.source?.kind })));
+    
+    return response;
   }
 
   /**
@@ -94,7 +144,7 @@ export class CanvasService {
           confidenceScore: relationship.confidenceScore ?? 1.0,
           visualStyle: relationship.visualStyle || 'solid',
           lineColor: relationship.lineColor || '#8bb4f7',
-          lineWidth: relationship.lineWidth ?? 2,
+          lineWidth: relationship.lineWidth ?? 3,
           isIntraSource: relationship.isIntraSource ?? false,
           isSelected: relationship.isSelected ?? false,
         });

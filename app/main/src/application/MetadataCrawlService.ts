@@ -119,6 +119,9 @@ export class MetadataCrawlService {
         case 'postgres': {
           const adapter = new PostgresAdapter({ connection: connection as PostgresConnection });
           await adapter.healthCheck();
+          // Update connection status to connected after successful health check
+          await updateConnectionStatus(sourceId, 'connected');
+          sourceService.setConnectionStatus(sourceId, 'connected');
           snapshot = await crawlPostgres(adapter);
           stats = await profilePostgres(adapter);
           await adapter.close();
@@ -127,6 +130,9 @@ export class MetadataCrawlService {
         case 'mysql': {
           const adapter = new MysqlAdapter({ connection: connection as MySqlConnection });
           await adapter.healthCheck();
+          // Update connection status to connected after successful health check
+          await updateConnectionStatus(sourceId, 'connected');
+          sourceService.setConnectionStatus(sourceId, 'connected');
           snapshot = await crawlMysql(adapter);
           stats = await profileMysql(adapter, { sampleSize: 1000 });
           await adapter.close();
@@ -135,6 +141,9 @@ export class MetadataCrawlService {
         case 'mongo': {
           const adapter = new MongoAdapter({ connection: connection as MongoConnection });
           await adapter.healthCheck();
+          // Update connection status to connected after successful health check
+          await updateConnectionStatus(sourceId, 'connected');
+          sourceService.setConnectionStatus(sourceId, 'connected');
           snapshot = await crawlMongoSchema(adapter, { sampleSize: 1000 });
           stats = await profileMongoCollections(adapter, { sampleSize: 1000 });
           await adapter.close();
@@ -143,6 +152,9 @@ export class MetadataCrawlService {
         case 'duckdb': {
           const adapter = new DuckDbAdapter({ connection: { ...connection as DuckDbConnection, readOnly: false } });
           await adapter.healthCheck();
+          // Update connection status to connected after successful health check
+          await updateConnectionStatus(sourceId, 'connected');
+          sourceService.setConnectionStatus(sourceId, 'connected');
           snapshot = await crawlDuckDbSchema(adapter);
           stats = await profileDuckDbTables(adapter, { sampleSize: 1000 });
           await adapter.close();

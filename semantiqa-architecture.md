@@ -12,8 +12,15 @@
 - **Small, typed surface.** Contracts (DTOs + JSON Schemas) are the single source of truth.
 
 ## High‑Level Components
-**Renderer (React/Vite/Tailwind)**  
-UI only: Source Explorer, Results Grid, Graph (Cytoscape), Inspector, Docs Editor (tiptap), Search. Optional NL chat appears only when enrichment is enabled.
+**Renderer (React/Vite/Tailwind/ReactFlow)**  
+UI only: Source Explorer with ReactFlow canvas for visual data source management, Results Grid, Inspector, Docs Editor (tiptap), Search. Optional NL chat appears only when enrichment is enabled.
+
+**Canvas Implementation**: Uses ReactFlow library for node-based canvas interactions, eliminating custom zoom/pan/connection logic. ReactFlow provides built-in:
+- Drag-and-drop node positioning
+- Zoom/pan controls with mouse and touch support
+- Connection creation via draggable handles  
+- MiniMap for canvas overview
+- Background patterns and grid snapping
 
 **Preload (contextBridge)**  
 Versioned IPC bridge exposing a minimal, schema‑validated API.
@@ -60,6 +67,22 @@ Enrichment is purely additive and never blocks core flows.
 5) **Graph & Docs** → Add/Update nodes/edges; Yjs CRDT docs for descriptions/notes; embeddings updated; changelog appended.
 6) **Export** → Data dictionary/graph to Markdown/PDF; explicit action; audited.
 
+## IPC Architecture & Best Practices
+### Channel Registration
+- **Preload allowlist:** ALL IPC channels must be explicitly added to preload's `allowedChannels` array
+- **Channel-Service consistency:** Every handler in main process must have corresponding channel in preload
+- **Schema validation:** Both request/response schemas must be defined in `channelToSchema` and `responseSchemas`
+
+### Common Pitfalls
+- ❌ Adding new IPC handler without updating preload allowlist → "Blocked attempt to access channel" errors
+- ❌ Incomplete database initialization → Schema validation failures with null fields
+- ❌ Missing response schema validation → Runtime type mismatches
+
+### Debugging IPC Issues
+1. Check browser console for "Blocked attempt" errors → Missing preload channel
+2. Check schema validation errors → Database returning incomplete/malformed data
+3. Verify main process handler registration matches preload channels
+
 ## IPC Contracts (Renderer ↔ Main, v1)
 All payloads validated (zod/JSON Schema); every call audited.
 - `sources.add(readOnlyConn): SourceId`
@@ -77,6 +100,19 @@ All payloads validated (zod/JSON Schema); every call audited.
 - `models.enable({id, tasks}): Ack`
 - `models.healthcheck({id}): {latency, tokensPerSec, ok}`
 - `audit.list({since}): AuditEntries`
+
+## Database Initialization & Schema Management
+### Repository Pattern Best Practices
+- **Complete entity creation:** `ensure*` methods must initialize ALL required fields with proper defaults
+- **Schema compliance:** Generated entities must pass contract validation (Zod schemas)
+- **Migration safety:** Use `INSERT OR REPLACE` with `COALESCE` to handle incomplete existing data
+- **Null handling:** Avoid nullable database columns where contracts expect non-null values
+
+### Common Database Pitfalls
+- ❌ Partial entity initialization → Schema validation failures
+- ❌ `INSERT OR IGNORE` for data fixes → Existing broken records remain unfixed  
+- ❌ Missing default values → Runtime null/undefined errors
+- ❌ Database schema mismatch with contracts → Type conversion errors
 
 ## Local Storage (SQLite)
 - `nodes(id TEXT PK, type TEXT, props JSON, owner_ids JSON, tags JSON, sensitivity TEXT, status TEXT, created_at, updated_at, origin_device_id)`
@@ -116,6 +152,26 @@ All payloads validated (zod/JSON Schema); every call audited.
 ## Packaging & Updates
 - `electron-builder` → signed installers (Win/macOS). Auto‑update disabled; provide offline packages.
 - Installer **bundles ONNX embeddings**; generator models are **not bundled** (download on demand).
+
+## Development Workflow & Debugging
+### Adding New Features
+1. **Define contracts first:** Add request/response types and schemas in `/contracts`
+2. **Update IPC config:** Add channel to `IPC_CHANNELS`, `channelToSchema`, `responseSchemas`  
+3. **Add preload allowlist:** Include new channel in preload `allowedChannels` array
+4. **Implement handler:** Add main process handler to `handlerMap`
+5. **Test end-to-end:** Verify renderer → preload → main → back works correctly
+
+### When Things Break
+- **"Blocked attempt to access channel"** → Missing channel in preload allowlist
+- **Schema validation errors** → Database returning unexpected data structure  
+- **"Handler not found"** → Missing main process handler registration
+- **Type errors at runtime** → Contract/implementation mismatch
+
+### Architecture Verification Checklist
+- [ ] New IPC channels added to preload allowlist
+- [ ] Database initialization creates complete, valid entities
+- [ ] All service methods handle edge cases (missing data, validation failures)
+- [ ] Error handling provides meaningful feedback to renderer
 
 ## Extension Points
 - **Adapters**: add MSSQL/Oracle later without touching core.

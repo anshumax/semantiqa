@@ -259,7 +259,9 @@
 
 ---
 
-## Phase 4 — UI Foundations (Canvas-Based)
+## Phase 4 — UI Foundations (Canvas-Based with ReactFlow)
+
+**Note:** Phase 4 has been refactored to use ReactFlow library instead of custom canvas implementation, significantly reducing complexity and technical debt. ReactFlow provides production-ready zoom/pan/drag/connection features out of the box.
 
 ### T-04-01: Renderer UI groundwork ✅
 - **Status:** Completed (2025-10-09)
@@ -284,12 +286,12 @@
 - **Risks:** Navigation complexity → keep simple tab/sidebar pattern.
 - **Notes:** Updated from 4-tab to 3-tab navigation, merging Sources and Relationships into unified canvas.
 
-### T-04-04: Canvas infrastructure foundation ✅
-- **Status:** Completed (2025-10-18)
-- **Desc:** Core canvas rendering engine with infinite scroll, zoom/pan controls, dotted background pattern, and viewport management. SVG-based rendering for crisp scaling.
-- **DoD:** Empty canvas renders with dotted background; mouse wheel zoom (0.1x - 3x); pan with middle-click or space+drag; viewport bounds tracked; zoom level persisted; smooth animations.
+### T-04-04: Canvas infrastructure foundation ✅ → ReactFlow
+- **Status:** Completed - **MIGRATED TO REACTFLOW** (2025-10-23)
+- **Desc:** ~~Core canvas rendering engine with infinite scroll, zoom/pan controls~~ **Replaced with ReactFlow library** for production-ready canvas interactions.
+- **DoD:** ReactFlow canvas renders with dotted background; built-in zoom/pan controls; drag-and-drop nodes; connection handles; MiniMap and Controls components.
 - **Deps:** T-04-03
-- **Risks:** Performance on large canvases → implement viewport culling; browser compatibility → test across Chromium versions.
+- **Migration:** Custom Canvas.tsx replaced with ReactFlow components. All zoom/pan/drag logic now handled by library.
 
 ### T-04-05: Canvas block system ✅
 - **Status:** Completed (2025-10-18)

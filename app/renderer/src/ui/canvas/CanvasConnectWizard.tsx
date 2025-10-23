@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, Fragment } from 'react';
 import type { SourcesAddRequest } from '@semantiqa/contracts';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
 import { useCanvasPersistence } from './useCanvasPersistence';
@@ -37,7 +37,7 @@ const DEFAULT_STATE: FormState = {
 const FIELD_DEFINITIONS: Record<SourceKind, Array<{ key: string; label: string; type?: string; optional?: boolean }>> = {
   postgres: [
     { key: 'host', label: 'Host' },
-    { key: 'port', label: 'Port', type: 'number' },
+    { key: 'port', label: 'Port', type: 'text' },
     { key: 'database', label: 'Database' },
     { key: 'user', label: 'User' },
     { key: 'password', label: 'Password', type: 'password' },
@@ -104,7 +104,7 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
   const [error, setError] = useState<string | null>(null);
   const [createdBlocks, setCreatedBlocks] = useState<Array<{ name: string; position: { x: number; y: number } }>>([]);
 
-  const { data: canvasData, createBlock } = useCanvasPersistence();
+  const { data: canvasData, createBlock, refresh: refreshCanvas } = useCanvasPersistence();
 
   const reset = useCallback(() => {
     setCurrentStep('choose-kind');
@@ -134,9 +134,8 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
   }, []);
 
   const handleConnectionChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type } = event.target;
-    const nextValue = type === 'number' ? Number(value) : value;
-    setFormState((prev) => ({ ...prev, connection: { ...prev.connection, [name]: nextValue } }));
+    const { name, value } = event.target;
+    setFormState((prev) => ({ ...prev, connection: { ...prev.connection, [name]: value } }));
   }, []);
 
   const ownersList = useMemo(
@@ -171,10 +170,25 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
       return;
     }
 
+    // Validate port range if present
+    if (formState.connection.port) {
+      const port = parseInt(formState.connection.port as string, 10);
+      if (isNaN(port) || port < 0 || port > 65535) {
+        setError('Port must be a number between 0 and 65535.');
+        return;
+      }
+    }
+
     setTesting(true);
     setError(null);
 
     try {
+      // Convert port to number if it exists
+      const connection = { ...formState.connection };
+      if (connection.port) {
+        connection.port = parseInt(connection.port as string, 10);
+      }
+
       // Test connection by attempting to add the source (this will validate the connection)
       const payload: SourcesAddRequest = {
         kind: selectedKind,
@@ -182,7 +196,7 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
         description: formState.description || undefined,
         owners: ownersList,
         tags: tagsList,
-        connection: formState.connection as SourcesAddRequest['connection'],
+        connection: connection as SourcesAddRequest['connection'],
       };
 
       // For now, we'll simulate multi-database detection
@@ -233,6 +247,12 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
       for (let i = 0; i < selectedDatabases.length; i++) {
         const database = selectedDatabases[i];
         
+        // Convert port to number if it exists
+        const connection = { ...formState.connection };
+        if (connection.port) {
+          connection.port = parseInt(connection.port as string, 10);
+        }
+
         const payload: SourcesAddRequest = {
           kind: selectedKind,
           name: selectedDatabases.length > 1 ? `${formState.name} - ${database.name}` : formState.name,
@@ -240,16 +260,39 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
           owners: ownersList,
           tags: tagsList,
           connection: {
-            ...formState.connection,
+            ...connection,
             database: database.name,
           } as SourcesAddRequest['connection'],
         };
 
         // Add the source
         const sourceResponse = await window.semantiqa?.api.invoke('sources:add', payload);
-        if (!sourceResponse || !('sourceId' in sourceResponse)) {
-          throw new Error(`Failed to create source for database: ${database.name}`);
+        
+        console.log('Backend response:', JSON.stringify(sourceResponse, null, 2));
+        
+        // Handle different response types
+        if (!sourceResponse) {
+          throw new Error(`No response received for database: ${database.name}`);
         }
+        
+        // Check for backend errors - handle actual response format
+        let effectiveSourceId: string;
+        
+        if ('code' in sourceResponse && sourceResponse.code === 'VALIDATION_ERROR') {
+          // Duplicate: use the existing sourceId from details
+          if (sourceResponse.details && 'existingSourceId' in sourceResponse.details) {
+            console.warn('Duplicate source detected, using existing sourceId to create canvas block');
+            effectiveSourceId = (sourceResponse as any).details.existingSourceId;
+          } else {
+            throw new Error(sourceResponse.message || 'Validation error occurred');
+          }
+        } else if ('sourceId' in sourceResponse) {
+          effectiveSourceId = sourceResponse.sourceId;
+        } else {
+          throw new Error(`Invalid response format for database: ${database.name}. Response: ${JSON.stringify(sourceResponse)}`);
+        }
+        
+        // Now we have effectiveSourceId - either from new source or existing duplicate
 
         // Calculate position for the new block
         const position = calculateNewBlockPosition(
@@ -260,24 +303,42 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
           i
         );
 
-        // Create canvas block
-        await createBlock({
-          sourceId: sourceResponse.sourceId,
-          position,
-          size: { width: 200, height: 120 },
-          zIndex: 0,
-          colorTheme: 'auto',
-          isSelected: false,
-          isMinimized: false,
-        });
+        // Create canvas block via persistence hook (canvas:update)
+        console.log('🔶 BEFORE createBlock - sourceId:', effectiveSourceId, 'position:', position);
+        
+        try {
+          const blockData = {
+            sourceId: effectiveSourceId,
+            position,
+            size: { width: 200, height: 120 },
+            zIndex: 0,
+            colorTheme: 'auto',
+            isSelected: false,
+            isMinimized: false,
+          };
+          
+          console.log('🔶 Calling createBlock with data:', blockData);
+          await createBlock(blockData);
+          console.log('🔶 createBlock returned successfully');
+          
+        } catch (blockError) {
+          console.error('🔥 CANVAS BLOCK CREATION FAILED:', blockError);
+          throw blockError; // Re-throw to see if this is silently failing
+        }
 
         newBlocks.push({
           name: payload.name,
           position,
         });
+        
+        console.log('Successfully processed source and created canvas block:', effectiveSourceId);
       }
 
       setCreatedBlocks(newBlocks);
+      
+      // Refresh canvas to show new blocks
+      await refreshCanvas();
+      
       setCurrentStep('success');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create data sources');
@@ -303,27 +364,42 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
         </div>
 
         <div className="canvas-connect-wizard__content">
-          <ol className="canvas-connect-wizard__steps">
-            {[
-              { id: 'choose-kind', label: 'Choose type' },
-              { id: 'configure', label: 'Configure' },
-              { id: 'test-connection', label: 'Test connection' },
-              ...(detectedDatabases.length > 1 ? [{ id: 'select-databases', label: 'Select databases' }] : []),
-              { id: 'review', label: 'Review' },
-              { id: 'success', label: 'Complete' },
-            ].map((step, index) => (
-              <li
-                key={step.id}
-                className={`canvas-connect-wizard__step ${
-                  currentStep === step.id ? 'canvas-connect-wizard__step--active' : ''
-                } ${
-                  getStepIndex(currentStep) > index ? 'canvas-connect-wizard__step--completed' : ''
-                }`}
-              >
-                {step.label}
-              </li>
-            ))}
-          </ol>
+          <div className="canvas-connect-wizard__stepper">
+            <ol className="canvas-connect-wizard__steps">
+              {[
+                { id: 'choose-kind', label: 'Choose type' },
+                { id: 'configure', label: 'Configure' },
+                { id: 'test-connection', label: 'Test' },
+                ...(detectedDatabases.length > 1 ? [{ id: 'select-databases', label: 'Select DB' }] : []),
+                { id: 'review', label: 'Review' },
+                { id: 'success', label: 'Complete' },
+              ].map((step, index, array) => {
+                const isActive = currentStep === step.id;
+                const isCompleted = getStepIndex(currentStep) > index;
+                const showConnector = index < array.length - 1;
+                
+                return (
+                  <Fragment key={step.id}>
+                    <li className={`canvas-connect-wizard__step ${
+                      isActive ? 'canvas-connect-wizard__step--active' : ''
+                    } ${
+                      isCompleted ? 'canvas-connect-wizard__step--completed' : ''
+                    }`}>
+                      <div className="canvas-connect-wizard__step-circle">
+                        {isCompleted ? '✓' : index + 1}
+                      </div>
+                      <span>{step.label}</span>
+                    </li>
+                    {showConnector && (
+                      <div className={`canvas-connect-wizard__step-connector ${
+                        isCompleted ? 'canvas-connect-wizard__step-connector--completed' : ''
+                      }`} />
+                    )}
+                  </Fragment>
+                );
+              })}
+            </ol>
+          </div>
 
           <div className="canvas-connect-wizard__body">
             {currentStep === 'choose-kind' && (
@@ -494,13 +570,18 @@ function ConfigureForm({
           {fields.map((field) => (
             <label key={field.key} className={field.key === 'uri' ? 'canvas-connect-wizard__full' : ''}>
               {field.label}
-              <input
-                name={field.key}
-                type={field.type ?? 'text'}
-                value={(formState.connection[field.key] as string) ?? ''}
-                onChange={onConnectionChange}
-                required={!field.optional}
-              />
+                <input
+                  name={field.key}
+                  type={field.type ?? 'text'}
+                  value={(formState.connection[field.key] as string) ?? ''}
+                  onChange={onConnectionChange}
+                  required={!field.optional}
+                  {...(field.key === 'port' ? {
+                    min: 0,
+                    max: 65535,
+                    placeholder: '3306'
+                  } : {})}
+                />
             </label>
           ))}
         </div>

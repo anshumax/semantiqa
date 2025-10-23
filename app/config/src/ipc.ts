@@ -43,7 +43,8 @@ export type IpcChannel =
   | 'graph:get'
   | 'canvas:get'
   | 'canvas:update'
-  | 'canvas:save';
+  | 'canvas:save'
+  | 'tables:list';
 
 type HandlerMap = {
   'health:ping': {
@@ -114,6 +115,10 @@ type HandlerMap = {
     request: CanvasSaveRequest;
     response: CanvasSaveResponse | SemantiqaError;
   };
+  'tables:list': {
+    request: { sourceId: string };
+    response: { tables: Array<{ id: string; name: string; type: string; schema: string; rowCount: number }> } | SemantiqaError;
+  };
 };
 
 export type IpcRequest<T extends IpcChannel> = T extends keyof HandlerMap
@@ -141,6 +146,7 @@ export const IPC_CHANNELS = {
   CANVAS_GET: 'canvas:get' as const,
   CANVAS_UPDATE: 'canvas:update' as const,
   CANVAS_SAVE: 'canvas:save' as const,
+  TABLES_LIST: 'tables:list' as const,
 } satisfies Record<string, IpcChannel>;
 
 export type SafeRendererChannels = Pick<
@@ -162,6 +168,7 @@ export type SafeRendererChannels = Pick<
   | 'CANVAS_GET'
   | 'CANVAS_UPDATE'
   | 'CANVAS_SAVE'
+  | 'TABLES_LIST'
 >;
 
 export const RENDERER_CHANNELS = Object.freeze({

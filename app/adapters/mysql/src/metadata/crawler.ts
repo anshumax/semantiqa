@@ -49,7 +49,7 @@ SELECT
   table_type AS table_type,
   table_comment AS table_comment
 FROM information_schema.tables
-WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+WHERE table_schema = DATABASE()
 ORDER BY table_schema, table_name;
 `;
 
@@ -66,7 +66,7 @@ SELECT
   numeric_scale AS numeric_scale,
   column_comment AS column_comment
 FROM information_schema.columns
-WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+WHERE table_schema = DATABASE()
 ORDER BY table_schema, table_name, ordinal_position;
 `;
 

@@ -143,28 +143,6 @@ export function Canvas({
     };
   }, [viewport, onViewportChange, minZoom, maxZoom]);
 
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Zoom with + and - keys
-      if (event.key === '+' || event.key === '=') {
-        event.preventDefault();
-        const newZoom = Math.min(maxZoom, viewport.zoom * 1.1);
-        onViewportChange({ ...viewport, zoom: newZoom });
-      } else if (event.key === '-') {
-        event.preventDefault();
-        const newZoom = Math.max(minZoom, viewport.zoom * 0.9);
-        onViewportChange({ ...viewport, zoom: newZoom });
-      } else if (event.key === '0') {
-        // Reset zoom to 1.0
-        event.preventDefault();
-        onViewportChange({ ...viewport, zoom: 1.0 });
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewport, onViewportChange, minZoom, maxZoom]);
 
   // Calculate dotted background pattern offset based on viewport
   const backgroundOffset = useMemo(() => {

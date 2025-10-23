@@ -23,7 +23,7 @@ const ColumnRowSchema = zod_1.z.object({
 const TABLE_QUERY = `
 SELECT table_schema, table_name, table_type, table_comment
 FROM information_schema.tables
-WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+WHERE table_schema = DATABASE()
 ORDER BY table_schema, table_name;
 `;
 const COLUMN_QUERY = `
@@ -39,7 +39,7 @@ SELECT
   numeric_scale,
   column_comment
 FROM information_schema.columns
-WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+WHERE table_schema = DATABASE()
 ORDER BY table_schema, table_name, ordinal_position;
 `;
 async function crawlSchema(pool) {

@@ -1,0 +1,153 @@
+.data-source-node {
+  width: 200px;
+  min-height: 120px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.data-source-node--selected {
+  border-width: 3px;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3), 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Status-based border glows */
+.data-source-node--error {
+  border-color: rgba(239, 68, 68, 0.8) !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.data-source-node--checking {
+  border-color: rgba(251, 191, 36, 0.8) !important;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.data-source-node--ready {
+  border-color: rgba(34, 197, 94, 0.8) !important;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.data-source-node--connected {
+  border-color: rgba(59, 130, 246, 0.8) !important;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.data-source-node--unknown {
+  border-color: rgba(156, 163, 175, 0.6);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Header section */
+.data-source-node__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.data-source-node__icon {
+  font-size: 20px;
+}
+
+.data-source-node__kind {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+}
+
+/* Title and subtitle */
+.data-source-node__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-source-node__subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Meta information */
+.data-source-node__meta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Error display */
+.data-source-node__error {
+  font-size: 11px;
+  color: rgba(239, 68, 68, 1);
+  margin-top: 6px;
+  padding: 4px 6px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Hover effects */
+.data-source-node:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ReactFlow handles - make them invisible but functional */
+.data-source-node .react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background: rgba(59, 130, 246, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.data-source-node:hover .react-flow__handle {
+  opacity: 1;
+}
+
+.data-source-node .react-flow__handle:hover {
+  background: rgba(59, 130, 246, 1);
+  /* transform: scale(1.3); */
+}
+
+/* Ensure no pseudo-elements or content on handles */
+.data-source-node .react-flow__handle::before,
+.data-source-node .react-flow__handle::after {
+  content: none !important;
+  display: none !important;
+}
+
+.react-flow__handle::before,
+.react-flow__handle::after {
+  content: none !important;
+  display: none !important;
+}

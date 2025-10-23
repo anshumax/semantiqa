@@ -1,28 +1,33 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Canvas } from './Canvas';
-import { CanvasBlock } from './CanvasBlock';
-import { TableBlock } from './TableBlock';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import ReactFlow, {
+  Node,
+  Edge,
+  Controls,
+  Background,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  Connection,
+  BackgroundVariant,
+  Panel,
+  NodeTypes,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import { DataSourceNode, DataSourceNodeData } from './DataSourceNode';
 import { CanvasBreadcrumbs } from './CanvasBreadcrumbs';
 import { CanvasNavigationProvider, useCanvasNavigation } from './CanvasNavigationContext';
-import { CanvasFloatingUI, FloatingElement } from './CanvasFloatingUI';
 import { FloatingPlusButton } from './FloatingPlusButton';
-import { ZoomControls } from './ZoomControls';
-import { CanvasMiniMap } from './CanvasMiniMap';
-import { RelationshipRenderer } from './RelationshipRenderer';
-import { DynamicConnectionLine } from './DynamicConnectionLine';
 import { ConnectionModal } from './ConnectionModal';
 import { CanvasConnectWizard } from './CanvasConnectWizard';
-import { 
-  VisualRelationship, 
-  getRelationshipType, 
-  getStyleForRelationship,
-  RelationshipInteractionEvent
-} from './relationshipTypes';
-import { getConnectionPointPosition, calculateOptimalConnectionPoints } from './curveUtils';
-import { CanvasViewport } from './types';
-import { DrillDownContext, createDefaultTransition } from './navigationTypes';
-import { ConnectionCreationState, PendingConnection } from './connectionTypes';
+import { useCanvasPersistence } from './useCanvasPersistence';
+import { createDefaultTransition, TableInfo } from './navigationTypes';
 import './CanvasWorkspace.css';
+
+// Custom node types for ReactFlow
+const nodeTypes: NodeTypes = {
+  dataSource: DataSourceNode,
+};
 
 export interface CanvasWorkspaceProps {
   className?: string;
@@ -37,172 +42,185 @@ export function CanvasWorkspace({ className = '' }: CanvasWorkspaceProps) {
 }
 
 function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
-  const [viewport, setViewport] = useState<CanvasViewport>({
-    zoom: 1.0,
-    centerX: 0,
-    centerY: 0,
-  });
-  
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showConnectWizard, setShowConnectWizard] = useState(false);
   
-  // Connection creation state
-  const [connectionState, setConnectionState] = useState<ConnectionCreationState>({
-    isConnecting: false,
-    sourceBlockId: null,
-    sourcePosition: null,
-    cursorPosition: null,
-    targetBlockId: null,
-    targetPosition: null,
-  });
+  // Load canvas data from persistence layer
+  const { data: canvasData, refresh: refreshCanvas } = useCanvasPersistence();
   
-  const [pendingConnection, setPendingConnection] = useState<PendingConnection | null>(null);
-  const [userRelationships, setUserRelationships] = useState<VisualRelationship[]>([]);
+  // ReactFlow state
+  const [nodes, setNodes, onNodesChange] = useNodesState<DataSourceNodeData>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  
+  // Tables data for tables view
+  const [tablesData, setTablesData] = useState<TableInfo[]>([]);
+  
+  // Connection modal state
   const [connectionModal, setConnectionModal] = useState<{
     isOpen: boolean;
     sourceBlock?: { id: string; name: string; kind: string };
     targetBlock?: { id: string; name: string; kind: string };
+    sourceTable?: { id: string; name: string; sourceId: string };
+    targetTable?: { id: string; name: string; sourceId: string };
+    connection?: Connection;
   }>({ isOpen: false });
-  const canvasRef = useRef<HTMLDivElement>(null);
   
   const { state, drillDown, navigateToBreadcrumb } = useCanvasNavigation();
 
-  const handleViewportChange = useCallback((newViewport: CanvasViewport) => {
-    setViewport(newViewport);
-  }, []);
-  
-  // Reset and animate viewport when level changes
-  React.useEffect(() => {
-    if (state.isTransitioning && state.activeTransition) {
-      const transition = state.activeTransition;
+
+  // Load tables data when in tables view
+  useEffect(() => {
+    if (state.currentLevel === 'tables' && state.sourceId) {
+      // Load actual tables from metadata service
+      const loadTables = async () => {
+        try {
+          const response = await window.semantiqa?.api.invoke('tables:list', { sourceId: state.sourceId });
+          if ('tables' in response) {
+            setTablesData(response.tables);
+          } else {
+            console.error('Failed to load tables:', response);
+            setTablesData([]);
+          }
+        } catch (error) {
+          console.error('Error loading tables:', error);
+          setTablesData([]);
+        }
+      };
       
-      // Smooth zoom transition based on navigation direction
-      if (transition.type === 'drill-down') {
-        // Zoom in slightly when drilling down
-        setViewport(prev => ({
-          ...prev,
-          zoom: Math.min(prev.zoom * 1.2, 2.0),
-          centerX: 0,
-          centerY: 0,
-        }));
-      } else if (transition.type === 'drill-up') {
-        // Zoom out when drilling up
-        setViewport(prev => ({
-          ...prev,
-          zoom: Math.max(prev.zoom * 0.8, 0.5),
-          centerX: 0,
-          centerY: 0,
-        }));
+      loadTables();
+    } else {
+      setTablesData([]);
+    }
+  }, [state.currentLevel, state.sourceId]);
+
+  // Convert canvas blocks to ReactFlow nodes based on current level
+  useEffect(() => {
+    if (state.currentLevel === 'sources') {
+      // Show data source nodes
+      if (!canvasData?.blocks) return;
+
+      const flowNodes = canvasData.blocks.map((block) => {
+        return {
+          id: block.id,
+          type: 'dataSource',
+          position: { x: block.position.x, y: block.position.y },
+          data: {
+            id: block.sourceId,
+            name: block.source?.name || 'Unknown',
+            kind: (block.source?.kind || 'postgres') as DataSourceNodeData['kind'],
+            connectionStatus: block.source?.connectionStatus || 'unknown',
+            crawlStatus: block.source?.crawlStatus || 'not_crawled',
+            lastError: block.source?.lastError,
+          },
+        };
+      });
+
+      setNodes(flowNodes);
+    } else if (state.currentLevel === 'tables') {
+      // Show table nodes
+      const flowNodes = tablesData.map((table, index) => {
+        return {
+          id: `table-${table.id}`,
+          type: 'dataSource', // We'll use the same node type for now
+          position: { 
+            x: 100 + (index % 3) * 250, 
+            y: 100 + Math.floor(index / 3) * 150 
+          },
+          data: {
+            id: table.id,
+            name: table.name,
+            kind: (state.sourceKind || 'postgres') as DataSourceNodeData['kind'],
+            connectionStatus: 'connected' as const,
+            crawlStatus: 'crawled' as const,
+            tableCount: table.rowCount,
+          },
+        };
+      });
+
+      setNodes(flowNodes);
+    }
+  }, [canvasData?.blocks, state.currentLevel, state.sourceId, state.sourceKind, tablesData, setNodes]);
+
+  // Convert canvas relationships to ReactFlow edges
+  useEffect(() => {
+    if (!canvasData?.relationships) return;
+
+    const flowEdges: Edge[] = canvasData.relationships.map((rel) => ({
+      id: rel.id,
+      source: rel.sourceBlockId,
+      target: rel.targetBlockId,
+      type: 'smoothstep',
+      animated: false,
+      style: {
+        stroke: rel.type === 'cross-source' ? '#22c55e' : '#3b82f6',
+        strokeWidth: 2,
+        strokeDasharray: rel.type === 'cross-source' ? '5,5' : undefined,
+      },
+      label: rel.label,
+    }));
+
+    setEdges(flowEdges);
+  }, [canvasData?.relationships, setEdges]);
+
+  // Handle new connections
+  const onConnect = useCallback((connection: Connection) => {
+    console.log('🔗 Connection created:', connection);
+    
+    // Find source and target nodes
+    const sourceNode = nodes.find(n => n.id === connection.source);
+    const targetNode = nodes.find(n => n.id === connection.target);
+    
+    if (!sourceNode || !targetNode) {
+      console.error('Source or target node not found');
+      return;
+    }
+
+    // Check if we're in tables view and these are table nodes
+    if (state.currentLevel === 'tables' && sourceNode.id.startsWith('table-') && targetNode.id.startsWith('table-')) {
+      // This is a table-to-table connection
+      const sourceTableId = sourceNode.id.replace('table-', '');
+      const targetTableId = targetNode.id.replace('table-', '');
+      
+      const sourceTable = tablesData.find(t => t.id === sourceTableId);
+      const targetTable = tablesData.find(t => t.id === targetTableId);
+      
+      if (sourceTable && targetTable) {
+        setConnectionModal({
+          isOpen: true,
+          sourceTable: {
+            id: sourceTable.id,
+            name: sourceTable.name,
+            sourceId: state.sourceId || '',
+          },
+          targetTable: {
+            id: targetTable.id,
+            name: targetTable.name,
+            sourceId: state.sourceId || '',
+          },
+          connection,
+        });
+        return;
       }
     }
-  }, [state.currentLevel, state.isTransitioning, state.activeTransition]);
 
-  const resetViewport = useCallback(() => {
-    setViewport({
-      zoom: 1.0,
-      centerX: 0,
-      centerY: 0,
+    // Default data source to data source connection
+    setConnectionModal({
+      isOpen: true,
+      sourceBlock: {
+        id: sourceNode.id,
+        name: sourceNode.data.name,
+        kind: sourceNode.data.kind,
+      },
+      targetBlock: {
+        id: targetNode.id,
+        name: targetNode.data.name,
+        kind: targetNode.data.kind,
+      },
+      connection,
     });
-  }, []);
-  
-  // Zoom control handlers
-  const handleZoomIn = useCallback(() => {
-    setViewport(prev => ({
-      ...prev,
-      zoom: Math.min(prev.zoom * 1.2, 3.0)
-    }));
-  }, []);
-  
-  const handleZoomOut = useCallback(() => {
-    setViewport(prev => ({
-      ...prev,
-      zoom: Math.max(prev.zoom / 1.2, 0.1)
-    }));
-  }, []);
-  
-  const handleZoomReset = useCallback(() => {
-    setViewport(prev => ({
-      ...prev,
-      zoom: 1.0
-    }));
-  }, []);
-  
-  // Plus button handler with user feedback
-  const handleAddDataSource = useCallback(() => {
-    console.log('Add data source clicked - opening canvas connection wizard');
-    setShowConnectWizard(true);
-  }, []);
-  
-  const handleWizardClose = useCallback(() => {
-    setShowConnectWizard(false);
-  }, []);
-  
-  // Relationship interaction handler
-  const handleRelationshipInteraction = useCallback((event: RelationshipInteractionEvent) => {
-    console.log('Relationship interaction:', event.type, event.relationshipId);
-    
-    switch (event.type) {
-      case 'hover':
-        console.log('Hovering over relationship:', event.relationshipId);
-        break;
-      case 'click':
-        console.log('Clicked relationship:', event.relationshipId);
-        break;
-      case 'double-click':
-        console.log('Double-clicked relationship - open editor:', event.relationshipId);
-        break;
-      case 'context-menu':
-        console.log('Right-clicked relationship - show menu:', event.relationshipId);
-        break;
-    }
-  }, []);
-  
-  // Connection creation handlers
-  const handleConnectionStart = useCallback((sourceBlockId: string, sourcePosition: CanvasPosition) => {
-    console.log('🔗 Connection start:', { sourceBlockId, sourcePosition });
-    
-    setConnectionState({
-      isConnecting: true,
-      sourceBlockId,
-      sourcePosition,
-      cursorPosition: sourcePosition,
-      targetBlockId: null,
-      targetPosition: null,
-    });
-    
-    console.log('🔗 Connection state updated to connecting mode');
-  }, []);
-  
-  const handleConnectionTarget = useCallback((targetBlockId: string, targetPosition: CanvasPosition) => {
-    console.log('🎯 Connection target:', { targetBlockId, targetPosition });
-    setConnectionState(prev => ({
-      ...prev,
-      targetBlockId,
-      targetPosition,
-    }));
-  }, []);
-  
-  const handleConnectionTargetLeave = useCallback(() => {
-    setConnectionState(prev => ({
-      ...prev,
-      targetBlockId: null,
-      targetPosition: null,
-    }));
-  }, []);
-  
-  const handleCancelConnection = useCallback(() => {
-    console.log('Cancelling connection');
-    setConnectionState({
-      isConnecting: false,
-      sourceBlockId: null,
-      sourcePosition: null,
-      cursorPosition: null,
-      targetBlockId: null,
-      targetPosition: null,
-    });
-  }, []);
-  
-  // Handle saving a relationship definition from the modal
+  }, [nodes, state.currentLevel, state.sourceId, tablesData]);
+
+  // Handle saving relationship from modal
   const handleSaveRelationship = useCallback((relationship: {
     sourceTable: string;
     sourceColumn: string;
@@ -211,233 +229,105 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
   }) => {
     console.log('💾 Saving relationship:', relationship);
     
-    if (!pendingConnection || !connectionModal.sourceBlock || !connectionModal.targetBlock) {
-      console.error('Missing required data for relationship creation');
+    if (!connectionModal.connection) {
+      console.error('Missing connection data for relationship creation');
       return;
     }
+
+    // Check if we have the required block or table data
+    const hasBlockData = connectionModal.sourceBlock && connectionModal.targetBlock;
+    const hasTableData = connectionModal.sourceTable && connectionModal.targetTable;
     
-    // Create a new visual relationship from the form data
-    const newRelationship: VisualRelationship = {
-      id: `user-rel-${Date.now()}`,
-      sourceBlockId: connectionModal.sourceBlock.id,
-      targetBlockId: connectionModal.targetBlock.id,
-      sourceKind: connectionModal.sourceBlock.kind as any,
-      targetKind: connectionModal.targetBlock.kind as any,
-      type: 'cross-source',
-      sourcePoint: {
-        id: `${connectionModal.sourceBlock.id}-connection-point`,
-        blockId: connectionModal.sourceBlock.id,
-        position: pendingConnection.sourcePosition,
-        anchor: determineAnchorFromPosition(pendingConnection.sourcePosition, pendingConnection.targetPosition)
-      },
-      targetPoint: {
-        id: `${connectionModal.targetBlock.id}-connection-point`,
-        blockId: connectionModal.targetBlock.id,
-        position: pendingConnection.targetPosition,
-        anchor: determineAnchorFromPosition(pendingConnection.targetPosition, pendingConnection.sourcePosition)
-      },
+    if (!hasBlockData && !hasTableData) {
+      console.error('Missing required source/target data for relationship creation');
+      return;
+    }
+
+    // Get table names for the label
+    const sourceTableInfo = tablesData.find(t => t.id === relationship.sourceTable);
+    const targetTableInfo = tablesData.find(t => t.id === relationship.targetTable);
+    const sourceTableName = sourceTableInfo?.name || relationship.sourceTable.split('_').pop() || 'unknown';
+    const targetTableName = targetTableInfo?.name || relationship.targetTable.split('_').pop() || 'unknown';
+
+    // Create new edge with relationship metadata
+    const newEdge: Edge = {
+      id: `edge-${Date.now()}`,
+      source: connectionModal.connection.source!,
+      target: connectionModal.connection.target!,
+      sourceHandle: connectionModal.connection.sourceHandle,
+      targetHandle: connectionModal.connection.targetHandle,
+      type: 'smoothstep',
+      animated: false,
       style: {
-        strokeColor: 'rgba(34, 197, 94, 0.8)', // Green for user-created
-        hoverColor: 'rgba(34, 197, 94, 1)',
-        selectedColor: 'rgba(34, 197, 94, 1)',
+        stroke: '#22c55e',
         strokeWidth: 2,
-        strokeDasharray: '5,5', // Dashed to distinguish from demo relationships
-        opacity: 0.9,
-        curve: {
-          curvature: 0.3,
-          controlPointOffset: 80
-        }
+        strokeDasharray: '5,5',
       },
-      metadata: {
-        label: `${relationship.sourceTable}.${relationship.sourceColumn} → ${relationship.targetTable}.${relationship.targetColumn}`,
-        description: `User-defined relationship between ${connectionModal.sourceBlock.name} and ${connectionModal.targetBlock.name}`,
-        cardinality: '1:1' // Default, could be configurable later
-      }
+      label: `${sourceTableName} → ${targetTableName}`,
+      data: {
+        sourceTable: relationship.sourceTable,
+        sourceColumn: relationship.sourceColumn,
+        targetTable: relationship.targetTable,
+        targetColumn: relationship.targetColumn,
+      },
     };
+
+    setEdges((eds) => addEdge(newEdge, eds));
     
-    // Add the new relationship to state
-    setUserRelationships(prev => [...prev, newRelationship]);
-    
-    // For demo purposes, show success in console
-    console.log('✅ Relationship created successfully between:', {
-      source: `${connectionModal.sourceBlock?.name}.${relationship.sourceTable}.${relationship.sourceColumn}`,
-      target: `${connectionModal.targetBlock?.name}.${relationship.targetTable}.${relationship.targetColumn}`
-    });
-    
-    // TODO: This is where we would persist the relationship to the backend
-    // In the future, this would call an IPC method like:
-    // await window.semantiqa?.api.invoke('relationships:create', {
-    //   sourceBlockId: connectionModal.sourceBlock?.id,
-    //   targetBlockId: connectionModal.targetBlock?.id,
-    //   sourceTable: relationship.sourceTable,
-    //   sourceColumn: relationship.sourceColumn,
-    //   targetTable: relationship.targetTable,
-    //   targetColumn: relationship.targetColumn,
-    // });
-    
-    // Close modal and clean up state
+    // Close modal
     setConnectionModal({ isOpen: false });
-    setPendingConnection(null);
-  }, [connectionModal.sourceBlock, connectionModal.targetBlock, pendingConnection]);
-  
-  const handleCompleteConnection = useCallback(() => {
-    if (connectionState.sourceBlockId && connectionState.targetBlockId && 
-        connectionState.sourcePosition && connectionState.targetPosition) {
-      
-      // Prevent self-connection
-      if (connectionState.sourceBlockId === connectionState.targetBlockId) {
-        console.warn('Cannot create connection to the same block');
-        handleCancelConnection();
-        return;
-      }
-      
-      // Find source and target block info
-      const sourceBlock = demoDataSources.find(ds => ds.id === connectionState.sourceBlockId);
-      const targetBlock = demoDataSources.find(ds => ds.id === connectionState.targetBlockId);
-      
-      if (!sourceBlock || !targetBlock) {
-        console.error('Source or target block not found');
-        handleCancelConnection();
-        return;
-      }
-      
-      // Check if both blocks are in a valid state for connection
-      if (sourceBlock.status === 'error' || targetBlock.status === 'error') {
-        console.warn('Cannot create connection with blocks in error state');
-        // Could show a toast or modal here instead of just canceling
-        handleCancelConnection();
-        return;
-      }
-      
-      // Open connection configuration modal
-      setConnectionModal({
-        isOpen: true,
-        sourceBlock: {
-          id: sourceBlock.id,
-          name: sourceBlock.name,
-          kind: sourceBlock.kind
-        },
-        targetBlock: {
-          id: targetBlock.id,
-          name: targetBlock.name,
-          kind: targetBlock.kind
-        }
-      });
-      
-      const newConnection: PendingConnection = {
-        sourceBlockId: connectionState.sourceBlockId,
-        targetBlockId: connectionState.targetBlockId,
-        sourcePosition: connectionState.sourcePosition,
-        targetPosition: connectionState.targetPosition,
-      };
-      
-      setPendingConnection(newConnection);
-      console.log('Connection created between:', sourceBlock.name, 'and', targetBlock.name);
-    } else {
-      console.warn('Incomplete connection state - missing required data');
-    }
     
-    // Reset connection state
-    setConnectionState({
-      isConnecting: false,
-      sourceBlockId: null,
-      sourcePosition: null,
-      cursorPosition: null,
-      targetBlockId: null,
-      targetPosition: null,
-    });
-  }, [connectionState, handleCancelConnection]);
+    console.log('✅ Relationship created successfully');
+  }, [connectionModal, setEdges]);
+
+  // Plus button handler
+  const handleAddDataSource = useCallback(() => {
+    console.log('Add data source clicked');
+    setShowConnectWizard(true);
+  }, []);
   
-  // Mouse move tracking for connection mode
-  const handleCanvasMouseMove = useCallback((event: React.MouseEvent) => {
-    if (connectionState.isConnecting) {
-      const canvasContent = canvasRef.current?.querySelector('.canvas__content');
-      if (canvasContent) {
-        const rect = canvasContent.getBoundingClientRect();
-        const cursorPosition = {
-          x: event.clientX - rect.left,
-          y: event.clientY - rect.top,
-        };
-        
-        // Debug: Log cursor position updates less frequently
-        if (Math.random() < 0.1) { // Only log 10% of the time to avoid spam
-          console.log('🐭 Cursor moved during connection:', cursorPosition);
-        }
-        
-        setConnectionState(prev => ({
-          ...prev,
-          cursorPosition,
-        }));
-      }
-    }
-  }, [connectionState.isConnecting]);
-  
-  // Canvas click handler for connection completion or cancellation
-  const handleCanvasClick = useCallback((event: React.MouseEvent) => {
-    if (connectionState.isConnecting) {
-      console.log('🖥️ Canvas clicked during connection mode:', {
-        isConnecting: connectionState.isConnecting,
-        targetBlockId: connectionState.targetBlockId,
-        sourceBlockId: connectionState.sourceBlockId
-      });
-      
-      if (connectionState.targetBlockId) {
-        console.log('🚀 Completing connection...');
-        // Complete connection
-        handleCompleteConnection();
-      } else {
-        console.log('❌ Canceling connection - clicked empty canvas');
-        // Cancel connection (clicked empty canvas)
-        handleCancelConnection();
-      }
-      event.stopPropagation();
-    }
-  }, [connectionState.isConnecting, connectionState.targetBlockId, handleCompleteConnection, handleCancelConnection]);
-  
-  // Keyboard shortcuts for zoom controls and connection mode
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle if no input/textarea is focused
-      const activeElement = document.activeElement;
-      const isInputFocused = activeElement?.tagName === 'INPUT' || 
-                           activeElement?.tagName === 'TEXTAREA' ||
-                           activeElement?.contentEditable === 'true';
-                           
-      if (isInputFocused) return;
-      
-      // Handle ESC to cancel connection
-      if (e.key === 'Escape' && connectionState.isConnecting) {
-        e.preventDefault();
-        handleCancelConnection();
-        return;
-      }
-      
-      switch (e.key) {
-        case '+':
-        case '=':
-          e.preventDefault();
-          handleZoomIn();
-          break;
-        case '-':
-        case '_':
-          e.preventDefault();
-          handleZoomOut();
-          break;
-        case '0':
-          e.preventDefault();
-          handleZoomReset();
-          break;
-      }
-    };
-    
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleZoomIn, handleZoomOut, handleZoomReset, connectionState.isConnecting, handleCancelConnection]);
+  const handleWizardClose = useCallback(() => {
+    setShowConnectWizard(false);
+    // Refresh canvas data after wizard closes
+    setTimeout(async () => {
+      await refreshCanvas();
+    }, 100);
+  }, [refreshCanvas]);
 
   const handleBreadcrumbNavigation = useCallback((level: string, path: string[]) => {
     const transition = createDefaultTransition('drill-up');
     navigateToBreadcrumb(level, path, transition);
   }, [navigateToBreadcrumb]);
+
+  const handleNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node<DataSourceNodeData>) => {
+    console.log('🔍 Double-clicked node:', node.data.name);
+    
+    // Only allow drill-down when we're at the sources level
+    if (state.currentLevel !== 'sources') {
+      console.log('Already at tables level, ignoring double-click');
+      return;
+    }
+
+    // Check if the data source is connected and crawled
+    if (node.data.connectionStatus !== 'connected' || node.data.crawlStatus !== 'crawled') {
+      console.log('Data source not ready for drill-down:', {
+        connectionStatus: node.data.connectionStatus,
+        crawlStatus: node.data.crawlStatus
+      });
+      return;
+    }
+
+    // Drill down to tables view
+    const transition = createDefaultTransition('drill-down');
+    drillDown({
+      sourceId: node.data.id,
+      sourceName: node.data.name,
+      sourceKind: node.data.kind,
+      database: node.data.databaseName || 'default',
+      schema: 'public', // TODO: Get actual schema from metadata
+      tables: [] // TODO: Load actual tables from metadata
+    }, transition);
+  }, [state.currentLevel, drillDown]);
 
   return (
     <div className={`canvas-workspace ${className}`}>
@@ -447,29 +337,12 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         onNavigate={handleBreadcrumbNavigation}
       />
       
-      {/* Canvas header with controls */}
+      {/* Canvas header */}
       <div className="canvas-workspace__header">
         <h1 className="canvas-workspace__title">
-          {state.currentLevel === 'sources' ? 'Data Sources Canvas' : `Tables in ${state.sourceName}`}
+          {state.currentLevel === 'sources' ? 'Data Sources Canvas' : `Tables in ${state.sourceName} (${tablesData.length} tables)`}
         </h1>
         <div className="canvas-workspace__controls">
-          <button 
-            className="canvas-workspace__control-btn"
-            onClick={resetViewport}
-            title="Reset viewport (0)"
-          >
-            Reset View
-          </button>
-          {connectionState.isConnecting && (
-            <button 
-              className="canvas-workspace__control-btn"
-              style={{ background: 'rgba(239, 68, 68, 0.8)' }}
-              onClick={handleCancelConnection}
-              title="Cancel connection creation"
-            >
-              Cancel Connection
-            </button>
-          )}
           <button 
             className="canvas-workspace__control-btn"
             onClick={() => setShowHelpModal(!showHelpModal)}
@@ -477,110 +350,54 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
           >
             Help
           </button>
-          <span className="canvas-workspace__viewport-info">
-            Zoom: {Math.round(viewport.zoom * 100)}%
-          </span>
-          {process.env.NODE_ENV === 'development' && (
-            <span className="canvas-workspace__debug-info" style={{ 
-              fontSize: '0.7rem', 
-              color: 'rgba(255, 255, 255, 0.6)',
-              marginLeft: '1rem' 
-            }}>
-              Connection: {connectionState.isConnecting ? 'ON' : 'OFF'}
-            </span>
-          )}
         </div>
       </div>
 
-      {/* Main canvas area */}
-      <div ref={canvasRef} className={`canvas-workspace__content ${
-        state.isTransitioning ? 'canvas-workspace__content--transitioning' : ''
-      } ${
-        state.activeTransition?.type === 'drill-down' ? 'canvas-workspace__content--drill-down' : ''
-      } ${
-        state.activeTransition?.type === 'drill-up' ? 'canvas-workspace__content--drill-up' : ''
-      } ${
-        connectionState.isConnecting ? 'canvas-workspace__content--connecting' : ''
-      } ${
-        connectionState.isConnecting && connectionState.targetBlockId ? 'canvas-workspace__content--has-target' : ''
-      }`}>
-        <Canvas
-          viewport={viewport}
-          onViewportChange={handleViewportChange}
-          gridSize={20}
+      {/* ReactFlow Canvas */}
+      <div className="canvas-workspace__content" style={{ width: '100%', height: 'calc(100vh - 120px)' }}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeDoubleClick={handleNodeDoubleClick}
+          nodeTypes={nodeTypes}
+          fitView
           minZoom={0.1}
-          maxZoom={3.0}
+          maxZoom={3}
+          defaultEdgeOptions={{
+            type: 'smoothstep',
+            animated: false,
+          }}
         >
-          <div 
-            style={{ width: '100%', height: '100%', position: 'absolute' }}
-            onMouseMove={handleCanvasMouseMove}
-            onClick={handleCanvasClick}
-          >
-            {/* Render different content based on current level */}
-            {state.currentLevel === 'sources' ? (
-              <>
-                {/* Empty state for data sources - will be populated by actual data */}
-                <div style={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  color: '#999',
-                  textAlign: 'center',
-                  fontSize: '1.1rem'
-                }}>
-                  <div>No data sources configured</div>
-                  <div style={{ fontSize: '0.9rem', marginTop: '0.5rem', opacity: 0.7 }}>Click the + button to add your first data source</div>
-                </div>
-                {/* Dynamic connection line */}
-                <DynamicConnectionLine connectionState={connectionState} />
-              </>
-            ) : (
-              <div style={{
-                position: 'absolute',
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                color: '#666',
-                textAlign: 'center'
-              }}>
-                No tables to display
-              </div>
-            )}
-          </div>
-        </Canvas>
-        
-        {/* Floating UI overlay */}
-        <CanvasFloatingUI>
-          {/* Plus button - bottom right */}
-          <FloatingElement position="bottom-right">
+          <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="rgba(150, 150, 150, 0.3)" />
+          <Controls showInteractive={false} />
+          <MiniMap 
+            nodeColor={(node) => {
+              const data = node.data as DataSourceNodeData;
+              switch (data.kind) {
+                case 'postgres': return '#336791';
+                case 'mysql': return '#00758F';
+                case 'mongo': return '#4DB33D';
+                case 'duckdb': return '#FFA500';
+                default: return '#6B7280';
+              }
+            }}
+            maskColor="rgba(0, 0, 0, 0.6)"
+          />
+          
+          {/* Floating Plus Button */}
+          <Panel position="bottom-right">
             <FloatingPlusButton 
               onClick={handleAddDataSource}
               tooltip="Add new data source"
             />
-          </FloatingElement>
-          
-          {/* Zoom controls - bottom left */}
-          <FloatingElement position="bottom-left">
-            <ZoomControls
-              zoom={viewport.zoom}
-              onZoomIn={handleZoomIn}
-              onZoomOut={handleZoomOut}
-              onZoomReset={handleZoomReset}
-            />
-          </FloatingElement>
-          
-          {/* Mini-map - top right */}
-          <FloatingElement position="top-right">
-            <CanvasMiniMap
-              viewport={viewport}
-              onViewportChange={setViewport}
-            />
-          </FloatingElement>
-        </CanvasFloatingUI>
+          </Panel>
+        </ReactFlow>
       </div>
 
-      {/* Collapsible Help Modal */}
+      {/* Help Modal */}
       {showHelpModal && (
         <div className="help-modal-overlay" onClick={() => setShowHelpModal(false)}>
           <div className="help-modal" onClick={(e) => e.stopPropagation()}>
@@ -597,22 +414,16 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
             <div className="help-modal__body">
               <ul>
                 <li><strong>Mouse wheel:</strong> Zoom in/out</li>
-                <li><strong>Ctrl/Cmd + Drag:</strong> Pan canvas</li>
-                <li><strong>+ / -:</strong> Zoom with keyboard</li>
-                <li><strong>0:</strong> Reset zoom to 100%</li>
-                <li><strong>Hover near block edge:</strong> Show connection dot</li>
-                <li><strong>Click connection dot:</strong> Start creating connection</li>
-                <li><strong>While connecting:</strong> Bezier curve follows cursor</li>
-                <li><strong>Click target block:</strong> Open relationship modal</li>
-                <li><strong>ESC:</strong> Cancel connection creation</li>
-                <li><strong>Double-click block:</strong> Drill down to tables</li>
-                <li><strong>Breadcrumb / Back:</strong> Navigate up levels</li>
+                <li><strong>Left mouse + drag:</strong> Pan canvas</li>
+                <li><strong>Drag nodes:</strong> Reposition data sources</li>
+                <li><strong>Double-click nodes:</strong> Explore tables within data source</li>
+                <li><strong>Drag from connection points:</strong> Create relationships</li>
+                <li><strong>Controls:</strong> Use buttons in bottom-left for zoom</li>
+                <li><strong>Mini-map:</strong> Overview in bottom-right</li>
               </ul>
               <p className="help-note">
-                {state.currentLevel === 'sources' 
-                  ? 'Double-click any data source block to view its tables and collections.'
-                  : 'Use the back button or breadcrumbs to return to the data sources view.'
-                }
+                Connect data sources by dragging from the connection handles (dots) that appear when you hover over a node.
+                Double-click any connected data source to explore its tables and collections.
               </p>
             </div>
           </div>
@@ -620,41 +431,21 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       )}
       
       {/* Canvas Connect Wizard Modal */}
-      {showConnectWizard && (
-        <CanvasConnectWizard onClose={handleWizardClose} />
-      )}
+      <CanvasConnectWizard 
+        isOpen={showConnectWizard} 
+        onClose={handleWizardClose} 
+      />
       
       {/* Connection Configuration Modal */}
       <ConnectionModal
         isOpen={connectionModal.isOpen}
-        onClose={() => {
-          setConnectionModal({ isOpen: false });
-          setPendingConnection(null);
-          // Also ensure connection state is fully reset when modal closes
-          if (connectionState.isConnecting) {
-            handleCancelConnection();
-          }
-        }}
+        onClose={() => setConnectionModal({ isOpen: false })}
         sourceBlock={connectionModal.sourceBlock}
         targetBlock={connectionModal.targetBlock}
+        sourceTable={connectionModal.sourceTable}
+        targetTable={connectionModal.targetTable}
         onSaveRelationship={handleSaveRelationship}
       />
     </div>
   );
-}
-
-// Helper function to determine anchor based on relative positions
-function determineAnchorFromPosition(
-  sourcePos: CanvasPosition, 
-  targetPos: CanvasPosition
-): 'top' | 'right' | 'bottom' | 'left' {
-  const dx = targetPos.x - sourcePos.x;
-  const dy = targetPos.y - sourcePos.y;
-  
-  // Determine which direction is stronger
-  if (Math.abs(dx) > Math.abs(dy)) {
-    return dx > 0 ? 'right' : 'left';
-  } else {
-    return dy > 0 ? 'bottom' : 'top';
-  }
 }

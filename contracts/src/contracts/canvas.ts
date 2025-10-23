@@ -60,6 +60,25 @@ export const CanvasBlockSchema = z.object({
 
 export type CanvasBlock = z.infer<typeof CanvasBlockSchema>;
 
+// Source information for enriched canvas blocks
+export const CanvasBlockSourceSchema = z.object({
+  id: NonEmptyString,
+  name: NonEmptyString,
+  kind: z.enum(['postgres', 'mysql', 'mongo', 'duckdb']),
+  connectionStatus: z.enum(['unknown', 'checking', 'connected', 'error']).default('unknown'),
+  crawlStatus: z.enum(['not_crawled', 'crawling', 'crawled', 'error']).default('not_crawled'),
+  lastError: z.string().optional(),
+});
+
+export type CanvasBlockSource = z.infer<typeof CanvasBlockSourceSchema>;
+
+// Enriched canvas block with source information (used in get responses)
+export const EnrichedCanvasBlockSchema = CanvasBlockSchema.extend({
+  source: CanvasBlockSourceSchema,
+});
+
+export type EnrichedCanvasBlock = z.infer<typeof EnrichedCanvasBlockSchema>;
+
 // Canvas relationship with visual properties
 export const CanvasRelationshipStyleSchema = z.enum(['solid', 'dashed', 'dotted']);
 export const CanvasRelationshipTypeSchema = z.enum(['semantic_link', 'foreign_key', 'derives_from']);
@@ -180,7 +199,7 @@ export type CanvasGetRequest = z.infer<typeof CanvasGetRequestSchema>;
 
 export const CanvasGetResponseSchema = z.object({
   canvas: CanvasStateSchema,
-  blocks: z.array(CanvasBlockSchema).default([]),
+  blocks: z.array(EnrichedCanvasBlockSchema).default([]),
   relationships: z.array(CanvasRelationshipSchema).default([]),
   navigationLevel: CanvasNavigationLevelSchema.optional(),
   layoutSettings: CanvasLayoutSettingsSchema.optional(),

@@ -105,11 +105,29 @@ All payloads validated (zod/JSON Schema); every call audited.
 ### Repository Pattern Best Practices
 - **Complete entity creation:** `ensure*` methods must initialize ALL required fields with proper defaults
 - **Schema compliance:** Generated entities must pass contract validation (Zod schemas)
-- **Migration safety:** Use `INSERT OR REPLACE` with `COALESCE` to handle incomplete existing data
+- **Explicit upsert logic:** Use programmatic checks (`SELECT` → `UPDATE` or `INSERT`) instead of implicit SQL upserts
 - **Null handling:** Avoid nullable database columns where contracts expect non-null values
+
+### Database Upsert Policy (Critical)
+**NEVER use implicit database upserts** (`INSERT OR REPLACE`, `ON CONFLICT DO UPDATE`):
+- ❌ `INSERT OR REPLACE` acts as `DELETE` + `INSERT`, triggering `ON DELETE CASCADE` and losing child data
+- ❌ Implicit upserts obscure application logic and cause unintended side effects
+- ✅ Always use explicit programmatic flow: Check existence → `UPDATE` if exists, `INSERT` if not
+- ✅ Keeps business logic visible in application code, not hidden in SQL semantics
+
+**Example Pattern:**
+```typescript
+const existing = db.prepare('SELECT id FROM table WHERE id = ?').get(id);
+if (existing) {
+  db.prepare('UPDATE table SET ... WHERE id = ?').run(...);
+} else {
+  db.prepare('INSERT INTO table VALUES (...)').run(...);
+}
+```
 
 ### Common Database Pitfalls
 - ❌ Partial entity initialization → Schema validation failures
+- ❌ `INSERT OR REPLACE` for upserts → Cascades delete child records, data loss
 - ❌ `INSERT OR IGNORE` for data fixes → Existing broken records remain unfixed  
 - ❌ Missing default values → Runtime null/undefined errors
 - ❌ Database schema mismatch with contracts → Type conversion errors
@@ -131,9 +149,52 @@ Canvas state is stored separately from the main graph to support visual data sou
 
 ### Canvas Tables
 - `canvas_state(id TEXT PK, name TEXT, description TEXT, viewport_zoom REAL, viewport_center_x REAL, viewport_center_y REAL, grid_size REAL, snap_to_grid BOOLEAN, auto_save BOOLEAN, theme TEXT, canvas_version TEXT, created_at TEXT, updated_at TEXT, last_saved_at TEXT)`
-- `canvas_source_blocks(id TEXT PK, canvas_id TEXT, source_id TEXT, position_x REAL, position_y REAL, width REAL, height REAL, z_index INTEGER, color_theme TEXT, is_selected BOOLEAN, is_minimized BOOLEAN, custom_title TEXT, created_at TEXT, updated_at TEXT)`
+- `canvas_source_blocks(id TEXT PK, canvas_id TEXT, source_id TEXT, position_x REAL, position_y REAL, width REAL, height REAL, z_index INTEGER, color_theme TEXT, is_selected BOOLEAN, is_minimized BOOLEAN, custom_title TEXT, created_at TEXT, updated_at TEXT, UNIQUE(canvas_id, source_id))`
 - `canvas_table_blocks(id TEXT PK, canvas_id TEXT, source_id TEXT, table_id TEXT, position_x REAL, position_y REAL, width REAL, height REAL, z_index INTEGER, color_theme TEXT, is_selected BOOLEAN, is_minimized BOOLEAN, custom_title TEXT, created_at TEXT, updated_at TEXT)`
 - `canvas_relationships(id TEXT PK, canvas_id TEXT, source_id TEXT, target_id TEXT, source_table_id TEXT, target_table_id TEXT, source_column_name TEXT, target_column_name TEXT, relationship_type TEXT, confidence_score REAL, visual_style TEXT, line_color TEXT, line_width INTEGER, curve_path TEXT, is_selected BOOLEAN, created_at TEXT, updated_at TEXT)`
+
+### Canvas Persistence Pattern (Write-Back Cache)
+The canvas implements a **write-back persistence pattern** for optimal UX:
+
+**Architecture:**
+- **ReactFlow** manages UI state (node positions, edges) as source of truth during active editing
+- **In-memory maps** (`inMemoryBlocks`, `inMemoryTableBlocks`, `inMemoryRelationships`) track changes
+- **Debounced auto-save** writes to SQLite silently without triggering re-renders
+- **Database serves as cold storage** - only read on view entry, never during active editing
+
+**Critical Pattern (Preventing Re-render Loops):**
+1. **On view entry**: Load positions from DB → Create ReactFlow nodes **ONCE** → Set flag to prevent recreation
+2. **On user interaction**: ReactFlow updates internal state → `updateBlockPosition` updates in-memory map → Debounced save to DB
+3. **During save**: Write to DB silently - **DO NOT** update React state or reload from DB
+4. **On view exit**: Clear flags and in-memory state
+5. **On view re-entry**: Fresh load from DB picks up persisted changes
+
+**Anti-Patterns to Avoid:**
+- ❌ Re-creating nodes on every effect run → Positions snap back to stale values
+- ❌ Updating React state after save → Causes unnecessary re-renders
+- ❌ Reading from `canvasData` during active editing → Creates fight between DB and ReactFlow state
+- ❌ Including `canvasData` in effect dependencies → Triggers re-renders after save
+- ✅ Use refs to track initialization state (`nodesCreatedRef`) - prevents node recreation
+- ✅ Let ReactFlow own positions during editing - DB is write-only until view exit
+
+**Implementation Details:**
+```typescript
+// Track whether nodes have been created for current view
+const nodesCreatedRef = useRef(false);
+
+useEffect(() => {
+  if (currentLevel === 'tables' && !nodesCreatedRef.current) {
+    // Create nodes ONCE from DB
+    nodesCreatedRef.current = true;
+    const nodes = createNodesFromDB(canvasData.tableBlocks);
+    setNodes(nodes);
+  } else if (currentLevel !== 'tables') {
+    // Reset on exit
+    nodesCreatedRef.current = false;
+  }
+  // NOTE: canvasData NOT in dependencies - prevents re-creation after save
+}, [currentLevel, tablesData]);
+```
 
 ### Relationship Model
 **All meaningful relationships are table-to-table relationships** with optional column-level granularity:

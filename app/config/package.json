@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    
     "@semantiqa/contracts": "workspace:^0.1.0"
   }
 }

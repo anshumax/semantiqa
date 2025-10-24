@@ -60,6 +60,43 @@ export const CanvasBlockSchema = z.object({
 
 export type CanvasBlock = z.infer<typeof CanvasBlockSchema>;
 
+// Canvas source blocks (for data sources on main canvas)
+export const CanvasSourceBlockSchema = z.object({
+  id: NonEmptyString,
+  canvasId: NonEmptyString.default('default'),
+  sourceId: NonEmptyString,
+  position: CanvasPositionSchema,
+  size: CanvasSizeSchema,
+  zIndex: z.number().int().default(0),
+  colorTheme: z.enum(['auto', 'blue', 'green', 'purple', 'orange', 'red']).default('auto'),
+  isSelected: z.boolean().default(false),
+  isMinimized: z.boolean().default(false),
+  customTitle: z.string().optional(),
+  createdAt: IsoDateTimeSchema.optional(),
+  updatedAt: IsoDateTimeSchema.optional(),
+});
+
+export type CanvasSourceBlock = z.infer<typeof CanvasSourceBlockSchema>;
+
+// Canvas table blocks (for tables in drill-down view)
+export const CanvasTableBlockSchema = z.object({
+  id: NonEmptyString,
+  canvasId: NonEmptyString.default('default'),
+  sourceId: NonEmptyString,
+  tableId: NonEmptyString,
+  position: CanvasPositionSchema,
+  size: CanvasSizeSchema,
+  zIndex: z.number().int().default(0),
+  colorTheme: z.enum(['auto', 'blue', 'green', 'purple', 'orange', 'red']).default('auto'),
+  isSelected: z.boolean().default(false),
+  isMinimized: z.boolean().default(false),
+  customTitle: z.string().optional(),
+  createdAt: IsoDateTimeSchema.optional(),
+  updatedAt: IsoDateTimeSchema.optional(),
+});
+
+export type CanvasTableBlock = z.infer<typeof CanvasTableBlockSchema>;
+
 // Source information for enriched canvas blocks
 export const CanvasBlockSourceSchema = z.object({
   id: NonEmptyString,
@@ -89,19 +126,18 @@ export type CanvasRelationshipType = z.infer<typeof CanvasRelationshipTypeSchema
 export const CanvasRelationshipSchema = z.object({
   id: NonEmptyString,
   canvasId: NonEmptyString.default('default'),
-  sourceBlockId: NonEmptyString,
-  targetBlockId: NonEmptyString,
-  sourceTableName: NonEmptyString,
-  sourceColumnName: NonEmptyString,
-  targetTableName: NonEmptyString,
-  targetColumnName: NonEmptyString,
+  sourceId: NonEmptyString,
+  targetId: NonEmptyString,
+  sourceTableId: NonEmptyString,
+  targetTableId: NonEmptyString,
+  sourceColumnName: z.string().optional(),
+  targetColumnName: z.string().optional(),
   relationshipType: CanvasRelationshipTypeSchema.default('semantic_link'),
   confidenceScore: z.number().min(0).max(1).default(1.0),
   visualStyle: CanvasRelationshipStyleSchema.default('solid'),
   lineColor: NonEmptyString.default('#8bb4f7'),
   lineWidth: z.number().min(1).max(10).default(2),
   curvePath: z.string().optional(), // SVG path data
-  isIntraSource: z.boolean().default(false),
   isSelected: z.boolean().default(false),
   createdAt: IsoDateTimeSchema.optional(),
   updatedAt: IsoDateTimeSchema.optional(),
@@ -201,6 +237,7 @@ export const CanvasGetResponseSchema = z.object({
   canvas: CanvasStateSchema,
   blocks: z.array(EnrichedCanvasBlockSchema).default([]),
   relationships: z.array(CanvasRelationshipSchema).default([]),
+  tableBlocks: z.array(CanvasTableBlockSchema).optional(),
   navigationLevel: CanvasNavigationLevelSchema.optional(),
   layoutSettings: CanvasLayoutSettingsSchema.optional(),
 });
@@ -212,6 +249,7 @@ export const CanvasUpdateRequestSchema = z.object({
   canvasId: NonEmptyString.optional().default('default'),
   canvas: CanvasStateSchema.partial().optional(),
   blocks: z.array(CanvasBlockSchema.partial().extend({ id: NonEmptyString })).optional(),
+  tableBlocks: z.array(CanvasTableBlockSchema.partial().extend({ id: NonEmptyString })).optional(),
   relationships: z.array(CanvasRelationshipSchema.partial().extend({ id: NonEmptyString })).optional(),
   userActionId: NonEmptyString.optional(),
 });

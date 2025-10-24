@@ -445,6 +445,26 @@
   margin-top: 1rem;
 }
 
+/* Warning message */
+.canvas-connect-wizard__warning {
+  padding: 1rem;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 6px;
+  color: #d97706;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+.canvas-connect-wizard__warning strong {
+  font-weight: 600;
+}
+
+.canvas-connect-wizard__warning small {
+  font-size: 0.8125rem;
+  opacity: 0.9;
+}
+
 /* Responsive adjustments */
 @media (max-width: 640px) {
   .canvas-connect-wizard {

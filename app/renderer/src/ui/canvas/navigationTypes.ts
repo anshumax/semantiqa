@@ -33,6 +33,7 @@ export interface TableInfo {
   id: string;
   name: string;
   type: 'table' | 'view' | 'collection';
+  sourceId: string;
   rowCount?: number;
   schema?: string;
   description?: string;

@@ -29,6 +29,7 @@ export type IpcChannel =
   | 'health:ping'
   | 'sources:add'
   | 'sources:add:secure'
+  | 'sources:check-duplicate'
   | 'metadata:crawl'
   | 'sources:test-connection'
   | 'sources:crawl-all'
@@ -44,7 +45,10 @@ export type IpcChannel =
   | 'canvas:get'
   | 'canvas:update'
   | 'canvas:save'
-  | 'tables:list';
+  | 'canvas:deleteBlock'
+  | 'tables:list'
+  | 'app:before-quit'
+  | 'app:save-complete';
 
 type HandlerMap = {
   'health:ping': {
@@ -54,6 +58,10 @@ type HandlerMap = {
   'sources:add': {
     request: SourcesAddRequest;
     response: { sourceId: string } | SemantiqaError;
+  };
+  'sources:check-duplicate': {
+    request: { kind: string; connection: Record<string, unknown> };
+    response: { exists: boolean; existingSourceId?: string; existingSourceName?: string } | SemantiqaError;
   };
   'metadata:crawl': {
     request: MetadataCrawlRequest;
@@ -115,9 +123,21 @@ type HandlerMap = {
     request: CanvasSaveRequest;
     response: CanvasSaveResponse | SemantiqaError;
   };
+  'canvas:deleteBlock': {
+    request: { canvasId: string; blockId: string; sourceId: string };
+    response: { success: boolean } | SemantiqaError;
+  };
   'tables:list': {
     request: { sourceId: string };
     response: { tables: Array<{ id: string; name: string; type: string; schema: string; rowCount: number }> } | SemantiqaError;
+  };
+  'app:before-quit': {
+    request: void;
+    response: void;
+  };
+  'app:save-complete': {
+    request: void;
+    response: void;
   };
 };
 
@@ -131,6 +151,7 @@ export type IpcResponse<T extends IpcChannel> = T extends keyof HandlerMap
 export const IPC_CHANNELS = {
   HEALTH_PING: 'health:ping' as const,
   SOURCES_ADD: 'sources:add' as const,
+  SOURCES_CHECK_DUPLICATE: 'sources:check-duplicate' as const,
   METADATA_CRAWL: 'metadata:crawl' as const,
   SOURCES_TEST_CONNECTION: 'sources:test-connection' as const,
   SOURCES_CRAWL_ALL: 'sources:crawl-all' as const,
@@ -146,6 +167,7 @@ export const IPC_CHANNELS = {
   CANVAS_GET: 'canvas:get' as const,
   CANVAS_UPDATE: 'canvas:update' as const,
   CANVAS_SAVE: 'canvas:save' as const,
+  CANVAS_DELETE_BLOCK: 'canvas:deleteBlock' as const,
   TABLES_LIST: 'tables:list' as const,
 } satisfies Record<string, IpcChannel>;
 
@@ -161,6 +183,7 @@ export type SafeRendererChannels = Pick<
   | 'AUDIT_LIST'
   | 'GRAPH_GET'
   | 'SOURCES_ADD'
+  | 'SOURCES_CHECK_DUPLICATE'
   | 'METADATA_CRAWL'
   | 'SOURCES_RETRY_CRAWL'
   | 'SOURCES_CRAWL_ALL'
@@ -168,6 +191,7 @@ export type SafeRendererChannels = Pick<
   | 'CANVAS_GET'
   | 'CANVAS_UPDATE'
   | 'CANVAS_SAVE'
+  | 'CANVAS_DELETE_BLOCK'
   | 'TABLES_LIST'
 >;
 

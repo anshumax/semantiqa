@@ -8,7 +8,7 @@ export interface TablesServiceDeps {
 export class TablesService {
   constructor(private readonly deps: TablesServiceDeps) {}
 
-  async listTables(sourceId: string): Promise<{ tables: Array<{ id: string; name: string; type: string; schema: string; rowCount: number }> } | SemantiqaError> {
+  async listTables(sourceId: string): Promise<{ tables: Array<{ id: string; name: string; type: string; sourceId: string; schema: string; rowCount: number }> } | SemantiqaError> {
     try {
       const db = this.deps.openSourcesDb();
       
@@ -28,6 +28,7 @@ export class TablesService {
           id: row.id,
           name: props.name,
           type: props.tableType || 'table',
+          sourceId: sourceId,
           schema: props.schema || 'public',
           rowCount: 0, // TODO: Get actual row count from stats
         };

@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { initializeSchema } from '../migrator';
+import { DatabaseService } from '../DatabaseService';
 
 function resolveDbPath() {
   return process.env.SEMANTIQA_DB_PATH ?? path.resolve(process.cwd(), 'semantiqa.db');
@@ -8,7 +8,8 @@ function resolveDbPath() {
 
 export function migrate() {
   const dbPath = resolveDbPath();
-  initializeSchema(dbPath);
+  // Initialize DatabaseService which will create schema if needed
+  DatabaseService.getInstance(dbPath);
   console.log('Database schema initialized');
 }
 

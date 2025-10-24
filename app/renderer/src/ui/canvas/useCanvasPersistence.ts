@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDebouncedCallback } from 'use-debounce';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
 import type {
   CanvasGetRequest,
@@ -9,8 +10,10 @@ import type {
   CanvasSaveResponse,
   CanvasState,
   CanvasBlock,
+  CanvasTableBlock,
   CanvasRelationship,
   CanvasViewport,
+  CanvasPosition,
 } from '@semantiqa/contracts';
 
 export type CanvasPersistenceState =
@@ -23,6 +26,7 @@ export type CanvasPersistenceState =
 export interface CanvasData {
   canvas: CanvasState;
   blocks: CanvasBlock[];
+  tableBlocks?: CanvasTableBlock[];
   relationships: CanvasRelationship[];
 }
 
@@ -36,13 +40,87 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
   const {
     canvasId = 'default',
     autoSave = true,
-    autoSaveDelay = 2000, // 2 seconds
+    autoSaveDelay = 5000, // 5 seconds
   } = options;
 
   const [state, setState] = useState<CanvasPersistenceState>({ status: 'idle', data: null });
   const [pendingChanges, setPendingChanges] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout>();
   const lastSaveRef = useRef<number>(0);
+
+  // In-memory state tracking
+  const [inMemoryBlocks, setInMemoryBlocks] = useState<Map<string, CanvasBlock>>(new Map());
+  const [inMemoryTableBlocks, setInMemoryTableBlocks] = useState<Map<string, CanvasTableBlock>>(new Map());
+  const [inMemoryRelationships, setInMemoryRelationships] = useState<Map<string, CanvasRelationship>>(new Map());
+
+  // Single save method for all changes
+  const saveAllToDatabase = useCallback(async () => {
+    if (!hasUnsavedChanges) return;
+    
+    console.log('💾 Saving all canvas state to database...');
+    setState(prev => prev.status === 'ready' ? { status: 'saving', data: prev.data } : prev);
+    
+    try {
+      const blocks = Array.from(inMemoryBlocks.values());
+      const tableBlocks = Array.from(inMemoryTableBlocks.values());
+      const relationships = Array.from(inMemoryRelationships.values());
+      
+      console.log('💾 Blocks to save:', blocks.map(b => ({ id: b.id, position: b.position })));
+      console.log('💾 Table blocks to save:', tableBlocks.map(tb => ({ id: tb.id, position: tb.position })));
+      
+      const request: CanvasUpdateRequest = {
+        canvasId,
+        blocks,
+        tableBlocks,
+        relationships,
+      };
+      
+      console.log('🔌 Frontend calling IPC:', {
+        channel: IPC_CHANNELS.CANVAS_UPDATE,
+        request: request
+      });
+      
+      const response = (await window.semantiqa?.api.invoke(
+        IPC_CHANNELS.CANVAS_UPDATE,
+        request
+      )) as CanvasUpdateResponse | undefined;
+      
+      console.log('🔌 Frontend received IPC response:', response);
+      
+      if (response?.success) {
+        setHasUnsavedChanges(false);
+        setPendingChanges(false);
+        lastSaveRef.current = Date.now();
+        console.log('✅ Canvas state saved successfully');
+        
+        // Update state.data with the saved values to keep it in sync
+        setState(prev => {
+          if (prev.status === 'saving' && prev.data) {
+            return {
+              status: 'ready',
+              data: {
+                ...prev.data,
+                blocks,
+                tableBlocks,
+                relationships,
+              }
+            };
+          }
+          return prev;
+        });
+      } else {
+        console.error('❌ Failed to save canvas state:', response);
+        setState(prev => prev.status === 'saving' ? { status: 'ready', data: prev.data } : prev);
+      }
+    } catch (error) {
+      console.error('❌ Error saving canvas state:', error);
+      setState(prev => prev.status === 'saving' ? { status: 'ready', data: prev.data } : prev);
+    }
+  }, [inMemoryBlocks, inMemoryTableBlocks, inMemoryRelationships, canvasId, hasUnsavedChanges]);
+
+  // Debounced auto-save
+  const debouncedSave = useDebouncedCallback(saveAllToDatabase, autoSaveDelay);
 
   // Load canvas data
   const loadCanvas = useCallback(async () => {
@@ -73,16 +151,43 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
       const data: CanvasData = {
         canvas: response.canvas,
         blocks: response.blocks || [],
+        tableBlocks: response.tableBlocks || [],
         relationships: response.relationships || [],
       };
       
       console.log('🟣 Canvas loaded successfully:', {
         blockCount: data.blocks.length,
+        tableBlockCount: data.tableBlocks?.length || 0,
         relationshipCount: data.relationships.length
+      });
+
+      // Populate in-memory state from loaded data
+      const blocksMap = new Map<string, CanvasBlock>();
+      data.blocks.forEach(block => blocksMap.set(block.id, block));
+      setInMemoryBlocks(blocksMap);
+
+      // Load table blocks into memory
+      const tableBlocksMap = new Map<string, CanvasTableBlock>();
+      if (data.tableBlocks) {
+        data.tableBlocks.forEach(tb => {
+          tableBlocksMap.set(tb.id, tb);
+        });
+      }
+      setInMemoryTableBlocks(tableBlocksMap);
+      console.log('🟣 Loaded table blocks into memory:', tableBlocksMap.size);
+
+      const relationshipsMap = new Map<string, CanvasRelationship>();
+      data.relationships.forEach(rel => relationshipsMap.set(rel.id, rel));
+      setInMemoryRelationships(relationshipsMap);
+      
+      console.log('🔄 Loaded relationships into memory:', {
+        count: data.relationships.length,
+        relationships: data.relationships.map(r => ({ id: r.id, sourceTableId: r.sourceTableId, targetTableId: r.targetTableId }))
       });
 
       setState({ status: 'ready', data });
       setPendingChanges(false);
+      setHasUnsavedChanges(false);
     } catch (error) {
       console.error('🔥 Canvas load failed:', error);
       
@@ -109,6 +214,7 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
   const updateCanvas = useCallback(async (updates: {
     canvas?: Partial<CanvasState>;
     blocks?: Partial<CanvasBlock>[];
+    tableBlocks?: Partial<CanvasTableBlock>[];
     relationships?: Partial<CanvasRelationship>[];
     skipAutoSave?: boolean;
   }) => {
@@ -130,6 +236,12 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
           }
           return { ...block, id: block.id };
         }),
+        tableBlocks: updates.tableBlocks?.map(tableBlock => {
+          if (!tableBlock.id) {
+            throw new Error('Table block ID is required for canvas updates');
+          }
+          return { ...tableBlock, id: tableBlock.id };
+        }),
         relationships: updates.relationships?.map(rel => {
           if (!rel.id) {
             throw new Error('Relationship ID is required for canvas updates');
@@ -138,10 +250,17 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
         }),
       };
 
+      console.log('🔌 Frontend calling IPC:', {
+        channel: IPC_CHANNELS.CANVAS_UPDATE,
+        request: request
+      });
+      
       const response = (await window.semantiqa?.api.invoke(
         IPC_CHANNELS.CANVAS_UPDATE,
         request
       )) as CanvasUpdateResponse | undefined;
+      
+      console.log('🔌 Frontend received IPC response:', response);
 
       if (!response || !response.success) {
         throw new Error('Failed to update canvas');
@@ -228,21 +347,42 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
     }));
   }, [state.status]);
 
-  // Block position update (bypasses full update for drag performance)
-  const updateBlockPositionOnly = useCallback(async (blockId: string, position: { x: number; y: number }) => {
-    if (state.status !== 'ready') return;
-
-    // Update local state immediately for responsive drag
-    setState((prev) => ({
-      status: 'ready',
-      data: {
-        ...prev.data!,
-        blocks: prev.data!.blocks.map(block =>
-          block.id === blockId ? { ...block, position } : block
-        )
-      }
-    }));
-  }, [state.status]);
+  // Block position update (memory-first)
+  const updateBlockPosition = useCallback((blockId: string, position: CanvasPosition) => {
+    console.log('📍 Updating block position:', { blockId, position });
+    
+    // Check if it's a table block (starts with 'table-')
+    if (blockId.startsWith('table-')) {
+      setInMemoryTableBlocks(prev => {
+        const block = prev.get(blockId);
+        if (!block) {
+          console.warn('📍 Table block not found for position update:', blockId);
+          return prev;
+        }
+        const updated = new Map(prev);
+        updated.set(blockId, { ...block, position });
+        console.log('📍 Table block position updated in memory');
+        return updated;
+      });
+    } else {
+      // Datasource block
+      setInMemoryBlocks(prev => {
+        const block = prev.get(blockId);
+        if (!block) {
+          console.warn('📍 Block not found for position update:', blockId);
+          return prev;
+        }
+        const updated = new Map(prev);
+        updated.set(blockId, { ...block, position });
+        console.log('📍 Block position updated in memory');
+        return updated;
+      });
+    }
+    
+    setHasUnsavedChanges(true);
+    setPendingChanges(true);
+    debouncedSave();
+  }, [debouncedSave]);
 
   // Create block
   const createBlock = useCallback(async (block: Omit<CanvasBlock, 'id' | 'canvasId' | 'createdAt' | 'updatedAt'>) => {
@@ -278,60 +418,83 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
     }
   }, [canvasId, updateCanvas, state.status, state.data]);
 
-  // Delete block
-  const deleteBlock = useCallback(async (blockId: string) => {
-    if (state.status !== 'ready') return;
-
-    // Remove from local state immediately
-    setState((prev) => ({
-      status: 'ready',
-      data: {
-        ...prev.data!,
-        blocks: prev.data!.blocks.filter(block => block.id !== blockId),
-        relationships: prev.data!.relationships.filter(
-          rel => rel.sourceBlockId !== blockId && rel.targetBlockId !== blockId
-        )
-      }
-    }));
-
-    setPendingChanges(true);
-  }, [state.status]);
-
-  // Create relationship
-  const createRelationship = useCallback(async (relationship: Omit<CanvasRelationship, 'id' | 'canvasId' | 'createdAt' | 'updatedAt'>) => {
-    const newRelationship: Partial<CanvasRelationship> = {
-      id: `rel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      canvasId,
-      ...relationship,
-    };
-
-    await updateCanvas({
-      relationships: [newRelationship],
-    });
-  }, [canvasId, updateCanvas]);
-
-  // Delete relationship
-  const deleteRelationship = useCallback(async (relationshipId: string) => {
-    if (state.status !== 'ready') return;
-
-    // Remove from local state immediately
-    setState((prev) => ({
-      status: 'ready',
-      data: {
-        ...prev.data!,
-        relationships: prev.data!.relationships.filter(rel => rel.id !== relationshipId)
-      }
-    }));
-
-    setPendingChanges(true);
-  }, [state.status]);
-
   // Load on mount
   useEffect(() => {
     if (state.status === 'idle') {
       void loadCanvas();
     }
   }, [loadCanvas, state.status]);
+
+  // Create relationship (memory-first)
+  const createRelationship = useCallback((relationship: Omit<CanvasRelationship, 'id' | 'canvasId' | 'createdAt' | 'updatedAt'>) => {
+    const newRel: CanvasRelationship = {
+      ...relationship,
+      id: `rel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      canvasId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    setInMemoryRelationships(prev => {
+      const updated = new Map(prev);
+      updated.set(newRel.id, newRel);
+      return updated;
+    });
+    setHasUnsavedChanges(true);
+    setPendingChanges(true);
+    debouncedSave();
+  }, [canvasId, debouncedSave]);
+
+  // Delete relationship (memory-first)
+  const deleteRelationship = useCallback((relationshipId: string) => {
+    setInMemoryRelationships(prev => {
+      const updated = new Map(prev);
+      updated.delete(relationshipId);
+      return updated;
+    });
+    setHasUnsavedChanges(true);
+    setPendingChanges(true);
+    debouncedSave();
+  }, [debouncedSave]);
+
+  // Delete block (memory-first)
+  const deleteBlock = useCallback(async (blockId: string, sourceId: string) => {
+    console.log('🗑️ Deleting block from frontend:', { blockId, sourceId });
+    
+    // Remove from in-memory state immediately
+    setInMemoryBlocks(prev => {
+      const updated = new Map(prev);
+      updated.delete(blockId);
+      return updated;
+    });
+    
+    // Also remove any relationships involving this source
+    setInMemoryRelationships(prev => {
+      const updated = new Map(prev);
+      for (const [id, rel] of prev.entries()) {
+        if (rel.sourceId === sourceId || rel.targetId === sourceId) {
+          updated.delete(id);
+        }
+      }
+      return updated;
+    });
+    
+    // Call backend to delete from database
+    try {
+      const response = await window.semantiqa?.api.invoke(
+        IPC_CHANNELS.CANVAS_DELETE_BLOCK,
+        { canvasId, blockId, sourceId }
+      );
+      
+      if (response?.success) {
+        console.log('✅ Block deleted successfully from database');
+      } else {
+        console.error('❌ Failed to delete block from database');
+      }
+    } catch (error) {
+      console.error('❌ Error deleting block:', error);
+    }
+  }, [canvasId]);
 
   // Cleanup auto-save timeout on unmount
   useEffect(() => {
@@ -343,38 +506,31 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
   }, []);
 
   return useMemo(() => ({
-    state,
     data: state.data,
-    isLoading: state.status === 'loading',
-    isReady: state.status === 'ready',
-    isSaving: state.status === 'saving',
-    isError: state.status === 'error',
+    status: state.status,
     error: state.status === 'error' ? state.error : null,
-    pendingChanges,
-    lastSave: lastSaveRef.current,
-    
-    // Actions
-    loadCanvas,
+    refresh: loadCanvas,
     updateCanvas,
-    saveCanvas,
-    updateViewportOnly,
-    updateBlockPositionOnly,
+    updateBlockPosition,
     createBlock,
     deleteBlock,
     createRelationship,
     deleteRelationship,
-    refresh: loadCanvas,
+    saveNow: saveAllToDatabase,
+    hasUnsavedChanges,
+    isSaving: state.status === 'saving',
+    pendingChanges,
   }), [
     state,
-    pendingChanges,
     loadCanvas,
     updateCanvas,
-    saveCanvas,
-    updateViewportOnly,
-    updateBlockPositionOnly,
+    updateBlockPosition,
     createBlock,
     deleteBlock,
     createRelationship,
     deleteRelationship,
+    saveAllToDatabase,
+    hasUnsavedChanges,
+    pendingChanges,
   ]);
 }

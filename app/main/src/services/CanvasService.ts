@@ -33,6 +33,8 @@ export class CanvasService {
       console.error('🔥 Canvas not found in database:', canvasId);
       throw new Error(`Canvas with id '${canvasId}' not found`);
     }
+    
+    console.log('🔍 About to load relationships from database...');
 
     console.log('🟪 Repository returned:', {
       canvasId: canvasData.canvas.id,
@@ -80,6 +82,7 @@ export class CanvasService {
       canvas: canvasData.canvas,
       blocks: enrichedBlocks,
       relationships: includeRelationships ? canvasData.relationships : [],
+      tableBlocks: canvasData.tableBlocks || [],
     };
     
     console.log('🟪 Returning response with blockCount:', response.blocks.length);
@@ -92,84 +95,133 @@ export class CanvasService {
    * Update canvas state, blocks, and relationships
    */
   async updateCanvas(request: CanvasUpdateRequest): Promise<CanvasUpdateResponse> {
+    console.log('📦 Bulk updating canvas state:', {
+      canvasId: request.canvasId,
+      blocksCount: request.blocks?.length || 0,
+      relationshipsCount: request.relationships?.length || 0,
+      blocks: request.blocks?.map(b => ({ id: b.id, sourceId: b.sourceId, position: b.position }))
+    });
+
     const { canvasId = 'default', canvas, blocks = [], relationships = [] } = request;
     
+    // Single transaction for all changes
     const transaction = this.db.transaction(() => {
-      let updatedCanvas: CanvasState | undefined;
-      
+      // Update canvas state if provided
       if (canvas) {
         this.canvasRepo.saveCanvasState({ 
           id: canvasId, 
           ...canvas 
         });
-        // Get the updated canvas state
-        const current = this.canvasRepo.getCanvas(canvasId);
-        if (!current) {
-          throw new Error(`Canvas with id '${canvasId}' not found`);
-        }
-        updatedCanvas = current.canvas;
       }
-
-      const updatedBlocks = blocks.map(block => {
-        if (!block.id) {
-          throw new Error('Block ID is required for updates');
+      
+      // Blocks and relationships are never bulk-deleted
+      // They are only deleted individually via explicit user actions:
+      // - deleteCanvasBlock() for blocks (which cascades to relationships)
+      // - deleteCanvasRelationship() for individual relationships
+      // This preserves user data and prevents accidental loss
+      
+      // Insert new blocks
+      if (blocks.length > 0) {
+        console.log('📦 Inserting blocks:', blocks.length);
+        for (const block of blocks) {
+          console.log('📦 Saving block:', { id: block.id, sourceId: block.sourceId, position: block.position });
+          this.canvasRepo.saveCanvasBlock({
+            ...block,
+            canvasId: block.canvasId || canvasId,
+            sourceId: block.sourceId || '',
+            position: block.position || { x: 0, y: 0 },
+            size: block.size || { width: 200, height: 120 },
+            zIndex: block.zIndex ?? 0,
+            colorTheme: block.colorTheme || 'auto',
+            isSelected: block.isSelected ?? false,
+            isMinimized: block.isMinimized ?? false,
+          });
         }
-        return this.canvasRepo.saveCanvasBlock({
-          ...block,
-          canvasId: block.canvasId || canvasId,
-          sourceId: block.sourceId || '',
-          position: block.position || { x: 0, y: 0 },
-          size: block.size || { width: 200, height: 120 },
-          zIndex: block.zIndex ?? 0,
-          colorTheme: block.colorTheme || 'auto',
-          isSelected: block.isSelected ?? false,
-          isMinimized: block.isMinimized ?? false,
-        });
-      });
-
-      const updatedRelationships = relationships.map(relationship => {
-        if (!relationship.id) {
-          throw new Error('Relationship ID is required for updates');
-        }
-        return this.canvasRepo.saveCanvasRelationship({
-          ...relationship,
-          canvasId: relationship.canvasId || canvasId,
-          sourceBlockId: relationship.sourceBlockId || '',
-          targetBlockId: relationship.targetBlockId || '',
-          sourceTableName: relationship.sourceTableName || '',
-          sourceColumnName: relationship.sourceColumnName || '',
-          targetTableName: relationship.targetTableName || '',
-          targetColumnName: relationship.targetColumnName || '',
-          relationshipType: relationship.relationshipType || 'semantic_link',
-          confidenceScore: relationship.confidenceScore ?? 1.0,
-          visualStyle: relationship.visualStyle || 'solid',
-          lineColor: relationship.lineColor || '#8bb4f7',
-          lineWidth: relationship.lineWidth ?? 3,
-          isIntraSource: relationship.isIntraSource ?? false,
-          isSelected: relationship.isSelected ?? false,
-        });
-      });
-
-      // Get current canvas state if not updated
-      if (!updatedCanvas) {
-        const current = this.canvasRepo.getCanvas(canvasId);
-        if (!current) {
-          throw new Error(`Canvas with id '${canvasId}' not found`);
-        }
-        updatedCanvas = current.canvas;
+        console.log('📦 All blocks saved successfully');
       }
-
-      return { updatedCanvas, updatedBlocks, updatedRelationships };
+      
+      // Insert/update table blocks
+      if (request.tableBlocks && request.tableBlocks.length > 0) {
+        console.log('📦 Inserting table blocks:', request.tableBlocks.length);
+        for (const tableBlock of request.tableBlocks) {
+          console.log('📦 Saving table block:', { id: tableBlock.id, tableId: tableBlock.tableId, position: tableBlock.position });
+          this.canvasRepo.saveCanvasTableBlock({
+            ...tableBlock,
+            canvasId: tableBlock.canvasId || canvasId,
+            sourceId: tableBlock.sourceId || '',
+            tableId: tableBlock.tableId || '',
+            position: tableBlock.position || { x: 0, y: 0 },
+            size: tableBlock.size || { width: 200, height: 150 },
+            zIndex: tableBlock.zIndex ?? 0,
+            colorTheme: tableBlock.colorTheme || 'auto',
+            isSelected: tableBlock.isSelected ?? false,
+            isMinimized: tableBlock.isMinimized ?? false,
+          });
+        }
+        console.log('📦 All table blocks saved successfully');
+      }
+      
+      // Insert new relationships
+      if (relationships.length > 0) {
+        for (const rel of relationships) {
+          this.canvasRepo.saveCanvasRelationship({
+            ...rel,
+            canvasId: rel.canvasId || canvasId,
+            sourceId: rel.sourceId || '',
+            targetId: rel.targetId || '',
+            sourceTableId: rel.sourceTableId || '',
+            targetTableId: rel.targetTableId || '',
+            sourceColumnName: rel.sourceColumnName || undefined,
+            targetColumnName: rel.targetColumnName || undefined,
+            relationshipType: rel.relationshipType || 'semantic_link',
+            confidenceScore: rel.confidenceScore ?? 1.0,
+            visualStyle: rel.visualStyle || 'solid',
+            lineColor: rel.lineColor || '#8bb4f7',
+            lineWidth: rel.lineWidth ?? 3,
+            isSelected: rel.isSelected ?? false,
+          });
+        }
+      }
     });
+    
+    // Execute transaction
+    transaction();
+    console.log('📦 Canvas update transaction completed');
+    
+    // Debug: Check what's in the database after the transaction
+    console.log('🔍 AFTER TRANSACTION - Checking database contents:');
+    const allBlocksAfterTransaction = this.db.prepare(`SELECT * FROM canvas_source_blocks`).all();
+    console.log('🔍 ALL BLOCKS AFTER TRANSACTION:', allBlocksAfterTransaction);
+    
+    const canvasBlocksAfterTransaction = this.db.prepare(`SELECT * FROM canvas_source_blocks WHERE canvas_id = ?`).all(canvasId);
+    console.log('🔍 CANVAS BLOCKS AFTER TRANSACTION:', canvasBlocksAfterTransaction);
+    
+    const allRelationshipsAfterTransaction = this.db.prepare(`SELECT * FROM canvas_relationships`).all();
+    console.log('🔍 ALL RELATIONSHIPS AFTER TRANSACTION:', allRelationshipsAfterTransaction);
+    
+    const canvasRelationshipsAfterTransaction = this.db.prepare(`SELECT * FROM canvas_relationships WHERE canvas_id = ?`).all(canvasId);
+    console.log('🔍 CANVAS RELATIONSHIPS AFTER TRANSACTION:', canvasRelationshipsAfterTransaction);
+    
+    return { success: true };
+  }
 
-    const result = transaction();
-
-    return {
-      success: true,
-      updatedCanvas: result.updatedCanvas,
-      updatedBlocks: result.updatedBlocks,
-      updatedRelationships: result.updatedRelationships,
-    };
+  /**
+   * Delete a canvas block and all its relationships
+   */
+  async deleteBlock(request: { canvasId: string; blockId: string; sourceId: string }): Promise<{ success: boolean }> {
+    const { blockId, sourceId } = request;
+    
+    console.log('🗑️ Deleting block:', { blockId, sourceId });
+    
+    try {
+      const deletedCount = this.canvasRepo.deleteCanvasBlock(blockId, sourceId);
+      console.log(`✅ Successfully deleted block and ${deletedCount} associated items`);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Failed to delete block:', error);
+      return { success: false };
+    }
   }
 
   /**
@@ -202,12 +254,6 @@ export class CanvasService {
     this.canvasRepo.updateBlockPosition(blockId, position);
   }
 
-  /**
-   * Delete a canvas block
-   */
-  async deleteCanvasBlock(blockId: string): Promise<number> {
-    return this.canvasRepo.deleteCanvasBlock(blockId);
-  }
 
   /**
    * Delete a canvas relationship

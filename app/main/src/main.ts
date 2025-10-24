@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, session } from 'electron';
+import { app, BrowserWindow, protocol, session, dialog } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
@@ -14,11 +14,13 @@ import { CanvasService } from './services/CanvasService';
 import { TablesService } from './services/TablesService';
 import { logIpcEvent } from './logging/audit';
 import { SourceService, SnapshotRepository } from '@semantiqa/graph-service';
-import { createSqliteFactory, initializeSchema } from '@semantiqa/storage-sqlite';
+import { DatabaseService } from '@semantiqa/storage-sqlite';
 
 let graphServices: {
   GraphSnapshotService: typeof import('./services/GraphSnapshotService').GraphSnapshotService;
 } | null = null;
+
+let databaseService: DatabaseService | null = null;
 
 type UiStatus = 'queued' | 'running' | 'connecting' | 'ready' | 'error' | 'warning' | 'needs_attention';
 
@@ -214,15 +216,32 @@ app.whenReady().then(async () => {
   const services = await ensureGraphServices();
   const dbPath = path.join(app.getPath('userData'), 'graph.db');
 
+  // Initialize the centralized database service
   try {
-    initializeSchema(dbPath);
-  } catch (error) {
-    console.error('Failed to initialize database schema', error);
-    throw error;
+    databaseService = DatabaseService.getInstance(dbPath);
+  } catch (error: any) {
+    console.error('Failed to initialize database', error);
+    
+    if (error.code === 'SQLITE_BUSY') {
+      dialog.showErrorBox(
+        'Database Locked',
+        'The database is locked. Another instance of the application may be running.\n\nPlease close all instances and try again.'
+      );
+    } else {
+      dialog.showErrorBox(
+        'Database Error',
+        `Failed to initialize database: ${error.message || 'Unknown error'}`
+      );
+    }
+    
+    app.quit();
+    return;
   }
 
-  const graphDbFactory = createSqliteFactory({ dbPath });
-  const graphSnapshotService = new (await ensureGraphServices()).GraphSnapshotService({ openDatabase: graphDbFactory });
+  // Create a factory that returns the singleton database connection
+  const graphDbFactory = () => databaseService!.getConnection();
+  
+  const graphSnapshotService = new services.GraphSnapshotService({ openDatabase: graphDbFactory });
 
   // Shared dependencies for services
   const broadcastSourceStatus = (
@@ -333,6 +352,9 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     logger: console,
   });
 
+  // Canvas service - use graphStore instance to ensure single connection
+  const canvasService = new CanvasService(graphDbFactory());
+
   // Source provisioning service
   const sourceProvisioningService = new SourceProvisioningService({
     openSourcesDb: graphDbFactory,
@@ -349,63 +371,37 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     audit,
     logger: console,
     createSourceService: () => new SourceService({ openDatabase: graphDbFactory }),
+    canvasService: canvasService,
   });
-
-  // Canvas service
-  const canvasService = new CanvasService(graphDbFactory());
 
   // Tables service
   const tablesService = new TablesService({
     openSourcesDb: graphDbFactory,
   });
 
-  // Ensure canvas has blocks for existing sources (one-time seeding on startup)
-  try {
-    const db = graphDbFactory();
-    const existingBlocksStmt = db.prepare(
-      "SELECT source_id FROM canvas_blocks WHERE canvas_id = 'default'"
-    );
-    const existingBlockSourceIds = new Set(
-      (existingBlocksStmt.all() as Array<{ source_id: string }>).map((r) => r.source_id),
-    );
-
-    const sourcesStmt = db.prepare("SELECT id FROM sources");
-    const sources = sourcesStmt.all() as Array<{ id: string }>;
-
-    const insertBlockStmt = db.prepare(
-      `INSERT OR IGNORE INTO canvas_blocks (
-        id, canvas_id, source_id, position_x, position_y, width, height, z_index,
-        color_theme, is_selected, is_minimized, created_at, updated_at
-      ) VALUES (
-        @id, 'default', @source_id, @x, @y, 200, 120, 0,
-        'auto', 0, 0, @ts, @ts
-      )`,
-    );
-
-    let index = 0;
-    const spacingX = 260;
-    const spacingY = 180;
-    const perRow = 4;
-    const now = new Date().toISOString();
-
-    for (const { id: sourceId } of sources) {
-      if (existingBlockSourceIds.has(sourceId)) continue;
-      const row = Math.floor(index / perRow);
-      const col = index % perRow;
-      const x = 100 + col * spacingX;
-      const y = 100 + row * spacingY;
-      const blockId = `block-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
-      insertBlockStmt.run({ id: blockId, source_id: sourceId, x, y, ts: now });
-      index++;
-    }
-  } catch (seedErr) {
-    console.warn('Canvas seeding skipped/failed:', seedErr);
-  }
+  // Database will be created by schema initialization if it doesn't exist
+  // Canvas loading is handled by CanvasService.getCanvas() which reads existing data
+  const databasePath = path.join(app.getPath('userData'), 'graph.db');
+  console.log('🗄️ Database path:', databasePath);
+  console.log('🗄️ Database exists:', fs.existsSync(databasePath));
+  console.log('🗄️ Canvas will load existing blocks and relationships from database');
 
   const handlerMap: IpcHandlerMap = {
     [IPC_CHANNELS.GRAPH_GET]: (request) => graphSnapshotService.getSnapshot(request),
     [IPC_CHANNELS.SOURCES_ADD]: (request) => sourceProvisioningService.createSource(request),
+    [IPC_CHANNELS.SOURCES_CHECK_DUPLICATE]: (request: { kind: string; connection: Record<string, unknown> }) => {
+      // Check for duplicate connection without creating a source
+      const sourceService = new SourceService({ openDatabase: graphDbFactory });
+      const existing = sourceService.findExistingConnection(request as any);
+      if (existing) {
+        return {
+          exists: true,
+          existingSourceId: existing.id,
+          existingSourceName: existing.name,
+        };
+      }
+      return { exists: false };
+    },
     [IPC_CHANNELS.METADATA_CRAWL]: async (request) => crawlQueue.enqueue(request.sourceId),
     [IPC_CHANNELS.SOURCES_TEST_CONNECTION]: (request) => connectivityQueue.queueCheck(request.sourceId),
     [IPC_CHANNELS.SOURCES_CRAWL_ALL]: async () => {
@@ -430,6 +426,7 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     [IPC_CHANNELS.CANVAS_GET]: (request) => canvasService.getCanvas(request),
     [IPC_CHANNELS.CANVAS_UPDATE]: (request) => canvasService.updateCanvas(request),
     [IPC_CHANNELS.CANVAS_SAVE]: (request) => canvasService.saveCanvas(request),
+    [IPC_CHANNELS.CANVAS_DELETE_BLOCK]: (request) => canvasService.deleteBlock(request),
     [IPC_CHANNELS.TABLES_LIST]: (request: { sourceId: string }) => tablesService.listTables(request.sourceId),
   };
 
@@ -442,6 +439,62 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
       void createWindow();
     }
   });
+
+  // Note: Auto-save on quit is handled by the debounced save in the renderer
+  // The 5-second debounce ensures changes are saved before the user can quit
+});
+
+// Force database checkpoint before app quits to ensure data persistence
+app.on('before-quit', async () => {
+  console.log('🔄 App shutting down, forcing database checkpoint...');
+  
+  if (databaseService) {
+    try {
+      databaseService.checkpoint();
+      console.log('✅ Database checkpoint completed');
+    } catch (error) {
+      console.error('❌ Database checkpoint failed:', error);
+    }
+  }
+});
+
+// Ensure database is properly closed on process exit
+process.on('exit', () => {
+  console.log('🔄 Process exiting, closing database...');
+  if (databaseService) {
+    try {
+      databaseService.close();
+      console.log('✅ Database closed successfully');
+    } catch (error) {
+      console.error('❌ Error closing database:', error);
+    }
+  }
+});
+
+process.on('SIGINT', () => {
+  console.log('🔄 SIGINT received, closing database...');
+  if (databaseService) {
+    try {
+      databaseService.close();
+      console.log('✅ Database closed successfully');
+    } catch (error) {
+      console.error('❌ Error closing database:', error);
+    }
+  }
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('🔄 SIGTERM received, closing database...');
+  if (databaseService) {
+    try {
+      databaseService.close();
+      console.log('✅ Database closed successfully');
+    } catch (error) {
+      console.error('❌ Error closing database:', error);
+    }
+  }
+  process.exit(0);
 });
 
 app.on('window-all-closed', () => {

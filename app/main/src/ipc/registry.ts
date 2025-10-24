@@ -40,6 +40,10 @@ import { logIpcEvent } from '../logging/audit';
 const channelToSchema: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'health:ping': z.undefined(),
   'sources:add': SourcesAddRequestSchema,
+  'sources:check-duplicate': z.object({ 
+    kind: z.string(), 
+    connection: z.record(z.unknown()) 
+  }),
   'metadata:crawl': MetadataCrawlRequestSchema,
   'sources:test-connection': z.object({ sourceId: z.string() }),
   'sources:crawl-all': z.undefined(),
@@ -55,6 +59,11 @@ const channelToSchema: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'canvas:get': CanvasGetRequestSchema,
   'canvas:update': CanvasUpdateRequestSchema,
   'canvas:save': CanvasSaveRequestSchema,
+  'canvas:deleteBlock': z.object({ 
+    canvasId: z.string(), 
+    blockId: z.string(), 
+    sourceId: z.string() 
+  }),
   'tables:list': z.object({ sourceId: z.string() }),
 };
 
@@ -63,6 +72,14 @@ const auditResponse = z.object({ entries: z.array(z.unknown()) });
 
 const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'sources:add': z.union([z.object({ sourceId: z.string() }), SemantiqaErrorSchema]),
+  'sources:check-duplicate': z.union([
+    z.object({ 
+      exists: z.boolean(), 
+      existingSourceId: z.string().optional(), 
+      existingSourceName: z.string().optional() 
+    }),
+    SemantiqaErrorSchema
+  ]),
   'metadata:crawl': z.union([MetadataCrawlResponseSchema, SemantiqaErrorSchema]),
   'sources:test-connection': z.object({ queued: z.boolean() }),
   'sources:crawl-all': z.union([okResponse, SemantiqaErrorSchema]),
@@ -78,12 +95,17 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'canvas:get': z.union([CanvasGetResponseSchema, SemantiqaErrorSchema]),
   'canvas:update': z.union([CanvasUpdateResponseSchema, SemantiqaErrorSchema]),
   'canvas:save': z.union([CanvasSaveResponseSchema, SemantiqaErrorSchema]),
+  'canvas:deleteBlock': z.union([
+    z.object({ success: z.boolean() }), 
+    SemantiqaErrorSchema
+  ]),
   'tables:list': z.union([
     z.object({ 
       tables: z.array(z.object({ 
         id: z.string(), 
         name: z.string(), 
         type: z.string(), 
+        sourceId: z.string(),
         schema: z.string(), 
         rowCount: z.number() 
       })) 
@@ -112,8 +134,10 @@ export function registerIpcHandlers(handlerMap: IpcHandlerMap) {
     }
 
     ipcMain.handle(channel, async (event, rawPayload) => {
+      console.log(`🔌 IPC Handler called for ${channel}:`, rawPayload);
       const parseResult = payloadSchema.safeParse(rawPayload);
       if (!parseResult.success) {
+        console.error(`❌ Validation failed for ${channel}:`, parseResult.error.flatten());
         logIpcEvent({
           channel,
           direction: 'renderer->main',
@@ -123,6 +147,7 @@ export function registerIpcHandlers(handlerMap: IpcHandlerMap) {
         });
         throw parseResult.error;
       }
+      console.log(`✅ Validation passed for ${channel}`);
 
       // Type assertion to tell TypeScript the types align
       const result = await handler(parseResult.data as IpcRequest<K>);

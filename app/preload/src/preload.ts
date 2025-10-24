@@ -14,9 +14,10 @@ declare const window: {
 
 const { contextBridge, ipcRenderer } = require('electron') as typeof import('electron');
 
-const allowedChannels: readonly IpcChannel[] = [
+const allowedChannels: readonly string[] = [
   'health:ping',
   'sources:add',
+  'sources:check-duplicate',
   'metadata:crawl',
   'sources:test-connection',
   'sources:crawl-all',
@@ -32,10 +33,13 @@ const allowedChannels: readonly IpcChannel[] = [
   'canvas:get',
   'canvas:update',
   'canvas:save',
+  'canvas:deleteBlock',
   'tables:list',
+  'app:before-quit',
+  'app:save-complete',
 ];
 
-function assertChannel(channel: IpcChannel): IpcChannel {
+function assertChannel(channel: string): string {
   if (!allowedChannels.includes(channel)) {
     throw new Error(`Blocked attempt to access channel: ${channel}`);
   }
@@ -47,6 +51,14 @@ const api = {
   invoke<T extends IpcChannel>(channel: T, payload: IpcRequest<T>) {
     const safeChannel = assertChannel(channel);
     return ipcRenderer.invoke(safeChannel, payload) as Promise<IpcResponse<T>>;
+  },
+  send(channel: string, payload?: unknown) {
+    const safeChannel = assertChannel(channel);
+    ipcRenderer.send(safeChannel, payload);
+  },
+  on(channel: string, func: (...args: unknown[]) => void) {
+    const safeChannel = assertChannel(channel);
+    ipcRenderer.on(safeChannel, func);
   },
   ping(): Promise<IpcResponse<'health:ping'>> {
     return api.invoke('health:ping', undefined as IpcRequest<'health:ping'>);

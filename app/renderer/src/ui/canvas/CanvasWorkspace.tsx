@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -12,6 +12,8 @@ import ReactFlow, {
   BackgroundVariant,
   Panel,
   NodeTypes,
+  NodeChange,
+  EdgeChange,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { DataSourceNode, DataSourceNodeData } from './DataSourceNode';
@@ -22,11 +24,15 @@ import { ConnectionModal } from './ConnectionModal';
 import { CanvasConnectWizard } from './CanvasConnectWizard';
 import { useCanvasPersistence } from './useCanvasPersistence';
 import { createDefaultTransition, TableInfo } from './navigationTypes';
+import type { CanvasTableBlock } from '@semantiqa/contracts';
+import { DataSourceContextMenu } from './DataSourceContextMenu';
+import { RelationshipContextMenu } from './RelationshipContextMenu';
+import { CanvasLoadingScreen } from './CanvasLoadingScreen';
 import './CanvasWorkspace.css';
 
 // Custom node types for ReactFlow
 const nodeTypes: NodeTypes = {
-  dataSource: DataSourceNode,
+  dataSource: (props: any) => <DataSourceNode {...props} onRetryCrawl={props.data.onRetryCrawl} onContextMenu={props.data.onContextMenu} />,
 };
 
 export interface CanvasWorkspaceProps {
@@ -45,15 +51,85 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showConnectWizard, setShowConnectWizard] = useState(false);
   
-  // Load canvas data from persistence layer
-  const { data: canvasData, refresh: refreshCanvas } = useCanvasPersistence();
+  // Load canvas data from persistence layer with auto-save
+  const { 
+    data: canvasData, 
+    refresh: refreshCanvas,
+    updateCanvas,
+    updateBlockPosition,
+    createBlock,
+    deleteBlock,
+    createRelationship,
+    deleteRelationship,
+    saveNow,
+    hasUnsavedChanges,
+    isSaving,
+    status
+  } = useCanvasPersistence();
+
+  // Initial load state
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   
   // ReactFlow state
   const [nodes, setNodes, onNodesChange] = useNodesState<DataSourceNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+  // Custom handlers that integrate with persistence layer
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    onNodesChange(changes);
+    
+    // Handle position changes for auto-save
+    changes.forEach(change => {
+      if (change.type === 'position' && change.position) {
+        updateBlockPosition(change.id, change.position);
+      }
+    });
+  }, [onNodesChange, updateBlockPosition]);
+
+  const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
+    onEdgesChange(changes);
+    
+    // Handle edge deletions for auto-save
+    changes.forEach(change => {
+      if (change.type === 'remove') {
+        const edgeId = change.id;
+        
+        // Remove from persistence layer (this will trigger auto-save)
+        deleteRelationship(edgeId);
+      }
+    });
+  }, [onEdgesChange, deleteRelationship]);
   
   // Tables data for tables view
   const [tablesData, setTablesData] = useState<TableInfo[]>([]);
+  
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    sourceId: string;
+    blockId: string;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    sourceId: '',
+    blockId: '',
+  });
+
+  // Relationship context menu state
+  const [relationshipContextMenu, setRelationshipContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    relationshipId: string;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    relationshipId: '',
+  });
   
   // Connection modal state
   const [connectionModal, setConnectionModal] = useState<{
@@ -66,6 +142,85 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
   }>({ isOpen: false });
   
   const { state, drillDown, navigateToBreadcrumb } = useCanvasNavigation();
+
+  // Handler functions
+  const handleRetryCrawl = useCallback(async (sourceId: string) => {
+    try {
+      await window.semantiqa?.api.invoke('sources:retry-crawl', { sourceId });
+      // Refresh canvas to show updated status
+      await refreshCanvas();
+    } catch (error) {
+      console.error('Failed to retry crawl:', error);
+    }
+  }, [refreshCanvas]);
+
+  const handleContextMenu = useCallback((event: React.MouseEvent, nodeId: string, sourceId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    setContextMenu({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+      sourceId: sourceId,
+      blockId: nodeId,
+    });
+    
+    // Close relationship context menu if open
+    setRelationshipContextMenu(prev => ({ ...prev, visible: false }));
+  }, []);
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(prev => ({ ...prev, visible: false }));
+  }, []);
+
+  const handleContextMenuRetry = useCallback(() => {
+    if (contextMenu.sourceId) {
+      handleRetryCrawl(contextMenu.sourceId);
+    }
+    handleCloseContextMenu();
+  }, [contextMenu.sourceId, handleRetryCrawl, handleCloseContextMenu]);
+
+  // Handle edge context menu (right-click)
+  const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    setRelationshipContextMenu({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+      relationshipId: edge.id,
+    });
+    
+    // Close data source context menu if open
+    setContextMenu(prev => ({ ...prev, visible: false }));
+  }, []);
+
+  // Handle relationship deletion from context menu
+  const handleDeleteRelationship = useCallback((relationshipId: string) => {
+    console.log('Deleting relationship:', relationshipId);
+    deleteRelationship(relationshipId);
+    refreshCanvas();  // Refresh to update UI
+  }, [deleteRelationship, refreshCanvas]);
+
+  // Handle block deletion from context menu
+  const handleDeleteBlock = useCallback((blockId: string, sourceId: string) => {
+    console.log('Deleting block:', { blockId, sourceId });
+    deleteBlock(blockId, sourceId);
+    refreshCanvas();  // Refresh to update UI
+  }, [deleteBlock, refreshCanvas]);
+
+  // Close relationship context menu
+  const handleCloseRelationshipContextMenu = useCallback(() => {
+    setRelationshipContextMenu(prev => ({ ...prev, visible: false }));
+  }, []);
+
+  // Handle canvas clicks to close context menus
+  const onPaneClick = useCallback(() => {
+    setContextMenu(prev => ({ ...prev, visible: false }));
+    setRelationshipContextMenu(prev => ({ ...prev, visible: false }));
+  }, []);
 
 
   // Load tables data when in tables view
@@ -93,7 +248,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     }
   }, [state.currentLevel, state.sourceId]);
 
-  // Convert canvas blocks to ReactFlow nodes based on current level
+  // Convert canvas blocks to ReactFlow nodes for sources view
   useEffect(() => {
     if (state.currentLevel === 'sources') {
       // Show data source nodes
@@ -111,56 +266,163 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
             connectionStatus: block.source?.connectionStatus || 'unknown',
             crawlStatus: block.source?.crawlStatus || 'not_crawled',
             lastError: block.source?.lastError,
-          },
-        };
-      });
-
-      setNodes(flowNodes);
-    } else if (state.currentLevel === 'tables') {
-      // Show table nodes
-      const flowNodes = tablesData.map((table, index) => {
-        return {
-          id: `table-${table.id}`,
-          type: 'dataSource', // We'll use the same node type for now
-          position: { 
-            x: 100 + (index % 3) * 250, 
-            y: 100 + Math.floor(index / 3) * 150 
-          },
-          data: {
-            id: table.id,
-            name: table.name,
-            kind: (state.sourceKind || 'postgres') as DataSourceNodeData['kind'],
-            connectionStatus: 'connected' as const,
-            crawlStatus: 'crawled' as const,
-            tableCount: table.rowCount,
+            onRetryCrawl: handleRetryCrawl,
+            onContextMenu: (event: React.MouseEvent) => handleContextMenu(event, block.id, block.sourceId),
           },
         };
       });
 
       setNodes(flowNodes);
     }
-  }, [canvasData?.blocks, state.currentLevel, state.sourceId, state.sourceKind, tablesData, setNodes]);
+  }, [canvasData?.blocks, state.currentLevel, setNodes, handleRetryCrawl, handleContextMenu]);
+
+  // Track which tables have been initialized to avoid infinite loop
+  const initializedTablesRef = useRef<Set<string>>(new Set());
+
+  // Convert table data to ReactFlow nodes for tables view (separate effect to avoid recreation)
+  useEffect(() => {
+    if (state.currentLevel === 'tables') {
+      if (tablesData.length > 0) {
+        // Get saved table block positions from canvas data
+        const savedTableBlocks = canvasData?.tableBlocks || [];
+        const tableBlocksMap = new Map(savedTableBlocks.map(tb => [tb.tableId, tb]));
+        
+        // Collect new table blocks that need to be created (outside the map loop)
+        const newTableBlocksToCreate: Array<Omit<CanvasTableBlock, 'createdAt' | 'updatedAt'>> = [];
+        
+        // Show table nodes
+        const flowNodes = tablesData.map((table, index) => {
+          // Check if we have a saved position for this table
+          const savedBlock = tableBlocksMap.get(table.id);
+          const position = savedBlock 
+            ? { x: savedBlock.position.x, y: savedBlock.position.y }
+            : { 
+                x: 100 + (index % 3) * 250, 
+                y: 100 + Math.floor(index / 3) * 150 
+              };
+          
+          // Queue table block creation if it doesn't exist AND hasn't been initialized yet
+          if (!savedBlock && state.sourceId && !initializedTablesRef.current.has(table.id)) {
+            initializedTablesRef.current.add(table.id);
+            newTableBlocksToCreate.push({
+              id: `table-${table.id}`,
+              canvasId: 'default',
+              sourceId: state.sourceId,
+              tableId: table.id,
+              position,
+              size: { width: 200, height: 150 },
+              zIndex: 0,
+              colorTheme: 'auto' as const,
+              isSelected: false,
+              isMinimized: false,
+            });
+          }
+
+          return {
+            id: `table-${table.id}`,
+            type: 'dataSource', // We'll use the same node type for now
+            position,
+            draggable: true, // Enable dragging for table nodes
+            data: {
+              id: table.id,
+              name: table.name,
+              kind: (state.sourceKind || 'postgres') as DataSourceNodeData['kind'],
+              connectionStatus: 'connected' as const,
+              crawlStatus: 'crawled' as const,
+              tableCount: table.rowCount,
+              onContextMenu: (event: React.MouseEvent) => handleContextMenu(event, `table-${table.id}`, table.sourceId),
+            },
+          };
+        });
+
+        setNodes(flowNodes);
+        
+        // Create new table blocks in a single batch (only happens once per table)
+        if (newTableBlocksToCreate.length > 0) {
+          console.log('📦 Creating initial table blocks:', newTableBlocksToCreate.length);
+          updateCanvas({ tableBlocks: newTableBlocksToCreate });
+        }
+      } else {
+        // Clear nodes when no table data
+        setNodes([]);
+      }
+    } else {
+      // Clear the initialized tables when leaving table view
+      initializedTablesRef.current.clear();
+    }
+  }, [tablesData, state.currentLevel, state.sourceKind, state.sourceId, setNodes, updateCanvas, handleContextMenu]);
 
   // Convert canvas relationships to ReactFlow edges
   useEffect(() => {
-    if (!canvasData?.relationships) return;
+    console.log('🔗 Relationship conversion effect triggered:', {
+      hasCanvasData: !!canvasData,
+      hasRelationships: !!canvasData?.relationships,
+      relationshipCount: canvasData?.relationships?.length || 0,
+      currentLevel: state.currentLevel,
+      sourceId: state.sourceId
+    });
 
-    const flowEdges: Edge[] = canvasData.relationships.map((rel) => ({
-      id: rel.id,
-      source: rel.sourceBlockId,
-      target: rel.targetBlockId,
-      type: 'smoothstep',
-      animated: false,
-      style: {
-        stroke: rel.type === 'cross-source' ? '#22c55e' : '#3b82f6',
-        strokeWidth: 2,
-        strokeDasharray: rel.type === 'cross-source' ? '5,5' : undefined,
-      },
-      label: rel.label,
-    }));
+    if (!canvasData?.relationships) {
+      console.log('🔗 No relationships to convert, clearing edges');
+      setEdges([]);
+      return;
+    }
+
+    // Filter relationships based on current view level
+    const filteredRelationships = canvasData.relationships.filter(rel => {
+      if (state.currentLevel === 'sources') {
+        // Show only inter-source relationships (source and target are different data sources)
+        const isInterSource = rel.sourceId !== rel.targetId;
+        return isInterSource;
+      } else if (state.currentLevel === 'tables' && state.sourceId) {
+        // Show only intra-source relationships for the current source
+        const isIntraSource = rel.sourceId === state.sourceId && rel.targetId === state.sourceId;
+        return isIntraSource;
+      }
+      return false;
+    });
+
+    console.log('🔗 Converting relationships to edges:', {
+      currentLevel: state.currentLevel,
+      totalRelationships: canvasData.relationships.length,
+      filteredRelationships: filteredRelationships.length,
+      relationships: filteredRelationships.map(r => ({
+        id: r.id,
+        sourceTableId: r.sourceTableId,
+        targetTableId: r.targetTableId,
+        sourceId: r.sourceId,
+        targetId: r.targetId
+      }))
+    });
+
+    const flowEdges: Edge[] = filteredRelationships.map((rel) => {
+      // For table relationships, we need to map table IDs to ReactFlow node IDs
+      const sourceNodeId = state.currentLevel === 'tables' 
+        ? `table-${rel.sourceTableId}` 
+        : rel.sourceId;
+      const targetNodeId = state.currentLevel === 'tables' 
+        ? `table-${rel.targetTableId}` 
+        : rel.targetId;
+
+      return {
+        id: rel.id,
+        source: sourceNodeId,
+        target: targetNodeId,
+        type: 'smoothstep',
+        animated: false,
+        style: {
+          stroke: rel.lineColor || '#22c55e',
+          strokeWidth: rel.lineWidth || 2,
+          strokeDasharray: rel.visualStyle === 'dashed' ? '5,5' : undefined,
+          cursor: 'pointer',
+        },
+        className: 'canvas-edge',
+        label: `${rel.sourceTableId?.split('_').pop() || 'source'} → ${rel.targetTableId?.split('_').pop() || 'target'}`,
+      };
+    });
 
     setEdges(flowEdges);
-  }, [canvasData?.relationships, setEdges]);
+  }, [canvasData?.relationships, setEdges, state.currentLevel, state.sourceId]);
 
   // Handle new connections
   const onConnect = useCallback((connection: Connection) => {
@@ -272,13 +534,30 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       },
     };
 
+    // Add to ReactFlow state
     setEdges((eds) => addEdge(newEdge, eds));
+    
+    // Create relationship in persistence layer (this will trigger auto-save)
+    createRelationship({
+      sourceId: state.sourceId || '',
+      targetId: state.sourceId || '', // Same source for intra-source relationships
+      sourceTableId: relationship.sourceTable,
+      targetTableId: relationship.targetTable,
+      sourceColumnName: relationship.sourceColumn,
+      targetColumnName: relationship.targetColumn,
+      relationshipType: 'semantic_link',
+      confidenceScore: 1.0,
+      visualStyle: 'solid',
+      lineColor: '#22c55e',
+      lineWidth: 2,
+      isSelected: false,
+    });
     
     // Close modal
     setConnectionModal({ isOpen: false });
     
     console.log('✅ Relationship created successfully');
-  }, [connectionModal, setEdges]);
+  }, [connectionModal, setEdges, createRelationship, tablesData]);
 
   // Plus button handler
   const handleAddDataSource = useCallback(() => {
@@ -327,10 +606,28 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       schema: 'public', // TODO: Get actual schema from metadata
       tables: [] // TODO: Load actual tables from metadata
     }, transition);
-  }, [state.currentLevel, drillDown]);
+
+    // Refresh canvas data to load any existing relationships
+    refreshCanvas();
+  }, [state.currentLevel, drillDown, refreshCanvas]);
+
+  // Initial load effect
+  useEffect(() => {
+    const loadInitialState = async () => {
+      setIsInitialLoad(true);
+      await refreshCanvas();
+      setIsInitialLoad(false);
+    };
+    loadInitialState();
+  }, [refreshCanvas]);
+
+  // Note: Auto-save is handled by the debounced save mechanism
+  // Changes are automatically saved after 5 seconds of inactivity
 
   return (
     <div className={`canvas-workspace ${className}`}>
+      <CanvasLoadingScreen visible={isInitialLoad} message="Creating map..." />
+      
       {/* Breadcrumb navigation */}
       <CanvasBreadcrumbs 
         breadcrumbs={state.breadcrumbs}
@@ -342,6 +639,26 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         <h1 className="canvas-workspace__title">
           {state.currentLevel === 'sources' ? 'Data Sources Canvas' : `Tables in ${state.sourceName} (${tablesData.length} tables)`}
         </h1>
+        
+        {/* Auto-save status indicator */}
+        <div className="canvas-workspace__status">
+          {isSaving && (
+            <div className="canvas-workspace__status-item saving">
+              <div className="canvas-workspace__status-spinner"></div>
+              <span>Saving...</span>
+            </div>
+          )}
+          {hasUnsavedChanges && !isSaving && (
+            <div className="canvas-workspace__status-item pending">
+              <span>Unsaved changes</span>
+            </div>
+          )}
+          {!hasUnsavedChanges && !isSaving && (
+            <div className="canvas-workspace__status-item saved">
+              <span>✓ All changes saved</span>
+            </div>
+          )}
+        </div>
         <div className="canvas-workspace__controls">
           <button 
             className="canvas-workspace__control-btn"
@@ -358,10 +675,12 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
           onNodeDoubleClick={handleNodeDoubleClick}
+          onEdgeContextMenu={onEdgeContextMenu}
+          onPaneClick={onPaneClick}
           nodeTypes={nodeTypes}
           fitView
           minZoom={0.1}
@@ -445,6 +764,33 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         sourceTable={connectionModal.sourceTable}
         targetTable={connectionModal.targetTable}
         onSaveRelationship={handleSaveRelationship}
+      />
+      
+      {/* Data Source Context Menu */}
+      <DataSourceContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        visible={contextMenu.visible}
+        sourceId={contextMenu.sourceId}
+        blockId={contextMenu.blockId}
+        onClose={handleCloseContextMenu}
+        onRetryCrawl={handleContextMenuRetry}
+        onDelete={handleDeleteBlock}
+        canRetryCrawl={contextMenu.sourceId ? 
+          canvasData?.blocks?.find(b => b.sourceId === contextMenu.sourceId)?.source?.crawlStatus === 'error' ||
+          canvasData?.blocks?.find(b => b.sourceId === contextMenu.sourceId)?.source?.connectionStatus === 'error'
+          : false
+        }
+      />
+
+      {/* Relationship Context Menu */}
+      <RelationshipContextMenu
+        x={relationshipContextMenu.x}
+        y={relationshipContextMenu.y}
+        visible={relationshipContextMenu.visible}
+        relationshipId={relationshipContextMenu.relationshipId}
+        onClose={handleCloseRelationshipContextMenu}
+        onDelete={handleDeleteRelationship}
       />
     </div>
   );

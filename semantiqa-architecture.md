@@ -126,6 +126,33 @@ All payloads validated (zod/JSON Schema); every call audited.
 
 **Indexes:** `(type)`, `(updated_at)`, `(src_id,type)`, `(dst_id,type)`, `(owner_type,owner_id)`.
 
+## Canvas Storage (SQLite)
+Canvas state is stored separately from the main graph to support visual data source management and relationship mapping.
+
+### Canvas Tables
+- `canvas_state(id TEXT PK, name TEXT, description TEXT, viewport_zoom REAL, viewport_center_x REAL, viewport_center_y REAL, grid_size REAL, snap_to_grid BOOLEAN, auto_save BOOLEAN, theme TEXT, canvas_version TEXT, created_at TEXT, updated_at TEXT, last_saved_at TEXT)`
+- `canvas_source_blocks(id TEXT PK, canvas_id TEXT, source_id TEXT, position_x REAL, position_y REAL, width REAL, height REAL, z_index INTEGER, color_theme TEXT, is_selected BOOLEAN, is_minimized BOOLEAN, custom_title TEXT, created_at TEXT, updated_at TEXT)`
+- `canvas_table_blocks(id TEXT PK, canvas_id TEXT, source_id TEXT, table_id TEXT, position_x REAL, position_y REAL, width REAL, height REAL, z_index INTEGER, color_theme TEXT, is_selected BOOLEAN, is_minimized BOOLEAN, custom_title TEXT, created_at TEXT, updated_at TEXT)`
+- `canvas_relationships(id TEXT PK, canvas_id TEXT, source_id TEXT, target_id TEXT, source_table_id TEXT, target_table_id TEXT, source_column_name TEXT, target_column_name TEXT, relationship_type TEXT, confidence_score REAL, visual_style TEXT, line_color TEXT, line_width INTEGER, curve_path TEXT, is_selected BOOLEAN, created_at TEXT, updated_at TEXT)`
+
+### Relationship Model
+**All meaningful relationships are table-to-table relationships** with optional column-level granularity:
+
+- **Inter-source relationships**: Tables from different data sources (e.g., MySQL.users.id → PostgreSQL.customers.customer_id)
+- **Intra-source relationships**: Tables from the same data source (e.g., MySQL.users.id → MySQL.orders.user_id)
+- **Column-level relationships**: Specific column mappings within table relationships
+
+The "source-to-source" visualization is a higher-level view that groups table relationships by source, but the actual relationship data always contains specific table and column information.
+
+**Foreign Key Constraints:**
+- `canvas_source_blocks.source_id` → `sources.id`
+- `canvas_table_blocks.source_id` → `sources.id`
+- `canvas_table_blocks.table_id` → `nodes.id` (where type='table')
+- `canvas_relationships.source_id` → `sources.id`
+- `canvas_relationships.target_id` → `sources.id`
+- `canvas_relationships.source_table_id` → `nodes.id` (where type='table')
+- `canvas_relationships.target_table_id` → `nodes.id` (where type='table')
+
 ## Security
 - Renderer has no FS/network/driver access; only IPC.
 - SQL firewall denies DDL/DML; allowlist schemas; time/row caps; PII cross‑joins blockable.

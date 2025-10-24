@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import './DataSourceNode.css';
 
@@ -18,7 +18,25 @@ export interface DataSourceNodeData {
   lastCrawlAt?: string;
 }
 
-export function DataSourceNode({ data, selected }: NodeProps<DataSourceNodeData>) {
+export interface DataSourceNodeProps extends NodeProps<DataSourceNodeData> {
+  onRetryCrawl?: (sourceId: string) => void;
+  onContextMenu?: (event: React.MouseEvent, sourceId: string) => void;
+}
+
+export function DataSourceNode({ data, selected, onRetryCrawl, onContextMenu }: DataSourceNodeProps) {
+  const handleRetryCrawl = useCallback((sourceId: string) => {
+    if (onRetryCrawl) {
+      onRetryCrawl(sourceId);
+    }
+  }, [onRetryCrawl]);
+
+  const handleContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    if (onContextMenu) {
+      onContextMenu(event, data.id);
+    }
+  }, [onContextMenu, data.id]);
+
   // Get icon and color theme for data source kind
   const sourceTheme = useMemo(() => {
     switch (data.kind) {
@@ -76,6 +94,7 @@ export function DataSourceNode({ data, selected }: NodeProps<DataSourceNodeData>
       style={{
         background: sourceTheme.primaryColor,
       }}
+      onContextMenu={handleContextMenu}
     >
       {/* Connection handles on all sides */}
       <Handle type="target" position={Position.Top} id="top" />
@@ -121,7 +140,7 @@ export function DataSourceNode({ data, selected }: NodeProps<DataSourceNodeData>
       {(data.connectionStatus === 'error' || data.crawlStatus === 'error') && 
        data.lastError && (
         <div className="data-source-node__error" title={data.lastError}>
-          ⚠️ Error
+          <span>⚠️ Error - Right-click to retry</span>
         </div>
       )}
     </div>

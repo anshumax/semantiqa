@@ -102,9 +102,10 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
   const [submitting, setSubmitting] = useState(false);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<{ sourceName: string; sourceId: string } | null>(null);
   const [createdBlocks, setCreatedBlocks] = useState<Array<{ name: string; position: { x: number; y: number } }>>([]);
 
-  const { data: canvasData, createBlock, refresh: refreshCanvas } = useCanvasPersistence();
+  const { data: canvasData, refresh: refreshCanvas } = useCanvasPersistence();
 
   const reset = useCallback(() => {
     setCurrentStep('choose-kind');
@@ -114,6 +115,7 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
     setSubmitting(false);
     setTesting(false);
     setError(null);
+    setDuplicateWarning(null);
     setCreatedBlocks([]);
   }, []);
 
@@ -181,6 +183,7 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
 
     setTesting(true);
     setError(null);
+    setDuplicateWarning(null);
 
     try {
       // Convert port to number if it exists
@@ -189,18 +192,21 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
         connection.port = parseInt(connection.port as string, 10);
       }
 
-      // Test connection by attempting to add the source (this will validate the connection)
-      const payload: SourcesAddRequest = {
+      // First, check if this connection already exists
+      const duplicateCheck = await window.semantiqa?.api.invoke('sources:check-duplicate', {
         kind: selectedKind,
-        name: trimmedName,
-        description: formState.description || undefined,
-        owners: ownersList,
-        tags: tagsList,
-        connection: connection as SourcesAddRequest['connection'],
-      };
+        connection: connection,
+      });
 
-      // For now, we'll simulate multi-database detection
-      // In a real implementation, this would be part of the connection test
+      if (duplicateCheck?.exists) {
+        // Connection is a duplicate, show warning but allow user to continue
+        setDuplicateWarning({
+          sourceName: duplicateCheck.existingSourceName || 'Existing source',
+          sourceId: duplicateCheck.existingSourceId || '',
+        });
+      }
+
+      // Connection successful (or duplicate), simulate multi-database detection
       const mockDetectedDatabases = await simulateMultiDatabaseDetection(selectedKind, formState.connection);
       
       if (mockDetectedDatabases.length > 1) {
@@ -277,61 +283,42 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
         
         // Check for backend errors - handle actual response format
         let effectiveSourceId: string;
+        let isDuplicate = false;
         
         if ('code' in sourceResponse && sourceResponse.code === 'VALIDATION_ERROR') {
-          // Duplicate: use the existing sourceId from details
+          // Duplicate: the canvas block already exists, so we skip creating it
           if (sourceResponse.details && 'existingSourceId' in sourceResponse.details) {
-            console.warn('Duplicate source detected, using existing sourceId to create canvas block');
+            console.warn('Duplicate source detected - skipping canvas block creation (block already exists)');
             effectiveSourceId = (sourceResponse as any).details.existingSourceId;
+            isDuplicate = true;
           } else {
             throw new Error(sourceResponse.message || 'Validation error occurred');
           }
         } else if ('sourceId' in sourceResponse) {
+          // New source - backend will have already created the canvas block
           effectiveSourceId = sourceResponse.sourceId;
+          console.log('New source created - canvas block created by backend:', effectiveSourceId);
         } else {
           throw new Error(`Invalid response format for database: ${database.name}. Response: ${JSON.stringify(sourceResponse)}`);
         }
         
-        // Now we have effectiveSourceId - either from new source or existing duplicate
-
-        // Calculate position for the new block
-        const position = calculateNewBlockPosition(
-          [...existingBlocks, ...newBlocks].map(block => ({
-            position: block.position,
-            size: { width: 200, height: 120 }
-          })),
-          i
-        );
-
-        // Create canvas block via persistence hook (canvas:update)
-        console.log('🔶 BEFORE createBlock - sourceId:', effectiveSourceId, 'position:', position);
+        // Only create a canvas block if this is a new source AND the backend hasn't already done it
+        // NOTE: The backend (SourceProvisioningService) now automatically creates canvas blocks for new sources,
+        // so we should NEVER create blocks from the frontend to avoid duplicates.
         
-        try {
-          const blockData = {
-            sourceId: effectiveSourceId,
-            position,
-            size: { width: 200, height: 120 },
-            zIndex: 0,
-            colorTheme: 'auto',
-            isSelected: false,
-            isMinimized: false,
-          };
-          
-          console.log('🔶 Calling createBlock with data:', blockData);
-          await createBlock(blockData);
-          console.log('🔶 createBlock returned successfully');
-          
-        } catch (blockError) {
-          console.error('🔥 CANVAS BLOCK CREATION FAILED:', blockError);
-          throw blockError; // Re-throw to see if this is silently failing
+        if (isDuplicate) {
+          console.log('Skipping canvas block creation for duplicate source:', effectiveSourceId);
+        } else {
+          // Even for new sources, the backend has already created the block, so we just log it
+          console.log('Canvas block already created by backend for new source:', effectiveSourceId);
         }
 
         newBlocks.push({
           name: payload.name,
-          position,
+          position: { x: 0, y: 0 }, // Position is determined by backend
         });
         
-        console.log('Successfully processed source and created canvas block:', effectiveSourceId);
+        console.log('Successfully processed source:', effectiveSourceId);
       }
 
       setCreatedBlocks(newBlocks);
@@ -345,7 +332,7 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
     } finally {
       setSubmitting(false);
     }
-  }, [selectedKind, formState, ownersList, tagsList, detectedDatabases, canvasData?.blocks, createBlock]);
+  }, [selectedKind, formState, ownersList, tagsList, detectedDatabases, canvasData?.blocks, refreshCanvas]);
 
   if (!isOpen) return null;
 
@@ -416,6 +403,7 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
                 onNext={handleTestConnection}
                 testing={testing}
                 error={error}
+                duplicateWarning={duplicateWarning}
               />
             )}
 
@@ -521,6 +509,7 @@ function ConfigureForm({
   onNext,
   testing,
   error,
+  duplicateWarning,
 }: {
   kind: SourceKind;
   formState: FormState;
@@ -530,6 +519,7 @@ function ConfigureForm({
   onNext: () => void;
   testing: boolean;
   error: string | null;
+  duplicateWarning: { sourceName: string; sourceId: string } | null;
 }) {
   const fields = FIELD_DEFINITIONS[kind];
 
@@ -588,6 +578,13 @@ function ConfigureForm({
       </section>
 
       {error && <div className="canvas-connect-wizard__error">{error}</div>}
+      {duplicateWarning && (
+        <div className="canvas-connect-wizard__warning">
+          ⚠️ A connection to this database already exists: <strong>{duplicateWarning.sourceName}</strong>
+          <br />
+          <small>Clicking "Test Connection" will still allow you to create another canvas block for this source.</small>
+        </div>
+      )}
 
       <footer className="canvas-connect-wizard__actions">
         <button type="button" onClick={onNext} disabled={testing}>

@@ -156,7 +156,38 @@ export class SourceRepository {
        VALUES (@id, @name, @kind, json(@config), json(@owners), json(@tags), @status, @connection_status)`,
     );
 
+    // Check if node already exists for this source
+    const checkNode = this.db.prepare<{ id: string }>(`SELECT id FROM nodes WHERE id = @id`);
+    const insertNode = this.db.prepare<{
+      id: string;
+      type: string;
+      props: string;
+      owner_ids: string | null;
+      tags: string | null;
+      sensitivity: string | null;
+      status: string | null;
+      origin_device_id: string | null;
+    }>(
+      `INSERT INTO nodes (id, type, props, owner_ids, tags, sensitivity, status, origin_device_id)
+       VALUES (@id, @type, json(@props), json(@owner_ids), json(@tags), @sensitivity, @status, @origin_device_id)`,
+    );
+    const updateNode = this.db.prepare<{
+      id: string;
+      type: string;
+      props: string;
+      owner_ids: string | null;
+      tags: string | null;
+      sensitivity: string | null;
+      status: string | null;
+      origin_device_id: string | null;
+    }>(
+      `UPDATE nodes SET type = @type, props = json(@props), owner_ids = json(@owner_ids), tags = json(@tags), 
+       sensitivity = @sensitivity, status = @status, origin_device_id = @origin_device_id
+       WHERE id = @id`,
+    );
+
     const transaction = this.db.transaction(() => {
+      // Insert into sources table
       insertSource.run({
         id: sourceId,
         name: payload.name,
@@ -167,6 +198,29 @@ export class SourceRepository {
         status: initialCrawlStatus,
         connection_status: initialConnectionStatus,
       });
+
+      // Upsert node representation of the source
+      const nodeParams = {
+        id: sourceId,
+        type: 'source',
+        props: JSON.stringify({
+          name: payload.name,
+          kind: payload.kind,
+          description: payload.description,
+        }),
+        owner_ids: owners.length > 0 ? JSON.stringify(owners) : null,
+        tags: tags.length > 0 ? JSON.stringify(tags) : null,
+        sensitivity: null,
+        status: 'active',
+        origin_device_id: null,
+      };
+
+      const exists = checkNode.get({ id: sourceId });
+      if (exists) {
+        updateNode.run(nodeParams);
+      } else {
+        insertNode.run(nodeParams);
+      }
     });
 
     transaction();

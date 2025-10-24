@@ -114,6 +114,16 @@
   white-space: nowrap;
 }
 
+.data-source-node__error {
+  font-size: 10px;
+  color: rgba(239, 68, 68, 0.9);
+  text-align: center;
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
 /* Hover effects */
 .data-source-node:hover {
   border-color: rgba(255, 255, 255, 0.4);

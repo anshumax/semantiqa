@@ -47,6 +47,7 @@ export class SnapshotRepository {
   }
 
   private persistRelationalSnapshot(sourceId: string, snapshot: RelationalSnapshot, stats?: unknown): void {
+    const checkNode = this.db.prepare<{ id: string }>(`SELECT id FROM nodes WHERE id = @id`);
     const insertNode = this.db.prepare<{
       id: string;
       type: string;
@@ -57,10 +58,25 @@ export class SnapshotRepository {
       status: string | null;
       origin_device_id: string | null;
     }>(
-      `INSERT OR REPLACE INTO nodes (id, type, props, owner_ids, tags, sensitivity, status, origin_device_id)
+      `INSERT INTO nodes (id, type, props, owner_ids, tags, sensitivity, status, origin_device_id)
        VALUES (@id, @type, json(@props), @owner_ids, @tags, @sensitivity, @status, @origin_device_id)`,
     );
+    const updateNode = this.db.prepare<{
+      id: string;
+      type: string;
+      props: string;
+      owner_ids: string | null;
+      tags: string | null;
+      sensitivity: string | null;
+      status: string | null;
+      origin_device_id: string | null;
+    }>(
+      `UPDATE nodes SET type = @type, props = json(@props), owner_ids = @owner_ids, tags = @tags, 
+       sensitivity = @sensitivity, status = @status, origin_device_id = @origin_device_id
+       WHERE id = @id`,
+    );
 
+    const checkEdge = this.db.prepare<{ id: string }>(`SELECT id FROM edges WHERE id = @id`);
     const insertEdge = this.db.prepare<{
       id: string;
       src_id: string;
@@ -69,15 +85,61 @@ export class SnapshotRepository {
       props: string | null;
       origin_device_id: string | null;
     }>(
-      `INSERT OR REPLACE INTO edges (id, src_id, dst_id, type, props, origin_device_id)
+      `INSERT INTO edges (id, src_id, dst_id, type, props, origin_device_id)
        VALUES (@id, @src_id, @dst_id, @type, @props, @origin_device_id)`,
     );
+    const updateEdge = this.db.prepare<{
+      id: string;
+      src_id: string;
+      dst_id: string;
+      type: string;
+      props: string | null;
+      origin_device_id: string | null;
+    }>(
+      `UPDATE edges SET src_id = @src_id, dst_id = @dst_id, type = @type, props = @props, 
+       origin_device_id = @origin_device_id
+       WHERE id = @id`,
+    );
+
+    const upsertNode = (params: {
+      id: string;
+      type: string;
+      props: string;
+      owner_ids: string | null;
+      tags: string | null;
+      sensitivity: string | null;
+      status: string | null;
+      origin_device_id: string | null;
+    }) => {
+      const exists = checkNode.get({ id: params.id });
+      if (exists) {
+        updateNode.run(params);
+      } else {
+        insertNode.run(params);
+      }
+    };
+
+    const upsertEdge = (params: {
+      id: string;
+      src_id: string;
+      dst_id: string;
+      type: string;
+      props: string | null;
+      origin_device_id: string | null;
+    }) => {
+      const exists = checkEdge.get({ id: params.id });
+      if (exists) {
+        updateEdge.run(params);
+      } else {
+        insertEdge.run(params);
+      }
+    };
 
     for (const table of snapshot.tables) {
       const tableId = `tbl_${sourceId}_${table.schema}_${table.name}`;
 
-      // Insert table node
-      insertNode.run({
+      // Upsert table node
+      upsertNode({
         id: tableId,
         type: 'table',
         props: JSON.stringify({
@@ -94,9 +156,9 @@ export class SnapshotRepository {
         origin_device_id: null,
       });
 
-      // Insert edge from source to table
+      // Upsert edge from source to table
       const sourceEdgeId = `edge_${sourceId}_${tableId}`;
-      insertEdge.run({
+      upsertEdge({
         id: sourceEdgeId,
         src_id: sourceId,
         dst_id: tableId,
@@ -105,11 +167,11 @@ export class SnapshotRepository {
         origin_device_id: null,
       });
 
-      // Insert column nodes and edges
+      // Upsert column nodes and edges
       for (const column of table.columns) {
         const columnId = `col_${tableId}_${column.name}`;
 
-        insertNode.run({
+        upsertNode({
           id: columnId,
           type: 'column',
           props: JSON.stringify({
@@ -129,7 +191,7 @@ export class SnapshotRepository {
         });
 
         const columnEdgeId = `edge_${tableId}_${columnId}`;
-        insertEdge.run({
+        upsertEdge({
           id: columnEdgeId,
           src_id: tableId,
           dst_id: columnId,
@@ -166,6 +228,7 @@ export class SnapshotRepository {
   }
 
   private persistMongoSnapshot(sourceId: string, snapshot: MongoSnapshot, stats?: unknown): void {
+    const checkNode = this.db.prepare<{ id: string }>(`SELECT id FROM nodes WHERE id = @id`);
     const insertNode = this.db.prepare<{
       id: string;
       type: string;
@@ -176,10 +239,25 @@ export class SnapshotRepository {
       status: string | null;
       origin_device_id: string | null;
     }>(
-      `INSERT OR REPLACE INTO nodes (id, type, props, owner_ids, tags, sensitivity, status, origin_device_id)
+      `INSERT INTO nodes (id, type, props, owner_ids, tags, sensitivity, status, origin_device_id)
        VALUES (@id, @type, json(@props), @owner_ids, @tags, @sensitivity, @status, @origin_device_id)`,
     );
+    const updateNode = this.db.prepare<{
+      id: string;
+      type: string;
+      props: string;
+      owner_ids: string | null;
+      tags: string | null;
+      sensitivity: string | null;
+      status: string | null;
+      origin_device_id: string | null;
+    }>(
+      `UPDATE nodes SET type = @type, props = json(@props), owner_ids = @owner_ids, tags = @tags, 
+       sensitivity = @sensitivity, status = @status, origin_device_id = @origin_device_id
+       WHERE id = @id`,
+    );
 
+    const checkEdge = this.db.prepare<{ id: string }>(`SELECT id FROM edges WHERE id = @id`);
     const insertEdge = this.db.prepare<{
       id: string;
       src_id: string;
@@ -188,15 +266,61 @@ export class SnapshotRepository {
       props: string | null;
       origin_device_id: string | null;
     }>(
-      `INSERT OR REPLACE INTO edges (id, src_id, dst_id, type, props, origin_device_id)
+      `INSERT INTO edges (id, src_id, dst_id, type, props, origin_device_id)
        VALUES (@id, @src_id, @dst_id, @type, @props, @origin_device_id)`,
     );
+    const updateEdge = this.db.prepare<{
+      id: string;
+      src_id: string;
+      dst_id: string;
+      type: string;
+      props: string | null;
+      origin_device_id: string | null;
+    }>(
+      `UPDATE edges SET src_id = @src_id, dst_id = @dst_id, type = @type, props = @props, 
+       origin_device_id = @origin_device_id
+       WHERE id = @id`,
+    );
+
+    const upsertNode = (params: {
+      id: string;
+      type: string;
+      props: string;
+      owner_ids: string | null;
+      tags: string | null;
+      sensitivity: string | null;
+      status: string | null;
+      origin_device_id: string | null;
+    }) => {
+      const exists = checkNode.get({ id: params.id });
+      if (exists) {
+        updateNode.run(params);
+      } else {
+        insertNode.run(params);
+      }
+    };
+
+    const upsertEdge = (params: {
+      id: string;
+      src_id: string;
+      dst_id: string;
+      type: string;
+      props: string | null;
+      origin_device_id: string | null;
+    }) => {
+      const exists = checkEdge.get({ id: params.id });
+      if (exists) {
+        updateEdge.run(params);
+      } else {
+        insertEdge.run(params);
+      }
+    };
 
     for (const collection of snapshot.collections) {
       const collectionId = `coll_${sourceId}_${collection.database}_${collection.name}`;
 
-      // Insert collection node
-      insertNode.run({
+      // Upsert collection node
+      upsertNode({
         id: collectionId,
         type: 'collection',
         props: JSON.stringify({
@@ -211,9 +335,9 @@ export class SnapshotRepository {
         origin_device_id: null,
       });
 
-      // Insert edge from source to collection
+      // Upsert edge from source to collection
       const sourceEdgeId = `edge_${sourceId}_${collectionId}`;
-      insertEdge.run({
+      upsertEdge({
         id: sourceEdgeId,
         src_id: sourceId,
         dst_id: collectionId,
@@ -222,11 +346,11 @@ export class SnapshotRepository {
         origin_device_id: null,
       });
 
-      // Insert field nodes and edges
+      // Upsert field nodes and edges
       for (const field of collection.fields) {
         const fieldId = `fld_${collectionId}_${field.path.replace(/\./g, '_')}`;
 
-        insertNode.run({
+        upsertNode({
           id: fieldId,
           type: 'field',
           props: JSON.stringify({
@@ -244,7 +368,7 @@ export class SnapshotRepository {
         });
 
         const fieldEdgeId = `edge_${collectionId}_${fieldId}`;
-        insertEdge.run({
+        upsertEdge({
           id: fieldEdgeId,
           src_id: collectionId,
           dst_id: fieldId,

@@ -295,3 +295,62 @@
     font-size: 0.8rem;
   }
 }
+
+/* Auto-save status indicator */
+.canvas-workspace__status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 1rem;
+}
+
+.canvas-workspace__status-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.canvas-workspace__status-item.saving {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-accent-blue);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.canvas-workspace__status-item.pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.canvas-workspace__status-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-top: 2px solid var(--color-accent-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Relationship edge hover effects */
+.react-flow__edge.canvas-edge path {
+  transition: stroke-width 0.2s ease, stroke 0.2s ease;
+}
+
+.react-flow__edge.canvas-edge:hover path {
+  stroke-width: 4 !important;
+  filter: brightness(1.2);
+}
+
+.react-flow__edge.canvas-edge.selected path {
+  stroke-width: 4 !important;
+  filter: brightness(1.3);
+}

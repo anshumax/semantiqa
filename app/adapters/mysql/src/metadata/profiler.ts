@@ -29,9 +29,10 @@ ORDER BY table_schema, table_name, ordinal_position;
 
 export interface MysqlProfileOptions {
   sampleSize?: number;
+  maxColumnsPerTable?: number;
 }
 
-const DEFAULT_SAMPLE_SIZE = 1_000;
+const DEFAULT_SAMPLE_SIZE = 100; // Reduced from 1000 to 100 for faster profiling
 
 function escapeIdentifier(value: string): string {
   return `\`${value.replace(/`/g, '``')}\``;

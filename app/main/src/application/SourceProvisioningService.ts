@@ -1,5 +1,6 @@
 import type { SemantiqaError, SourcesAddRequest } from '@semantiqa/contracts';
 import { SourceService } from '@semantiqa/graph-service';
+import type { CanvasService } from '../services/CanvasService';
 
 export interface SourceProvisioningDeps {
   openSourcesDb: () => any;
@@ -19,6 +20,7 @@ export interface SourceProvisioningDeps {
     error(message: string, meta?: Record<string, unknown>): void;
   };
   createSourceService?: () => SourceService;
+  canvasService?: CanvasService;
 }
 
 export class SourceProvisioningService {
@@ -136,6 +138,36 @@ export class SourceProvisioningService {
       }
 
       logger.info('Source provisioned', { sourceId });
+      
+      // Automatically create a canvas block for the new source
+      if (this.deps.canvasService) {
+        try {
+          await this.createCanvasBlockForSource(sourceId, request.name);
+          audit({
+            action: 'sources.add.canvas_block_created',
+            sourceId,
+            status: 'success',
+            details: { sourceName: request.name },
+          });
+        } catch (canvasError) {
+          logger.warn('Failed to create canvas block for source', { 
+            error: canvasError, 
+            sourceId, 
+            sourceName: request.name 
+          });
+          audit({
+            action: 'sources.add.canvas_block_failed',
+            sourceId,
+            status: 'failure',
+            details: { 
+              error: (canvasError as Error).message ?? 'Unknown error',
+              sourceName: request.name 
+            },
+          });
+          // Don't fail the entire source creation if canvas block creation fails
+        }
+      }
+      
       return { sourceId };
     } catch (error) {
       const errorMessage = (error as Error).message ?? 'Unknown error';
@@ -268,6 +300,75 @@ export class SourceProvisioningService {
       status,
       opts.errorMessage ? { message: opts.errorMessage } : undefined,
     );
+  }
+
+  /**
+   * Create a canvas block for a newly created source
+   */
+  private async createCanvasBlockForSource(sourceId: string, sourceName: string): Promise<void> {
+    console.log('🎨 Starting canvas block creation for source:', { sourceId, sourceName });
+    
+    if (!this.deps.canvasService) {
+      console.error('🎨 Canvas service not available');
+      throw new Error('Canvas service not available');
+    }
+
+    // Generate a unique block ID
+    const blockId = `block-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    console.log('🎨 Generated block ID:', blockId);
+    
+    // Calculate position for the new block
+    // For now, use a simple grid layout
+    const spacingX = 260;
+    const spacingY = 180;
+    const perRow = 4;
+    
+    // Get existing blocks to calculate position
+    console.log('🎨 Getting existing canvas data...');
+    const canvasData = await this.deps.canvasService.getCanvas({ 
+      canvasId: 'default',
+      includeBlocks: true,
+      includeRelationships: false,
+      includeLevelData: false
+    });
+    const existingBlocks = canvasData.blocks || [];
+    console.log('🎨 Existing blocks count:', existingBlocks.length);
+    
+    const index = existingBlocks.length;
+    const row = Math.floor(index / perRow);
+    const col = index % perRow;
+    const x = 100 + col * spacingX;
+    const y = 100 + row * spacingY;
+    console.log('🎨 Calculated position:', { x, y, index, row, col });
+
+    // Create the canvas block
+    console.log('🎨 Creating canvas block...');
+    const blockData = {
+      id: blockId,
+      canvasId: 'default',
+      sourceId: sourceId,
+      position: { x, y },
+      size: { width: 200, height: 120 },
+      zIndex: 0,
+      colorTheme: 'auto' as const,
+      isSelected: false,
+      isMinimized: false,
+      customTitle: sourceName,
+    };
+    console.log('🎨 Block data:', blockData);
+    
+    await this.deps.canvasService.updateCanvas({
+      canvasId: 'default',
+      blocks: [blockData],
+    });
+    console.log('🎨 Canvas block created successfully');
+
+    this.deps.logger.info('Canvas block created for source', { 
+      sourceId, 
+      sourceName, 
+      blockId, 
+      position: { x, y } 
+    });
   }
 }
 

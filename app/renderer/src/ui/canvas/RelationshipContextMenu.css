@@ -1,0 +1,57 @@
+.relationship-context-menu {
+  background: var(--color-background-elevated, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 6px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  min-width: 180px;
+  overflow: hidden;
+  font-size: 14px;
+  z-index: 1000;
+}
+
+.relationship-context-menu__item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text-primary, #374151);
+  transition: background-color 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.relationship-context-menu__item:hover {
+  background-color: var(--color-background-hover, #f3f4f6);
+}
+
+.relationship-context-menu__item--delete {
+  color: #dc2626;
+}
+
+.relationship-context-menu__item--delete:hover {
+  background-color: #fee2e2;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .relationship-context-menu {
+    background: var(--color-background-elevated, #1f2937);
+    border-color: var(--color-border, #374151);
+  }
+
+  .relationship-context-menu__item {
+    color: var(--color-text-primary, #f9fafb);
+  }
+
+  .relationship-context-menu__item:hover {
+    background-color: var(--color-background-hover, #374151);
+  }
+
+  .relationship-context-menu__item--delete {
+    color: #fca5a5;
+  }
+
+  .relationship-context-menu__item--delete:hover {
+    background-color: #7f1d1d;
+  }
+}

@@ -278,14 +278,19 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
 
   // Track which tables have been initialized to avoid infinite loop
   const initializedTablesRef = useRef<Set<string>>(new Set());
+  // Track if we've already created nodes for this view (to prevent recreation)
+  const nodesCreatedRef = useRef(false);
 
   // Convert table data to ReactFlow nodes for tables view (separate effect to avoid recreation)
   useEffect(() => {
     if (state.currentLevel === 'tables') {
-      if (tablesData.length > 0) {
+      if (tablesData.length > 0 && !nodesCreatedRef.current) {
+        // Only create nodes ONCE when entering tables view
+        nodesCreatedRef.current = true;
+        
         // Get saved table block positions from canvas data
         const savedTableBlocks = canvasData?.tableBlocks || [];
-        const tableBlocksMap = new Map(savedTableBlocks.map(tb => [tb.tableId, tb]));
+        const tableBlocksMap = new Map(savedTableBlocks.map(tb => [tb.tableId, tb.position]));
         
         // Collect new table blocks that need to be created (outside the map loop)
         const newTableBlocksToCreate: Array<Omit<CanvasTableBlock, 'createdAt' | 'updatedAt'>> = [];
@@ -293,16 +298,16 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         // Show table nodes
         const flowNodes = tablesData.map((table, index) => {
           // Check if we have a saved position for this table
-          const savedBlock = tableBlocksMap.get(table.id);
-          const position = savedBlock 
-            ? { x: savedBlock.position.x, y: savedBlock.position.y }
+          const savedPosition = tableBlocksMap.get(table.id);
+          const position = savedPosition 
+            ? { x: savedPosition.x, y: savedPosition.y }
             : { 
                 x: 100 + (index % 3) * 250, 
                 y: 100 + Math.floor(index / 3) * 150 
               };
           
           // Queue table block creation if it doesn't exist AND hasn't been initialized yet
-          if (!savedBlock && state.sourceId && !initializedTablesRef.current.has(table.id)) {
+          if (!savedPosition && state.sourceId && !initializedTablesRef.current.has(table.id)) {
             initializedTablesRef.current.add(table.id);
             newTableBlocksToCreate.push({
               id: `table-${table.id}`,
@@ -342,15 +347,17 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
           console.log('📦 Creating initial table blocks:', newTableBlocksToCreate.length);
           updateCanvas({ tableBlocks: newTableBlocksToCreate });
         }
-      } else {
+      } else if (tablesData.length === 0) {
         // Clear nodes when no table data
         setNodes([]);
+        nodesCreatedRef.current = false;
       }
     } else {
       // Clear the initialized tables when leaving table view
       initializedTablesRef.current.clear();
+      nodesCreatedRef.current = false;
     }
-  }, [tablesData, state.currentLevel, state.sourceKind, state.sourceId, setNodes, updateCanvas, handleContextMenu]);
+  }, [tablesData, state.currentLevel, state.sourceKind, state.sourceId, canvasData?.tableBlocks, setNodes, updateCanvas, handleContextMenu]);
 
   // Convert canvas relationships to ReactFlow edges
   useEffect(() => {

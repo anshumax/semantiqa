@@ -93,28 +93,12 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
         setPendingChanges(false);
         lastSaveRef.current = Date.now();
         console.log('✅ Canvas state saved successfully');
-        
-        // Update state.data with the saved values to keep it in sync
-        setState(prev => {
-          if (prev.status === 'saving' && prev.data) {
-            return {
-              status: 'ready',
-              data: {
-                ...prev.data,
-                blocks,
-                tableBlocks,
-                relationships,
-              }
-            };
-          }
-          return prev;
-        });
       } else {
         console.error('❌ Failed to save canvas state:', response);
-        setState(prev => prev.status === 'saving' ? { status: 'ready', data: prev.data } : prev);
       }
     } catch (error) {
       console.error('❌ Error saving canvas state:', error);
+    } finally {
       setState(prev => prev.status === 'saving' ? { status: 'ready', data: prev.data } : prev);
     }
   }, [inMemoryBlocks, inMemoryTableBlocks, inMemoryRelationships, canvasId, hasUnsavedChanges]);

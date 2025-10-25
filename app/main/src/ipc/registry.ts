@@ -44,6 +44,7 @@ const channelToSchema: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
     kind: z.string(), 
     connection: z.record(z.unknown()) 
   }),
+  'sources:get-details': z.object({ sourceId: z.string() }),
   'metadata:crawl': MetadataCrawlRequestSchema,
   'sources:test-connection': z.object({ sourceId: z.string() }),
   'sources:crawl-all': z.undefined(),
@@ -65,6 +66,7 @@ const channelToSchema: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
     sourceId: z.string() 
   }),
   'tables:list': z.object({ sourceId: z.string() }),
+  'tables:get-details': z.object({ sourceId: z.string(), tableId: z.string() }),
 };
 
 const okResponse = z.object({ ok: z.literal(true) });
@@ -77,6 +79,27 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
       exists: z.boolean(), 
       existingSourceId: z.string().optional(), 
       existingSourceName: z.string().optional() 
+    }),
+    SemantiqaErrorSchema
+  ]),
+  'sources:get-details': z.union([
+    z.object({
+      sourceId: z.string(),
+      name: z.string(),
+      kind: z.enum(['postgres', 'mysql', 'mongo', 'duckdb']),
+      databaseName: z.string().optional(),
+      connectionStatus: z.enum(['unknown', 'checking', 'connected', 'error']),
+      crawlStatus: z.enum(['not_crawled', 'crawling', 'crawled', 'error']),
+      lastConnectedAt: z.string().optional(),
+      lastCrawlAt: z.string().optional(),
+      lastError: z.string().optional(),
+      statistics: z.object({
+        tableCount: z.number(),
+        totalColumns: z.number(),
+        totalRows: z.number().optional(),
+        schemas: z.array(z.object({ name: z.string(), tableCount: z.number() })).optional(),
+        topTables: z.array(z.object({ name: z.string(), rowCount: z.number(), columnCount: z.number() })).optional(),
+      }),
     }),
     SemantiqaErrorSchema
   ]),
@@ -110,6 +133,31 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
         rowCount: z.number() 
       })) 
     }), 
+    SemantiqaErrorSchema
+  ]),
+  'tables:get-details': z.union([
+    z.object({
+      tableId: z.string(),
+      sourceId: z.string(),
+      name: z.string(),
+      type: z.string(),
+      schema: z.string().optional(),
+      rowCount: z.number(),
+      columnCount: z.number(),
+      description: z.string().optional(),
+      columns: z.array(z.object({
+        name: z.string(),
+        type: z.string(),
+        nullable: z.boolean(),
+        isPrimaryKey: z.boolean(),
+        isForeignKey: z.boolean(),
+        nullPercent: z.number().optional(),
+        distinctCount: z.number().optional(),
+        sampleValues: z.array(z.union([z.string(), z.number(), z.boolean()])).optional(),
+      })),
+      indexes: z.array(z.object({ name: z.string(), columns: z.array(z.string()), unique: z.boolean() })).optional(),
+      foreignKeys: z.array(z.object({ name: z.string(), column: z.string(), referencedTable: z.string(), referencedColumn: z.string() })).optional(),
+    }),
     SemantiqaErrorSchema
   ]),
 };

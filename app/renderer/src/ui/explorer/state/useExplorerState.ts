@@ -19,6 +19,7 @@ type CrawlStage = 'queued' | 'running' | 'completed' | 'failed';
 export type CrawlStatusEvent = {
   kind: 'crawl';
   sourceId: string;
+  sourceName: string;
   status: UiStatus;
   crawlStatus: ExplorerSnapshot['sources'][number]['status'];
   stage?: CrawlStage;
@@ -29,6 +30,7 @@ export type CrawlStatusEvent = {
 export type ConnectionStatusEvent = {
   kind: 'connection';
   sourceId: string;
+  sourceName: string;
   status: UiStatus;
   connectionStatus: ExplorerSnapshot['sources'][number]['connectionStatus'];
   error?: { message: string; meta?: Record<string, unknown> };

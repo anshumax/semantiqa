@@ -1,0 +1,59 @@
+.inspector-relationship-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.inspector-relationship-panel__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+}
+
+.inspector-relationship-id {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem !important;
+  word-break: break-all;
+}
+
+.inspector-relationship-panel__placeholder {
+  margin-top: var(--spacing-xl);
+  padding: var(--spacing-xl);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.inspector-relationship-panel__placeholder p {
+  margin: 0 0 var(--spacing-md) 0;
+  font-size: 0.9rem;
+}
+
+.inspector-relationship-panel__note {
+  font-size: 0.8rem !important;
+  color: var(--color-text-muted);
+  margin-top: var(--spacing-lg) !important;
+}
+
+.inspector-relationship-panel__features {
+  list-style: none;
+  padding: 0;
+  margin: var(--spacing-md) 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.inspector-relationship-panel__features li {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  padding-left: var(--spacing-md);
+  position: relative;
+}
+
+.inspector-relationship-panel__features li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: var(--color-text-muted);
+}
+

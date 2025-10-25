@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppStateProvider } from './state';
 import { StatusBadge, StatusBadgeLabel, StatusBadgeValue } from './components';
 import { NavigationShell } from './navigation';
+import { GlobalStatusBar } from './status/GlobalStatusBar';
 import './App.css';
 import './components/Modal.css';
 
@@ -85,6 +86,7 @@ function RootContent() {
         </div>
       </header>
       <NavigationShell />
+      <GlobalStatusBar />
     </div>
   );
 }

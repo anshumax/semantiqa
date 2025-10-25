@@ -1,31 +1,27 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import './DataSourceContextMenu.css';
+import './TableContextMenu.css';
 
-export interface DataSourceContextMenuProps {
+export interface TableContextMenuProps {
   x: number;
   y: number;
   visible: boolean;
+  tableId: string;
   sourceId: string;
-  blockId: string;
   onClose: () => void;
   onViewDetails?: () => void;
-  onRetryCrawl?: () => void;
-  onDelete?: (blockId: string, sourceId: string) => void;
-  canRetryCrawl?: boolean;
+  onDelete?: (tableId: string) => void;
 }
 
-export function DataSourceContextMenu({
+export function TableContextMenu({
   x,
   y,
   visible,
+  tableId,
   sourceId,
-  blockId,
   onClose,
   onViewDetails,
-  onRetryCrawl,
   onDelete,
-  canRetryCrawl = false,
-}: DataSourceContextMenuProps) {
+}: TableContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const handleViewDetails = useCallback(() => {
@@ -35,19 +31,12 @@ export function DataSourceContextMenu({
     onClose();
   }, [onViewDetails, onClose]);
 
-  const handleRetryCrawl = useCallback(() => {
-    if (onRetryCrawl) {
-      onRetryCrawl();
-    }
-    onClose();
-  }, [onRetryCrawl, onClose]);
-
   const handleDelete = useCallback(() => {
     if (onDelete) {
-      onDelete(blockId, sourceId);
+      onDelete(tableId);
     }
     onClose();
-  }, [onDelete, blockId, sourceId, onClose]);
+  }, [onDelete, tableId, onClose]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -79,7 +68,7 @@ export function DataSourceContextMenu({
   return (
     <div
       ref={menuRef}
-      className="data-source-context-menu"
+      className="table-context-menu"
       style={{
         position: 'fixed',
         left: x,
@@ -89,26 +78,21 @@ export function DataSourceContextMenu({
     >
       {onViewDetails && (
         <div
-          className="data-source-context-menu__item"
+          className="table-context-menu__item"
           onClick={handleViewDetails}
         >
           📋 View details
         </div>
       )}
-      {canRetryCrawl && (
+      {onDelete && (
         <div
-          className="data-source-context-menu__item"
-          onClick={handleRetryCrawl}
+          className="table-context-menu__item table-context-menu__item--delete"
+          onClick={handleDelete}
         >
-          🔄 Retry crawl
+          🗑️ Delete block
         </div>
       )}
-      <div
-        className="data-source-context-menu__item data-source-context-menu__item--delete"
-        onClick={handleDelete}
-      >
-        🗑️ Delete block
-      </div>
     </div>
   );
 }
+

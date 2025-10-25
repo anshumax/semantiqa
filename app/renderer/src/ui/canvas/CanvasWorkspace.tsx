@@ -26,8 +26,10 @@ import { useCanvasPersistence } from './useCanvasPersistence';
 import { createDefaultTransition, TableInfo } from './navigationTypes';
 import type { CanvasTableBlock } from '@semantiqa/contracts';
 import { DataSourceContextMenu } from './DataSourceContextMenu';
+import { TableContextMenu } from './TableContextMenu';
 import { RelationshipContextMenu } from './RelationshipContextMenu';
 import { CanvasLoadingScreen } from './CanvasLoadingScreen';
+import { CanvasInspector, type InspectorSelection } from './inspector/CanvasInspector';
 import './CanvasWorkspace.css';
 
 // Custom node types for ReactFlow
@@ -130,6 +132,24 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     y: 0,
     relationshipId: '',
   });
+
+  // Table context menu state
+  const [tableContextMenu, setTableContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    tableId: string;
+    sourceId: string;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    tableId: '',
+    sourceId: '',
+  });
+  
+  // Inspector selection state
+  const [inspectorSelection, setInspectorSelection] = useState<InspectorSelection | null>(null);
   
   // Connection modal state
   const [connectionModal, setConnectionModal] = useState<{
@@ -166,12 +186,34 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       blockId: nodeId,
     });
     
-    // Close relationship context menu if open
+    // Close other menus
+    setTableContextMenu(prev => ({ ...prev, visible: false }));
+    setRelationshipContextMenu(prev => ({ ...prev, visible: false }));
+  }, []);
+
+  const handleTableContextMenu = useCallback((event: React.MouseEvent, tableId: string, sourceId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    setTableContextMenu({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+      tableId: tableId,
+      sourceId: sourceId,
+    });
+    
+    // Close other menus
+    setContextMenu(prev => ({ ...prev, visible: false }));
     setRelationshipContextMenu(prev => ({ ...prev, visible: false }));
   }, []);
 
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu(prev => ({ ...prev, visible: false }));
+  }, []);
+
+  const handleCloseTableContextMenu = useCallback(() => {
+    setTableContextMenu(prev => ({ ...prev, visible: false }));
   }, []);
 
   const handleContextMenuRetry = useCallback(() => {
@@ -180,6 +222,14 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     }
     handleCloseContextMenu();
   }, [contextMenu.sourceId, handleRetryCrawl, handleCloseContextMenu]);
+
+  const handleDeleteTableBlock = useCallback((tableId: string) => {
+    console.log('Deleting table block:', tableId);
+    // Table blocks are identified with the table- prefix
+    const blockId = `table-${tableId}`;
+    deleteBlock(blockId, tableContextMenu.sourceId);
+    refreshCanvas();
+  }, [deleteBlock, refreshCanvas, tableContextMenu.sourceId]);
 
   // Handle edge context menu (right-click)
   const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
@@ -216,12 +266,40 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     setRelationshipContextMenu(prev => ({ ...prev, visible: false }));
   }, []);
 
-  // Handle canvas clicks to close context menus
+  // Handle canvas clicks to close context menus and inspector
   const onPaneClick = useCallback(() => {
     setContextMenu(prev => ({ ...prev, visible: false }));
+    setTableContextMenu(prev => ({ ...prev, visible: false }));
     setRelationshipContextMenu(prev => ({ ...prev, visible: false }));
+    setInspectorSelection(null);
   }, []);
 
+  // Handle "View Details" from data source context menu
+  const handleViewSourceDetails = useCallback(() => {
+    if (contextMenu.sourceId) {
+      setInspectorSelection({
+        type: 'data-source',
+        id: contextMenu.sourceId,
+      });
+    }
+  }, [contextMenu.sourceId]);
+
+  // Handle "View Details" from table context menu
+  const handleViewTableDetails = useCallback(() => {
+    if (tableContextMenu.tableId && tableContextMenu.sourceId) {
+      setInspectorSelection({
+        type: 'table',
+        id: tableContextMenu.tableId,
+        sourceId: tableContextMenu.sourceId,
+      });
+    }
+  }, [tableContextMenu.tableId, tableContextMenu.sourceId]);
+
+
+  // Close inspector when navigation level changes
+  useEffect(() => {
+    setInspectorSelection(null);
+  }, [state.currentLevel]);
 
   // Load tables data when in tables view
   useEffect(() => {
@@ -335,7 +413,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
               connectionStatus: 'connected' as const,
               crawlStatus: 'crawled' as const,
               tableCount: table.rowCount,
-              onContextMenu: (event: React.MouseEvent) => handleContextMenu(event, `table-${table.id}`, table.sourceId),
+              onContextMenu: (event: React.MouseEvent) => handleTableContextMenu(event, table.id, table.sourceId),
             },
           };
         });
@@ -357,7 +435,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       initializedTablesRef.current.clear();
       nodesCreatedRef.current = false;
     }
-  }, [tablesData, state.currentLevel, state.sourceKind, state.sourceId, canvasData?.tableBlocks, setNodes, updateCanvas, handleContextMenu]);
+  }, [tablesData, state.currentLevel, state.sourceKind, state.sourceId, canvasData?.tableBlocks, setNodes, updateCanvas, handleTableContextMenu]);
 
   // Convert canvas relationships to ReactFlow edges
   useEffect(() => {
@@ -781,6 +859,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         sourceId={contextMenu.sourceId}
         blockId={contextMenu.blockId}
         onClose={handleCloseContextMenu}
+        onViewDetails={handleViewSourceDetails}
         onRetryCrawl={handleContextMenuRetry}
         onDelete={handleDeleteBlock}
         canRetryCrawl={contextMenu.sourceId ? 
@@ -788,6 +867,18 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
           canvasData?.blocks?.find(b => b.sourceId === contextMenu.sourceId)?.source?.connectionStatus === 'error'
           : false
         }
+      />
+
+      {/* Table Context Menu */}
+      <TableContextMenu
+        x={tableContextMenu.x}
+        y={tableContextMenu.y}
+        visible={tableContextMenu.visible}
+        tableId={tableContextMenu.tableId}
+        sourceId={tableContextMenu.sourceId}
+        onClose={handleCloseTableContextMenu}
+        onViewDetails={handleViewTableDetails}
+        onDelete={handleDeleteTableBlock}
       />
 
       {/* Relationship Context Menu */}
@@ -798,6 +889,12 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         relationshipId={relationshipContextMenu.relationshipId}
         onClose={handleCloseRelationshipContextMenu}
         onDelete={handleDeleteRelationship}
+      />
+
+      {/* Canvas Inspector */}
+      <CanvasInspector
+        selection={inspectorSelection}
+        onClose={() => setInspectorSelection(null)}
       />
     </div>
   );

@@ -1,0 +1,30 @@
+.inspector-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3xl);
+  text-align: center;
+  height: 100%;
+  color: var(--color-text-muted);
+}
+
+.inspector-empty-state__icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-lg);
+  opacity: 0.5;
+}
+
+.inspector-empty-state__title {
+  margin: 0 0 var(--spacing-sm) 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.inspector-empty-state__message {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+

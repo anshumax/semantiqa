@@ -12,6 +12,8 @@ import { CrawlQueue } from './application/CrawlQueue';
 import { ModelManagerService } from './services/ModelManagerService';
 import { CanvasService } from './services/CanvasService';
 import { TablesService } from './services/TablesService';
+import { SourceDetailsService } from './services/SourceDetailsService';
+import { TableDetailsService } from './services/TableDetailsService';
 import { logIpcEvent } from './logging/audit';
 import { SourceService, SnapshotRepository } from '@semantiqa/graph-service';
 import { DatabaseService } from '@semantiqa/storage-sqlite';
@@ -248,9 +250,14 @@ app.whenReady().then(async () => {
     sourceId: string,
     payload: SourceStatusPayload,
   ) => {
+    // Fetch source name from database
+    const db = graphDbFactory();
+    const source = db.prepare('SELECT name FROM sources WHERE id = ?').get(sourceId) as { name: string } | undefined;
+    
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send('sources:status', {
         sourceId,
+        sourceName: source?.name || sourceId, // Fallback to ID if name unavailable
         ...payload,
       });
     }
@@ -379,6 +386,16 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     openSourcesDb: graphDbFactory,
   });
 
+  // Source details service
+  const sourceDetailsService = new SourceDetailsService({
+    openSourcesDb: graphDbFactory,
+  });
+
+  // Table details service
+  const tableDetailsService = new TableDetailsService({
+    openSourcesDb: graphDbFactory,
+  });
+
   // Database will be created by schema initialization if it doesn't exist
   // Canvas loading is handled by CanvasService.getCanvas() which reads existing data
   const databasePath = path.join(app.getPath('userData'), 'graph.db');
@@ -427,7 +444,9 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     [IPC_CHANNELS.CANVAS_UPDATE]: (request) => canvasService.updateCanvas(request),
     [IPC_CHANNELS.CANVAS_SAVE]: (request) => canvasService.saveCanvas(request),
     [IPC_CHANNELS.CANVAS_DELETE_BLOCK]: (request) => canvasService.deleteBlock(request),
-    [IPC_CHANNELS.TABLES_LIST]: (request: { sourceId: string }) => tablesService.listTables(request.sourceId),
+    [IPC_CHANNELS.TABLES_LIST]: async (request: { sourceId: string }) => tablesService.listTables(request.sourceId),
+    [IPC_CHANNELS.SOURCES_GET_DETAILS]: async (request: { sourceId: string }) => sourceDetailsService.getSourceDetails(request.sourceId),
+    [IPC_CHANNELS.TABLES_GET_DETAILS]: async (request: { sourceId: string; tableId: string }) => tableDetailsService.getTableDetails(request.sourceId, request.tableId),
   };
 
   registerIpcHandlers(handlerMap);

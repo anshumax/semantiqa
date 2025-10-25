@@ -1,4 +1,5 @@
 import type { IpcChannel, IpcRequest, IpcResponse } from '@semantiqa/app-config';
+import { SAFE_RENDERER_CHANNEL_VALUES } from '@semantiqa/app-config';
 
 interface CustomEventInit<T = unknown> {
   detail?: T;
@@ -14,30 +15,8 @@ declare const window: {
 
 const { contextBridge, ipcRenderer } = require('electron') as typeof import('electron');
 
-const allowedChannels: readonly string[] = [
-  'health:ping',
-  'sources:add',
-  'sources:check-duplicate',
-  'metadata:crawl',
-  'sources:test-connection',
-  'sources:crawl-all',
-  'sources:retry-crawl',
-  'search:semantic',
-  'query:run-read-only',
-  'models:list',
-  'models:download',
-  'models:enable',
-  'nlsql:generate',
-  'audit:list',
-  'graph:get',
-  'canvas:get',
-  'canvas:update',
-  'canvas:save',
-  'canvas:deleteBlock',
-  'tables:list',
-  'app:before-quit',
-  'app:save-complete',
-];
+// Use auto-synced whitelist from config - single source of truth
+const allowedChannels: readonly string[] = SAFE_RENDERER_CHANNEL_VALUES;
 
 function assertChannel(channel: string): string {
   if (!allowedChannels.includes(channel)) {

@@ -8,6 +8,7 @@ type NavigationScreen = 'search-ask' | 'sources' | 'reports-dashboards';
 
 export function NavigationShell() {
   const [activeScreen, setActiveScreen] = useState<NavigationScreen>('sources');
+  const [isNavCollapsed, setIsNavCollapsed] = useState(false);
 
   const handleNavigate = useCallback((screen: NavigationScreen) => {
     setActiveScreen(screen);
@@ -20,9 +21,26 @@ export function NavigationShell() {
     }
   }, [handleNavigate]);
 
+  const toggleNavCollapse = useCallback(() => {
+    setIsNavCollapsed(prev => !prev);
+  }, []);
+
   return (
     <div className="navigation-shell">
-      <nav className="navigation-shell__nav" role="navigation" aria-label="Main navigation">
+      <nav 
+        className={`navigation-shell__nav ${isNavCollapsed ? 'navigation-shell__nav--collapsed' : ''}`} 
+        role="navigation" 
+        aria-label="Main navigation"
+      >
+        <button
+          type="button"
+          className="navigation-shell__collapse-toggle"
+          onClick={toggleNavCollapse}
+          aria-label={isNavCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          title={isNavCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+        >
+          {isNavCollapsed ? '→' : '←'}
+        </button>
         <ul className="nav-list">
           <li>
             <button

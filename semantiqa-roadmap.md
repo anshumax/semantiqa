@@ -358,8 +358,8 @@
 
 ### T-04-13: Inspector UI (canvas integration) ⬜
 - **Status:** Not Started
-- **Desc:** Inspector panel that appears when blocks or relationships are selected on canvas. Shows metadata, connection details, table stats, and relationship information. Slide-out panel design.
-- **DoD:** Right-click or select block opens inspector; shows source metadata, connection status, table count, last crawl time; relationship selection shows join details; panel slides in/out smoothly; can edit relationship mappings.
+- **Desc:** Inspector panel that appears when blocks or relationships are selected on canvas. Shows metadata, connection details, table stats, and relationship information. Slide-out panel design with distinct inspectors for data sources and tables.
+- **DoD:** Click block opens inspector; shows source metadata, connection status, table count, last crawl time; table selection shows column details; relationship selection shows join details; panel slides in/out smoothly; lazy loads detailed statistics.
 - **Deps:** T-04-04, T-01-01, T-01-02
 - **Risks:** Panel layout complexity → keep information hierarchy clear; performance → lazy load detailed stats.
 

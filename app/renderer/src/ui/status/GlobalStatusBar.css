@@ -1,0 +1,62 @@
+.global-status-bar {
+  height: 32px;
+  padding: 0 var(--spacing-2xl);
+  display: flex;
+  align-items: center;
+  
+  border-top: 1px solid rgba(170, 176, 190, 0.12);
+  background: linear-gradient(
+    180deg, 
+    rgba(12, 13, 18, 0.95) 0%, 
+    rgba(10, 11, 15, 0.98) 100%
+  );
+  backdrop-filter: blur(20px);
+  
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+  transition: background 0.3s ease;
+}
+
+.global-status-bar--active {
+  background: linear-gradient(
+    90deg, 
+    rgba(14, 165, 233, 0.08) 0%, 
+    rgba(14, 165, 233, 0.02) 50%, 
+    rgba(14, 165, 233, 0.08) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+.global-status-bar--active:hover {
+  background: linear-gradient(
+    90deg, 
+    rgba(14, 165, 233, 0.12) 0%, 
+    rgba(14, 165, 233, 0.04) 50%, 
+    rgba(14, 165, 233, 0.12) 100%
+  );
+  background-size: 200% 100%;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.global-status-bar__content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.global-status-bar__content strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.global-status-bar__idle {
+  color: var(--color-success);
+  font-weight: 500;
+}
+

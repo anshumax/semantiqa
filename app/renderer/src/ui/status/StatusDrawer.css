@@ -1,0 +1,111 @@
+.status-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.status-drawer {
+  background: rgba(18, 20, 28, 0.98);
+  border: 1px solid rgba(170, 176, 190, 0.16);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  width: 500px;
+  max-height: 300px;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.status-drawer header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid rgba(170, 176, 190, 0.12);
+}
+
+.status-drawer h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.status-drawer__close {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.status-drawer__close:hover {
+  background: rgba(170, 176, 190, 0.08);
+  color: var(--color-text);
+}
+
+.status-drawer__content {
+  padding: var(--spacing-lg);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.status-drawer__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.status-drawer__list li {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(170, 176, 190, 0.04);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(170, 176, 190, 0.08);
+}
+
+.status-drawer__spinner {
+  color: var(--color-primary);
+  font-size: 1rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.status-drawer__name {
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.status-drawer__empty {
+  text-align: center;
+  padding: var(--spacing-xl) var(--spacing-lg);
+  color: var(--color-success);
+  font-size: 0.9rem;
+}
+

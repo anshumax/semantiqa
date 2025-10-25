@@ -1,6 +1,7 @@
 import type { PostgresAdapter } from '../postgresAdapter';
 
 import { z } from 'zod';
+import { CrawlWarning, AvailableFeatures, EnhancedCrawlResult } from './types';
 
 const TableRowSchema = z.object({
   table_schema: z.string(),
@@ -55,6 +56,17 @@ WHERE relkind IN ('r', 'v')
 ORDER BY table_schema, table_name;
 `;
 
+const TABLE_QUERY_FALLBACK = `
+SELECT
+  table_schema,
+  table_name,
+  table_type,
+  NULL AS table_comment
+FROM information_schema.tables
+WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+ORDER BY table_schema, table_name;
+`;
+
 const COLUMN_QUERY = `
 SELECT
   table_schema,
@@ -72,10 +84,36 @@ WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
 ORDER BY table_schema, table_name, ordinal_position;
 `;
 
-export async function crawlSchema(postgresAdapter: PostgresAdapter): Promise<SchemaSnapshot> {
+export async function crawlSchema(postgresAdapter: PostgresAdapter): Promise<EnhancedCrawlResult<SchemaSnapshot>> {
+  const warnings: CrawlWarning[] = [];
+  const features: AvailableFeatures = {
+    hasRowCounts: false,
+    hasStatistics: false,
+    hasComments: false,
+    hasPermissionErrors: false,
+  };
+
   const client = await postgresAdapter.getPool().connect();
   try {
-    const tablesResult = await client.query(TABLE_QUERY);
+    let tablesResult;
+    
+    // Try primary strategy with pg_class
+    try {
+      tablesResult = await client.query(TABLE_QUERY);
+      features.hasComments = true;
+    } catch (error) {
+      warnings.push({
+        level: 'warning',
+        feature: 'pg_catalog',
+        message: 'Cannot access pg_catalog. Table comments unavailable.',
+        suggestion: 'Grant SELECT on pg_catalog for table descriptions.'
+      });
+      features.hasPermissionErrors = true;
+      
+      // Fallback to information_schema
+      tablesResult = await client.query(TABLE_QUERY_FALLBACK);
+    }
+
     const columnsResult = await client.query(COLUMN_QUERY);
 
     const tables = tablesResult.rows.map((row) => TableRowSchema.parse(row));
@@ -111,7 +149,9 @@ export async function crawlSchema(postgresAdapter: PostgresAdapter): Promise<Sch
     }
 
     return {
-      tables: Array.from(tableMap.values()),
+      data: { tables: Array.from(tableMap.values()) },
+      warnings,
+      availableFeatures: features,
     };
   } finally {
     client.release();

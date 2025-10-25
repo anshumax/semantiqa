@@ -1,4 +1,5 @@
 import type { PostgresAdapter } from '../postgresAdapter';
+import { CrawlWarning, AvailableFeatures, EnhancedCrawlResult } from './types';
 
 export interface ColumnProfile {
   column: string;
@@ -29,9 +30,12 @@ WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
 ORDER BY table_schema, table_name, column_name;
 `;
 
-export async function profileTables(postgresAdapter: PostgresAdapter): Promise<TableProfile[]> {
+export async function profileTables(postgresAdapter: PostgresAdapter): Promise<EnhancedCrawlResult<TableProfile[]>> {
+  const warnings: CrawlWarning[] = [];
+  let profiles: TableProfile[] = [];
+  
   const client = await postgresAdapter.getPool().connect();
-
+  
   try {
     const result = await client.query(PROFILE_QUERY);
     const tables = new Map<string, TableProfile>();
@@ -55,9 +59,27 @@ export async function profileTables(postgresAdapter: PostgresAdapter): Promise<T
       });
     }
 
-    return Array.from(tables.values());
+    profiles = Array.from(tables.values());
+  } catch (error) {
+    warnings.push({
+      level: 'warning',
+      feature: 'pg_stats',
+      message: 'Cannot access pg_stats view. Column statistics unavailable.',
+      suggestion: 'Grant SELECT on pg_stats or run ANALYZE on tables.'
+    });
   } finally {
     client.release();
   }
+  
+  return {
+    data: profiles,
+    warnings,
+    availableFeatures: {
+      hasRowCounts: false,
+      hasStatistics: profiles.length > 0,
+      hasComments: false,
+      hasPermissionErrors: warnings.length > 0,
+    },
+  };
 }
 

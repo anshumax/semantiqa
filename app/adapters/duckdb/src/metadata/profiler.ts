@@ -1,4 +1,10 @@
 import type { DuckDbAdapter } from '../duckdbAdapter';
+import { CrawlWarning, AvailableFeatures, EnhancedCrawlResult } from './types';
+
+// Add identifier escaping function
+function escapeIdentifier(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
 
 export interface DuckDbColumnProfile {
   column: string;
@@ -23,7 +29,9 @@ const DEFAULT_SAMPLE_SIZE = 1_000;
 export async function profileDuckDbTables(
   adapter: DuckDbAdapter,
   options: DuckDbProfilerOptions = {},
-): Promise<DuckDbTableProfile[]> {
+): Promise<EnhancedCrawlResult<DuckDbTableProfile[]>> {
+  const warnings: CrawlWarning[] = [];
+  const profiles: DuckDbTableProfile[] = [];
   const sampleSize = options.sampleSize ?? DEFAULT_SAMPLE_SIZE;
 
   const tables = await adapter.query<{ table_name: string }>(
@@ -32,8 +40,6 @@ export async function profileDuckDbTables(
      WHERE table_schema = 'main'
      ORDER BY table_name`,
   );
-
-  const profiles: DuckDbTableProfile[] = [];
 
   for (const table of tables) {
     const columns = await adapter.query<{ column_name: string }>(
@@ -47,37 +53,59 @@ export async function profileDuckDbTables(
     const columnProfiles: DuckDbColumnProfile[] = [];
 
     for (const column of columns) {
-      const stats = await adapter.query<{
-        sampled_rows: number;
-        null_count: number;
-        distinct_count: number;
-        min_value: number | string | null;
-        max_value: number | string | null;
-      }>(
-        `SELECT
-           COUNT(*) AS sampled_rows,
-           SUM(CASE WHEN ${column.column_name} IS NULL THEN 1 ELSE 0 END) AS null_count,
-           COUNT(DISTINCT ${column.column_name}) AS distinct_count,
-           MIN(${column.column_name}) AS min_value,
-           MAX(${column.column_name}) AS max_value
-         FROM (SELECT ${column.column_name} FROM ${table.table_name} LIMIT ${sampleSize})`,
-      );
+      try {
+        // FIX: Properly escape identifiers
+        const escapedColumn = escapeIdentifier(column.column_name);
+        const escapedTable = escapeIdentifier(table.table_name);
+        
+        const stats = await adapter.query<{
+          sampled_rows: number;
+          null_count: number;
+          distinct_count: number;
+          min_value: number | string | null;
+          max_value: number | string | null;
+        }>(
+          `SELECT
+             COUNT(*) AS sampled_rows,
+             SUM(CASE WHEN ${escapedColumn} IS NULL THEN 1 ELSE 0 END) AS null_count,
+             COUNT(DISTINCT ${escapedColumn}) AS distinct_count,
+             MIN(${escapedColumn}) AS min_value,
+             MAX(${escapedColumn}) AS max_value
+           FROM (SELECT ${escapedColumn} FROM ${escapedTable} LIMIT ?)`,
+          [sampleSize]
+        );
 
-      const { sampled_rows, null_count, distinct_count, min_value, max_value } = stats[0] ?? {
-        sampled_rows: 0,
-        null_count: 0,
-        distinct_count: 0,
-        min_value: null,
-        max_value: null,
-      };
+        const { sampled_rows, null_count, distinct_count, min_value, max_value } = stats[0] ?? {
+          sampled_rows: 0,
+          null_count: 0,
+          distinct_count: 0,
+          min_value: null,
+          max_value: null,
+        };
 
-      columnProfiles.push({
-        column: column.column_name,
-        nullFraction: sampled_rows > 0 ? null_count / sampled_rows : null,
-        distinctCount: sampled_rows > 0 ? distinct_count : null,
-        min: min_value,
-        max: max_value,
-      });
+        columnProfiles.push({
+          column: column.column_name,
+          nullFraction: sampled_rows > 0 ? null_count / sampled_rows : null,
+          distinctCount: sampled_rows > 0 ? distinct_count : null,
+          min: min_value,
+          max: max_value,
+        });
+      } catch (error) {
+        warnings.push({
+          level: 'warning',
+          feature: 'column_profiling',
+          message: `Cannot profile ${table.table_name}.${column.column_name}: ${(error as Error).message}`,
+          suggestion: 'Check column data type compatibility.'
+        });
+        
+        columnProfiles.push({
+          column: column.column_name,
+          nullFraction: null,
+          distinctCount: null,
+          min: null,
+          max: null,
+        });
+      }
     }
 
     profiles.push({
@@ -87,7 +115,16 @@ export async function profileDuckDbTables(
     });
   }
 
-  return profiles;
+  return {
+    data: profiles,
+    warnings,
+    availableFeatures: {
+      hasRowCounts: false,
+      hasStatistics: warnings.length === 0,
+      hasComments: false,
+      hasPermissionErrors: warnings.length > 0,
+    },
+  };
 }
 
 

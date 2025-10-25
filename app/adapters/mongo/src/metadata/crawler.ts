@@ -1,4 +1,5 @@
 import type { MongoAdapter } from '../mongoAdapter';
+import { CrawlWarning, AvailableFeatures, EnhancedCrawlResult } from './types';
 
 export interface MongoSchemaField {
   path: string;
@@ -83,38 +84,61 @@ function processDocument(accumulators: Map<string, FieldAccumulator>, document: 
 export async function crawlMongoSchema(
   adapter: MongoAdapter,
   options: MongoCrawlerOptions = {},
-): Promise<MongoSchemaSnapshot> {
+): Promise<EnhancedCrawlResult<MongoSchemaSnapshot>> {
+  const warnings: CrawlWarning[] = [];
   const sampleSize = options.sampleSize ?? DEFAULT_SAMPLE_SIZE;
   const collections = await adapter.listCollections();
   const results: MongoCollectionSchema[] = [];
 
   for (const collectionName of collections) {
-    const documents = await adapter.aggregate<Record<string, JsonValue>>(collectionName, [
-      { $sample: { size: sampleSize } },
-    ]);
+    try {
+      const documents = await adapter.aggregate<Record<string, JsonValue>>(collectionName, [
+        { $sample: { size: sampleSize } },
+      ]);
 
-    const accumulators = new Map<string, FieldAccumulator>();
-    for (const document of documents) {
-      processDocument(accumulators, document);
+      const accumulators = new Map<string, FieldAccumulator>();
+      for (const document of documents) {
+        processDocument(accumulators, document);
+      }
+
+      const fields: MongoSchemaField[] = Array.from(accumulators.entries()).map(([path, data]) => ({
+        path,
+        types: Array.from(data.types).sort(),
+        nullable: data.nullable || data.observed < documents.length,
+      }));
+
+      fields.sort((a, b) => a.path.localeCompare(b.path));
+
+      results.push({
+        name: collectionName,
+        documentSampleSize: documents.length,
+        fields,
+      });
+    } catch (error) {
+      warnings.push({
+        level: 'warning',
+        feature: 'collection_sampling',
+        message: `Cannot sample collection ${collectionName}: ${(error as Error).message}`,
+        suggestion: 'Grant read permissions on this collection.'
+      });
+      
+      results.push({
+        name: collectionName,
+        documentSampleSize: 0,
+        fields: [],
+      });
     }
-
-    const fields: MongoSchemaField[] = Array.from(accumulators.entries()).map(([path, data]) => ({
-      path,
-      types: Array.from(data.types).sort(),
-      nullable: data.nullable || data.observed < documents.length,
-    }));
-
-    fields.sort((a, b) => a.path.localeCompare(b.path));
-
-    results.push({
-      name: collectionName,
-      documentSampleSize: documents.length,
-      fields,
-    });
   }
 
   return {
-    collections: results,
+    data: { collections: results },
+    warnings,
+    availableFeatures: {
+      hasRowCounts: false,
+      hasStatistics: warnings.length === 0,
+      hasComments: false,
+      hasPermissionErrors: warnings.length > 0,
+    },
   };
 }
 

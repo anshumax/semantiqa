@@ -1,5 +1,6 @@
 
 import { MysqlAdapter } from '../mysqlAdapter';
+import { CrawlWarning, AvailableFeatures, EnhancedCrawlResult } from './types';
 
 export interface ColumnProfile {
   column: string;
@@ -41,7 +42,8 @@ function escapeIdentifier(value: string): string {
 export async function profileTables(
   mysqlAdapter: MysqlAdapter,
   options: MysqlProfileOptions = {},
-): Promise<TableProfile[]> {
+): Promise<EnhancedCrawlResult<TableProfile[]>> {
+  const warnings: CrawlWarning[] = [];
   const sampleSize = options.sampleSize ?? DEFAULT_SAMPLE_SIZE;
   const connection = await mysqlAdapter.getPool().getConnection();
 
@@ -91,28 +93,54 @@ export async function profileTables(
         ) AS sample
       `;
 
-      const [statsRows] = await connection.query(sampleQuery);
-      const stats = (statsRows as Array<Record<string, unknown>>)[0] ?? {};
+      try {
+        const [statsRows] = await connection.query(sampleQuery);
+        const stats = (statsRows as Array<Record<string, unknown>>)[0] ?? {};
 
-      const sampledRows = Number(stats.total_rows ?? 0);
-      table.sampledRows = Math.max(table.sampledRows, sampledRows);
+        const sampledRows = Number(stats.total_rows ?? 0);
+        table.sampledRows = Math.max(table.sampledRows, sampledRows);
 
-      table.columns.push({
-        column,
-        nullFraction:
-          sampledRows > 0 && stats.null_count != null
-            ? Number(stats.null_count) / sampledRows
-            : null,
-        distinctFraction:
-          sampledRows > 0 && stats.distinct_count != null
-            ? Number(stats.distinct_count) / sampledRows
-            : null,
-        min: stats.min_value as string | number | null,
-        max: stats.max_value as string | number | null,
-      });
+        table.columns.push({
+          column,
+          nullFraction:
+            sampledRows > 0 && stats.null_count != null
+              ? Number(stats.null_count) / sampledRows
+              : null,
+          distinctFraction:
+            sampledRows > 0 && stats.distinct_count != null
+              ? Number(stats.distinct_count) / sampledRows
+              : null,
+          min: stats.min_value as string | number | null,
+          max: stats.max_value as string | number | null,
+        });
+      } catch (error) {
+        warnings.push({
+          level: 'warning',
+          feature: 'column_profiling',
+          message: `Cannot profile ${schema}.${name}.${column}: ${(error as Error).message}`,
+          suggestion: 'Grant SELECT permission on this table.'
+        });
+        
+        table.columns.push({
+          column,
+          nullFraction: null,
+          distinctFraction: null,
+          min: null,
+          max: null,
+        });
+      }
     }
 
-    return Array.from(tables.values());
+    return {
+      data: Array.from(tables.values()),
+      warnings,
+      availableFeatures: {
+        hasRowCounts: false,
+        hasStatistics: warnings.length === 0,
+        hasComments: true,
+        hasPermissionErrors: warnings.length > 0,
+      },
+    };
   } finally {
     connection.release();
   }

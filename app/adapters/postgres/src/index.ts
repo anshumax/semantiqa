@@ -5,5 +5,7 @@ export type {
   SchemaColumn as PostgresSchemaColumn,
 } from './metadata/crawler';
 export { profileTables } from './metadata/profiler';
+export { getRowCounts } from './metadata/rowCounts';
+export type { CrawlWarning, AvailableFeatures, EnhancedCrawlResult } from './metadata/types';
 export * from './postgresAdapter';
 

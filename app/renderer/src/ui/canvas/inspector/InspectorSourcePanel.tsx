@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { InspectorHeader } from './InspectorHeader';
+import { Tooltip } from '../../components/Tooltip';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
 import './InspectorSourcePanel.css';
 
@@ -235,12 +236,21 @@ export function InspectorSourcePanel({ sourceId, onClose }: InspectorSourcePanel
               <dt>Columns</dt>
               <dd className="inspector-section__value--large">{formatNumber(details.statistics.totalColumns)}</dd>
             </div>
-            {details.statistics.totalRows !== undefined && (
-              <div className="inspector-section__row">
-                <dt>Total Rows</dt>
-                <dd className="inspector-section__value--large">{formatNumber(details.statistics.totalRows)}</dd>
-              </div>
-            )}
+            <div className="inspector-section__row">
+              <dt>Total Rows</dt>
+              <dd className="inspector-section__value--large">
+                {details.statistics.totalRows !== null && details.statistics.totalRows !== undefined ? (
+                  formatNumber(details.statistics.totalRows)
+                ) : (
+                  <Tooltip content="Row count unavailable. Database user may need elevated permissions to access statistics tables (pg_stat_user_tables, information_schema.TABLES, etc).">
+                    <span className="unavailable-stat">
+                      <span>Unknown</span>
+                      <span className="info-icon">ⓘ</span>
+                    </span>
+                  </Tooltip>
+                )}
+              </dd>
+            </div>
           </dl>
 
           {/* Schemas breakdown */}

@@ -1,4 +1,5 @@
 import type { MongoAdapter } from '../mongoAdapter';
+import { CrawlWarning, AvailableFeatures, EnhancedCrawlResult } from './types';
 
 export interface MongoFieldProfile {
   path: string;
@@ -22,51 +23,76 @@ const DEFAULT_SAMPLE_SIZE = 500;
 export async function profileMongoCollections(
   adapter: MongoAdapter,
   options: MongoProfileOptions = {},
-): Promise<MongoCollectionProfile[]> {
+): Promise<EnhancedCrawlResult<MongoCollectionProfile[]>> {
+  const warnings: CrawlWarning[] = [];
   const sampleSize = options.sampleSize ?? DEFAULT_SAMPLE_SIZE;
   const collections = await adapter.listCollections();
   const profiles: MongoCollectionProfile[] = [];
 
   for (const collectionName of collections) {
-    const pipeline = [
-      { $sample: { size: sampleSize } },
-      {
-        $project: {
-          _id: 0,
-          document: '$$ROOT',
+    try {
+      const pipeline = [
+        { $sample: { size: sampleSize } },
+        {
+          $project: {
+            _id: 0,
+            document: '$$ROOT',
+          },
         },
-      },
-    ];
+      ];
 
-    const documents = await adapter.aggregate<{ document: Record<string, unknown> }>(
-      collectionName,
-      pipeline,
-    );
+      const documents = await adapter.aggregate<{ document: Record<string, unknown> }>(
+        collectionName,
+        pipeline,
+      );
 
-    const fieldStats = new Map<string, { nulls: number; distinct: Set<string>; count: number }>();
+      const fieldStats = new Map<string, { nulls: number; distinct: Set<string>; count: number }>();
 
-    for (const { document } of documents) {
-      collectStats(fieldStats, document);
+      for (const { document } of documents) {
+        collectStats(fieldStats, document);
+      }
+
+      const sampledDocuments = documents.length;
+      const fields: MongoFieldProfile[] = Array.from(fieldStats.entries()).map(([path, stats]) => ({
+        path,
+        nullFraction: sampledDocuments > 0 ? stats.nulls / sampledDocuments : null,
+        distinctCount: stats.distinct.size,
+        sampleCount: stats.count,
+      }));
+
+      fields.sort((a, b) => a.path.localeCompare(b.path));
+
+      profiles.push({
+        name: collectionName,
+        fields,
+        sampledDocuments,
+      });
+    } catch (error) {
+      warnings.push({
+        level: 'warning',
+        feature: 'collection_profiling',
+        message: `Cannot profile collection ${collectionName}: ${(error as Error).message}`,
+        suggestion: 'Grant read permissions on this collection.'
+      });
+      
+      profiles.push({
+        name: collectionName,
+        fields: [],
+        sampledDocuments: 0,
+      });
     }
-
-    const sampledDocuments = documents.length;
-    const fields: MongoFieldProfile[] = Array.from(fieldStats.entries()).map(([path, stats]) => ({
-      path,
-      nullFraction: sampledDocuments > 0 ? stats.nulls / sampledDocuments : null,
-      distinctCount: stats.distinct.size,
-      sampleCount: stats.count,
-    }));
-
-    fields.sort((a, b) => a.path.localeCompare(b.path));
-
-    profiles.push({
-      name: collectionName,
-      fields,
-      sampledDocuments,
-    });
   }
 
-  return profiles;
+  return {
+    data: profiles,
+    warnings,
+    availableFeatures: {
+      hasRowCounts: false,
+      hasStatistics: warnings.length === 0,
+      hasComments: false,
+      hasPermissionErrors: warnings.length > 0,
+    },
+  };
 }
 
 function collectStats(

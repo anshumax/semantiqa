@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { InspectorHeader } from './InspectorHeader';
+import { Tooltip } from '../../components/Tooltip';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
 import './InspectorTablePanel.css';
 
@@ -166,16 +167,28 @@ export function InspectorTablePanel({ sourceId, tableId, onClose }: InspectorTab
                     <span className="column-badge column-badge--required">Required</span>
                   )}
                 </div>
-                {(column.nullPercent !== undefined || column.distinctCount !== undefined) && (
-                  <div className="column-item__stats">
-                    {column.nullPercent !== undefined && (
-                      <span>{column.nullPercent.toFixed(1)}% null</span>
-                    )}
-                    {column.distinctCount !== undefined && (
-                      <span>{formatNumber(column.distinctCount)} distinct</span>
-                    )}
-                  </div>
-                )}
+                <div className="column-item__stats">
+                  {column.nullPercent !== undefined && column.nullPercent !== null ? (
+                    <span>{column.nullPercent.toFixed(1)}% null</span>
+                  ) : (
+                    <Tooltip content="Null percentage unavailable. Database user may need permissions to profile this column.">
+                      <span className="unavailable-stat">
+                        <span>Null: N/A</span>
+                        <span className="info-icon">ⓘ</span>
+                      </span>
+                    </Tooltip>
+                  )}
+                  {column.distinctCount !== undefined && column.distinctCount !== null ? (
+                    <span>{formatNumber(column.distinctCount)} distinct</span>
+                  ) : (
+                    <Tooltip content="Distinct count unavailable. Database user may need permissions to profile this column.">
+                      <span className="unavailable-stat">
+                        <span>Distinct: N/A</span>
+                        <span className="info-icon">ⓘ</span>
+                      </span>
+                    </Tooltip>
+                  )}
+                </div>
               </div>
             ))}
           </div>

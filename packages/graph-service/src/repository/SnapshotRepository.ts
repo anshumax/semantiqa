@@ -34,7 +34,23 @@ type SnapshotData = RelationalSnapshot | MongoSnapshot;
 export class SnapshotRepository {
   constructor(private readonly db: Database) {}
 
-  persistSnapshot(params: { sourceId: string; kind: string; snapshot: SnapshotData; stats?: unknown }): void {
+  persistSnapshot(params: { 
+    sourceId: string; 
+    kind: string; 
+    snapshot: SnapshotData; 
+    stats?: unknown;
+    warnings?: Array<{ level: string; feature: string; message: string; suggestion?: string }>;
+  }): void {
+    // Log warnings if present
+    if (params.warnings && params.warnings.length > 0) {
+      const warningsSummary = {
+        count: params.warnings.length,
+        criticalCount: params.warnings.filter(w => w.level === 'error').length,
+        features: [...new Set(params.warnings.map(w => w.feature))],
+      };
+      console.log(`[SnapshotRepository] Stored snapshot with warnings for ${params.sourceId}:`, warningsSummary);
+    }
+
     const transaction = this.db.transaction(() => {
       if (params.kind === 'mongo') {
         this.persistMongoSnapshot(params.sourceId, params.snapshot as MongoSnapshot, params.stats);

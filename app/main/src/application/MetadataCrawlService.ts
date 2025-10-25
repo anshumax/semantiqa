@@ -37,6 +37,7 @@ export interface MetadataCrawlDeps {
     kind: string;
     snapshot: unknown;
     stats: unknown;
+    warnings?: Array<{ level: string; feature: string; message: string; suggestion?: string }>;
   }) => Promise<void>;
   updateCrawlStatus: (
     sourceId: string,
@@ -166,8 +167,38 @@ export class MetadataCrawlService {
         }
       }
 
-      // Persist snapshot
-      await persistSnapshot({ sourceId, kind: source.kind, snapshot, stats });
+      // Extract warnings from snapshot and stats
+      const allWarnings = [
+        ...((snapshot as any).warnings || []),
+        ...((stats as any).warnings || []),
+      ];
+
+      if (allWarnings.length > 0) {
+        logger.warn('Crawl completed with warnings', { 
+          sourceId, 
+          warningCount: allWarnings.length,
+          warnings: allWarnings.map((w: any) => ({
+            level: w.level,
+            feature: w.feature,
+            message: w.message,
+          }))
+        });
+        
+        // If there are error-level warnings, broadcast them
+        const criticalWarnings = allWarnings.filter((w: any) => w.level === 'error');
+        if (criticalWarnings.length > 0) {
+          logger.error('Critical crawl warnings', { sourceId, warnings: criticalWarnings });
+        }
+      }
+
+      // Persist snapshot - handle both wrapped and unwrapped formats
+      await persistSnapshot({ 
+        sourceId, 
+        kind: source.kind, 
+        snapshot: (snapshot as any).data || snapshot,
+        stats: (stats as any).data || stats,
+        warnings: allWarnings,
+      });
 
       await updateCrawlStatus(sourceId, 'crawled');
       sourceService.setCrawlStatus(sourceId, 'crawled');

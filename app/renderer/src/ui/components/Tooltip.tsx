@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import './Tooltip.css';
+import React from 'react';
+import { Tooltip as MantineTooltip } from '@mantine/core';
 
 interface TooltipProps {
   content: string;
@@ -7,21 +7,23 @@ interface TooltipProps {
 }
 
 export function Tooltip({ content, children }: TooltipProps) {
-  const [isVisible, setIsVisible] = useState(false);
-
   return (
-    <span 
-      className="tooltip-wrapper"
-      onMouseEnter={() => setIsVisible(true)}
-      onMouseLeave={() => setIsVisible(false)}
+    <MantineTooltip
+      label={content}
+      position="top"
+      withArrow
+      transitionProps={{ duration: 200 }}
+      styles={{
+        tooltip: {
+          background: 'rgba(20, 22, 30, 0.98)',
+          border: '1px solid rgba(170, 176, 190, 0.24)',
+          fontSize: '0.75rem',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+        },
+      }}
     >
-      {children}
-      {isVisible && (
-        <span className="tooltip-content">
-          {content}
-        </span>
-      )}
-    </span>
+      <span style={{ display: 'inline-block' }}>{children}</span>
+    </MantineTooltip>
   );
 }
 

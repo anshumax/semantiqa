@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, startTransition } from 'react';
 import './ConnectionModal.css';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
 import type { GraphGetRequest, GraphGetResponse, GraphNode } from '@semantiqa/contracts';
+import { Select, Button, Stack, Group, Text, Loader, Paper, Alert } from '@mantine/core';
+import { Modal } from '../components/Modal';
 
 interface TableInfo {
   id: string;
@@ -76,19 +78,19 @@ export function ConnectionModal({
     }
   }, [isOpen, sourceBlock, targetBlock, sourceTable, targetTable]);
 
-  // Preselect source table when provided
+  // Preselect tables when provided (batched for better performance)
   useEffect(() => {
-    if (sourceTable && isOpen) {
-      setSelectedSourceTable(sourceTable.id);
+    if (isOpen) {
+      startTransition(() => {
+        if (sourceTable) {
+          setSelectedSourceTable(sourceTable.id);
+        }
+        if (targetTable) {
+          setSelectedTargetTable(targetTable.id);
+        }
+      });
     }
-  }, [sourceTable, isOpen]);
-
-  // Preselect target table when provided
-  useEffect(() => {
-    if (targetTable && isOpen) {
-      setSelectedTargetTable(targetTable.id);
-    }
-  }, [targetTable, isOpen]);
+  }, [sourceTable, targetTable, isOpen]);
 
   const loadTablesAndColumns = async () => {
     if (!sourceBlock || !targetBlock) return;
@@ -117,8 +119,11 @@ export function ConnectionModal({
       const sourceTables = extractTablesAndColumns(sourceResponse.nodes, sourceResponse.edges || []);
       const targetTables = extractTablesAndColumns(targetResponse.nodes, targetResponse.edges || []);
       
-      setSourceTables(sourceTables);
-      setTargetTables(targetTables);
+      // Use transition for non-urgent state updates to prevent UI flash
+      startTransition(() => {
+        setSourceTables(sourceTables);
+        setTargetTables(targetTables);
+      });
     } catch (error) {
       console.error('Failed to load tables and columns:', error);
     } finally {
@@ -142,8 +147,12 @@ export function ConnectionModal({
       
       // Process tables and columns
       const allTables = extractTablesAndColumns(response.nodes, response.edges || []);
-      setSourceTables(allTables);
-      setTargetTables(allTables);
+      
+      // Use transition for non-urgent state updates to prevent UI flash
+      startTransition(() => {
+        setSourceTables(allTables);
+        setTargetTables(allTables);
+      });
       
     } catch (error) {
       console.error('Failed to load table columns:', error);
@@ -344,41 +353,42 @@ export function ConnectionModal({
                   <div className="form-group">
                     <label htmlFor="source-table">Table/Collection</label>
                     {sourceTable ? (
-                      <div className="form-display">
-                        <div className="form-display__value">{sourceTable.name}</div>
-                        <div className="form-display__note">Preselected from source table</div>
-                      </div>
+                      <Paper p="sm" withBorder>
+                        <Text fw={600}>{sourceTable.name}</Text>
+                        <Text size="xs" c="dimmed">Preselected from source table</Text>
+                      </Paper>
                     ) : (
-                      <select 
+                      <Select
                         id="source-table"
                         value={selectedSourceTable}
-                        onChange={(e) => setSelectedSourceTable(e.target.value)}
-                        className="form-select"
-                      >
-                        <option value="">Select table...</option>
-                        {sourceTables.map(table => (
-                          <option key={table.id} value={table.id}>{table.name}</option>
-                        ))}
-                      </select>
+                        onChange={(value) => setSelectedSourceTable(value || '')}
+                        placeholder="Select table..."
+                        data={sourceTables.map(table => ({
+                          value: table.id,
+                          label: table.name
+                        }))}
+                        searchable
+                      />
                     )}
                   </div>
                   
                   <div className="form-group">
                     <label htmlFor="source-column">Column/Field</label>
-                    <select 
+                    <Select
                       id="source-column"
                       value={selectedSourceColumn}
-                      onChange={(e) => setSelectedSourceColumn(e.target.value)}
-                      className="form-select"
+                      onChange={(value) => setSelectedSourceColumn(value || '')}
+                      placeholder="Select column..."
                       disabled={!selectedSourceTable}
-                    >
-                      <option value="">Select column...</option>
-                      {sourceColumns.map(column => (
-                        <option key={column.id} value={column.id}>
-                          {column.name} ({column.type})
-                        </option>
-                      ))}
-                    </select>
+                      data={sourceColumns.map(column => ({
+                        value: column.id,
+                        label: `${column.name} (${column.type})`
+                      }))}
+                      searchable
+                      withinPortal
+                      comboboxProps={{ shadow: 'md', zIndex: 10000 }}
+                      maxDropdownHeight={300}
+                    />
                   </div>
                 </div>
                 
@@ -388,41 +398,42 @@ export function ConnectionModal({
                   <div className="form-group">
                     <label htmlFor="target-table">Table/Collection</label>
                     {targetTable ? ( // Conditional rendering for preselected table
-                      <div className="form-display">
-                        <div className="form-display__value">{targetTable.name}</div>
-                        <div className="form-display__note">Preselected from target table</div>
-                      </div>
+                      <Paper p="sm" withBorder>
+                        <Text fw={600}>{targetTable.name}</Text>
+                        <Text size="xs" c="dimmed">Preselected from target table</Text>
+                      </Paper>
                     ) : (
-                      <select 
+                      <Select
                         id="target-table"
                         value={selectedTargetTable}
-                        onChange={(e) => setSelectedTargetTable(e.target.value)}
-                        className="form-select"
-                      >
-                        <option value="">Select table...</option>
-                        {targetTables.map(table => (
-                          <option key={table.id} value={table.id}>{table.name}</option>
-                        ))}
-                      </select>
+                        onChange={(value) => setSelectedTargetTable(value || '')}
+                        placeholder="Select table..."
+                        data={targetTables.map(table => ({
+                          value: table.id,
+                          label: table.name
+                        }))}
+                        searchable
+                      />
                     )}
                   </div>
                   
                   <div className="form-group">
                     <label htmlFor="target-column">Column/Field</label>
-                    <select 
+                    <Select
                       id="target-column"
                       value={selectedTargetColumn}
-                      onChange={(e) => setSelectedTargetColumn(e.target.value)}
-                      className="form-select"
+                      onChange={(value) => setSelectedTargetColumn(value || '')}
+                      placeholder="Select column..."
                       disabled={!selectedTargetTable}
-                    >
-                      <option value="">Select column...</option>
-                      {targetColumns.map(column => (
-                        <option key={column.id} value={column.id}>
-                          {column.name} ({column.type})
-                        </option>
-                      ))}
-                    </select>
+                      data={targetColumns.map(column => ({
+                        value: column.id,
+                        label: `${column.name} (${column.type})`
+                      }))}
+                      searchable
+                      withinPortal
+                      comboboxProps={{ shadow: 'md', zIndex: 10000 }}
+                      maxDropdownHeight={300}
+                    />
                   </div>
                 </div>
               </div>
@@ -457,19 +468,20 @@ export function ConnectionModal({
         </div>
         
         <div className="connection-modal__footer">
-          <button 
-            className="connection-modal__button connection-modal__button--secondary"
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button 
-            className="connection-modal__button connection-modal__button--primary"
-            onClick={handleSave}
-            disabled={!canSave || loading}
-          >
-            Create Relationship
-          </button>
+          <Group justify="flex-end" gap="sm">
+            <Button
+              variant="subtle"
+              onClick={onClose}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={!canSave || loading}
+            >
+              Create Relationship
+            </Button>
+          </Group>
         </div>
       </div>
     </div>

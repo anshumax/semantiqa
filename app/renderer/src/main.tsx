@@ -1,7 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { MantineProvider } from '@mantine/core';
 
 import App from './ui/App';
+import { theme } from './ui/theme';
+
+// Import Mantine styles
+import '@mantine/core/styles.css';
 import './ui/global.css';
 
 if ((import.meta as any).env.DEV && !(window as any).semantiqa) {
@@ -33,7 +38,9 @@ const root = createRoot(container);
 
 root.render(
   <StrictMode>
-    <App />
+    <MantineProvider theme={theme} defaultColorScheme="dark">
+      <App />
+    </MantineProvider>
   </StrictMode>,
 );
 

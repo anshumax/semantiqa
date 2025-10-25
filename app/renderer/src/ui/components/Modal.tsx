@@ -1,4 +1,4 @@
-import '../components/Modal.css';
+import { Modal as MantineModal } from '@mantine/core';
 
 interface ModalProps {
   title: string;
@@ -9,26 +9,29 @@ interface ModalProps {
 }
 
 export function Modal({ title, description, isOpen, onClose, children }: ModalProps) {
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby={description ? 'modal-description' : undefined}>
-      <div className="modal__backdrop" onClick={onClose} role="presentation" />
-      <div className="modal__container">
-        <header className="modal__header">
-          <div>
-            <h2 id="modal-title">{title}</h2>
-            {description ? <p id="modal-description">{description}</p> : null}
-          </div>
-          <button type="button" className="modal__close" onClick={onClose} aria-label="Close dialog">
-            ×
-          </button>
-        </header>
-        <div className="modal__body">{children}</div>
-      </div>
-    </div>
+    <MantineModal
+      opened={isOpen}
+      onClose={onClose}
+      title={
+        <div>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>{title}</h2>
+          {description && (
+            <p style={{ margin: '4px 0 0', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+              {description}
+            </p>
+          )}
+        </div>
+      }
+      size="lg"
+      centered
+      overlayProps={{
+        backgroundOpacity: 0.55,
+        blur: 3,
+      }}
+    >
+      {children}
+    </MantineModal>
   );
 }
 

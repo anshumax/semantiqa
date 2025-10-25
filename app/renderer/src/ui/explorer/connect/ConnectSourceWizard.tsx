@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { SourcesAddRequest } from '@semantiqa/contracts';
 import { useExplorerState } from '../state/useExplorerState';
+import { TextInput, Textarea, Button, Stack, Group, Text, Title, Paper, Card } from '@mantine/core';
 import './ConnectSourceWizard.css';
 
 type SourceKind = 'postgres' | 'mysql' | 'mongo' | 'duckdb';
@@ -76,15 +77,13 @@ export function ConnectSourceWizard() {
     }
   };
 
-  const handleBasicChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = event.target;
-    setFormState((prev) => ({ ...prev, [name]: value }));
+  const handleBasicChange = (field: string, value: string) => {
+    setFormState((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleConnectionChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type } = event.target;
+  const handleConnectionChange = (field: string, value: string, type?: string) => {
     const nextValue = type === 'number' ? Number(value) : value;
-    setFormState((prev) => ({ ...prev, connection: { ...prev.connection, [name]: nextValue } }));
+    setFormState((prev) => ({ ...prev, connection: { ...prev.connection, [field]: nextValue } }));
   };
 
   const ownersList = useMemo(
@@ -204,10 +203,24 @@ function KindPicker({ onSelect }: { onSelect: (kind: SourceKind) => void }) {
       <p>Choose the database or data store you want to connect.</p>
       <div className="connect-wizard__kind-grid">
         {(['postgres', 'mysql', 'mongo', 'duckdb'] as const).map((kind) => (
-          <button key={kind} type="button" className="connect-wizard__kind" onClick={() => onSelect(kind)}>
+          <Button 
+            key={kind} 
+            variant="light" 
+            size="lg"
+            className="connect-wizard__kind" 
+            onClick={() => onSelect(kind)}
+            styles={{
+              root: {
+                height: 'auto',
+                padding: '20px',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+              },
+            }}
+          >
             <span className="connect-wizard__kind-name">{kind.toUpperCase()}</span>
             <span className="connect-wizard__kind-meta">Secure, read-only connection</span>
-          </button>
+          </Button>
         ))}
       </div>
     </div>
@@ -224,8 +237,8 @@ function ConfigureForm({
 }: {
   kind: SourceKind;
   formState: FormState;
-  onBasicChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onConnectionChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onBasicChange: (field: string, value: string) => void;
+  onConnectionChange: (field: string, value: string, type?: string) => void;
   onBack: () => void;
   onContinue: () => void;
 }) {
@@ -238,52 +251,65 @@ function ConfigureForm({
           <h3>Configure {kind.toUpperCase()} source</h3>
           <p>Fill in connection information. Secrets are stored securely.</p>
         </div>
-        <button type="button" className="connect-wizard__link" onClick={onBack}>
+        <Button variant="subtle" onClick={onBack}>
           Change type
-        </button>
+        </Button>
       </header>
 
-      <div className="connect-wizard__grid">
-        <label>
-          Name
-          <input name="name" value={formState.name} onChange={onBasicChange} required />
-        </label>
-        <label>
-          Owners (comma separated)
-          <input name="owners" value={formState.owners} onChange={onBasicChange} />
-        </label>
-        <label className="connect-wizard__full">
-          Description
-          <textarea name="description" rows={3} value={formState.description} onChange={onBasicChange} />
-        </label>
-        <label className="connect-wizard__full">
-          Tags (comma separated)
-          <input name="tags" value={formState.tags} onChange={onBasicChange} />
-        </label>
-      </div>
+      <Stack gap="md">
+        <Group grow>
+          <TextInput
+            label="Name"
+            name="name"
+            value={formState.name}
+            onChange={(e) => onBasicChange('name', e.target.value)}
+            required
+          />
+          <TextInput
+            label="Owners (comma separated)"
+            name="owners"
+            value={formState.owners}
+            onChange={(e) => onBasicChange('owners', e.target.value)}
+          />
+        </Group>
+        
+        <Textarea
+          label="Description"
+          name="description"
+          rows={3}
+          value={formState.description}
+          onChange={(e) => onBasicChange('description', e.target.value)}
+        />
+        
+        <TextInput
+          label="Tags (comma separated)"
+          name="tags"
+          value={formState.tags}
+          onChange={(e) => onBasicChange('tags', e.target.value)}
+        />
+      </Stack>
 
       <section className="connect-wizard__section">
         <h4>Connection</h4>
-        <div className="connect-wizard__grid">
+        <Stack gap="md">
           {fields.map((field) => (
-            <label key={field.key} className={field.key === 'uri' ? 'connect-wizard__full' : ''}>
-              {field.label}
-              <input
-                name={field.key}
-                type={field.type ?? 'text'}
-                value={(formState.connection[field.key] as string) ?? ''}
-                onChange={onConnectionChange}
-                required={field.key !== 'replicaSet'}
-              />
-            </label>
+            <TextInput
+              key={field.key}
+              label={field.label}
+              name={field.key}
+              type={field.type ?? 'text'}
+              value={(formState.connection[field.key] as string) ?? ''}
+              onChange={(e) => onConnectionChange(field.key, e.target.value, field.type)}
+              required={!field.optional}
+            />
           ))}
-        </div>
+        </Stack>
       </section>
 
       <footer className="connect-wizard__actions">
-        <button type="button" onClick={onContinue}>
+        <Button onClick={onContinue}>
           Review details
-        </button>
+        </Button>
       </footer>
     </div>
   );
@@ -311,9 +337,9 @@ function ReviewStep({
           <h3>Review & connect</h3>
           <p>Confirm the details before connecting to {kind.toUpperCase()}.</p>
         </div>
-        <button type="button" className="connect-wizard__link" onClick={onBack}>
+        <Button variant="subtle" onClick={onBack}>
           Edit configuration
-        </button>
+        </Button>
       </header>
 
       <div className="connect-wizard__summary">
@@ -348,12 +374,12 @@ function ReviewStep({
         </section>
       </div>
 
-      {error ? <div className="connect-wizard__error">{error}</div> : null}
+      {error ? <Text c="red" size="sm">{error}</Text> : null}
 
       <footer className="connect-wizard__actions">
-        <button type="button" onClick={onSubmit} disabled={submitting}>
+        <Button onClick={onSubmit} disabled={submitting} loading={submitting}>
           {submitting ? 'Connecting…' : 'Connect source'}
-        </button>
+        </Button>
       </footer>
     </div>
   );

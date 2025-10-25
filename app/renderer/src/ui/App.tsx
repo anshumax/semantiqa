@@ -4,7 +4,6 @@ import { StatusBadge, StatusBadgeLabel, StatusBadgeValue } from './components';
 import { NavigationShell } from './navigation';
 import { GlobalStatusBar } from './status/GlobalStatusBar';
 import './App.css';
-import './components/Modal.css';
 
 declare global {
   interface Window {

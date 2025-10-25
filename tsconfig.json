@@ -9,10 +9,11 @@
   "include": [],
   "references": [
     { "path": "./core" },
-    { "path": "./adapters" },
     { "path": "./packages/adapters-runtime" },
-    { "path": "./app" },
-    { "path": "./contracts" },
-    { "path": "./docs" }
+    { "path": "./app/config" },
+    { "path": "./app/main" },
+    { "path": "./app/renderer" },
+    { "path": "./app/storage/sqlite" },
+    { "path": "./contracts" }
   ]
 }

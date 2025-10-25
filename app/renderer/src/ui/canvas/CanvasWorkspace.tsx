@@ -550,7 +550,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         id: rel.id,
         source: sourceNodeId,
         target: targetNodeId,
-        type: 'smoothstep',
+        type: 'default',
         animated: false,
         style: {
           stroke: rel.lineColor || '#22c55e',
@@ -660,7 +660,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       target: connectionModal.connection.target!,
       sourceHandle: connectionModal.connection.sourceHandle,
       targetHandle: connectionModal.connection.targetHandle,
-      type: 'smoothstep',
+      type: 'default',
       animated: false,
       style: {
         stroke: '#22c55e',
@@ -828,8 +828,9 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
           minZoom={0.1}
           maxZoom={3}
           proOptions={{ hideAttribution: true }}
+          connectionLineType="default"
           defaultEdgeOptions={{
-            type: 'smoothstep',
+            type: 'default',
             animated: false,
           }}
         >

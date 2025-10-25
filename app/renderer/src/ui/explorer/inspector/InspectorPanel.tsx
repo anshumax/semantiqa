@@ -22,7 +22,6 @@ interface InspectorPanelProps {
     kind?: 'postgres' | 'mysql' | 'mongo' | 'duckdb';
   } | null;
   stats: {
-    rowCount?: number;
     columnCount?: number;
     profile?: TableProfile;
   } | null;
@@ -40,13 +39,6 @@ export function InspectorPanel({
   lastCrawledAt,
   lastError,
 }: InspectorPanelProps) {
-  const formattedRowCount = useMemo(() => {
-    if (!stats?.rowCount && stats?.rowCount !== 0) {
-      return null;
-    }
-    return numberFormatter.format(stats.rowCount);
-  }, [stats?.rowCount]);
-
   const formattedColumnCount = useMemo(() => {
     if (!stats?.columnCount && stats?.columnCount !== 0) {
       return null;
@@ -82,14 +74,8 @@ export function InspectorPanel({
 
         <section className="inspector__panel inspector__panel--stats">
           <h4>Profile</h4>
-          {formattedRowCount || formattedColumnCount || stats?.profile ? (
+          {formattedColumnCount || stats?.profile ? (
             <div className="inspector__badges">
-              {formattedRowCount ? (
-                <StatusBadge tone="neutral">
-                  <StatusBadgeLabel>Rows</StatusBadgeLabel>
-                  <StatusBadgeValue>{formattedRowCount}</StatusBadgeValue>
-                </StatusBadge>
-              ) : null}
               {formattedColumnCount ? (
                 <StatusBadge tone="neutral">
                   <StatusBadgeLabel>Columns</StatusBadgeLabel>

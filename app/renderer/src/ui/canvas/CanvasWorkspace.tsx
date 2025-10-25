@@ -471,7 +471,6 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
               kind: (state.sourceKind || 'postgres') as DataSourceNodeData['kind'],
               connectionStatus: 'connected' as const,
               crawlStatus: 'crawled' as const,
-              tableCount: table.rowCount,
               onContextMenu: (event: React.MouseEvent) => handleTableContextMenu(event, table.id, table.sourceId),
             },
           };

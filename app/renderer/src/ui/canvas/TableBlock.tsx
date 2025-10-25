@@ -60,13 +60,6 @@ export function TableBlock({
     }
   };
 
-  const formatRowCount = (count?: number) => {
-    if (!count || count === 0) return '—';
-    if (count < 1000) return count.toString();
-    if (count < 1000000) return `${(count / 1000).toFixed(1)}K`;
-    return `${(count / 1000000).toFixed(1)}M`;
-  };
-
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only handle left click
     
@@ -173,13 +166,6 @@ export function TableBlock({
           {table.schema}
         </div>
       )}
-
-      {/* Row count */}
-      <div className="table-block__meta">
-        <span className="table-block__row-count">
-          {formatRowCount(table.rowCount)} rows
-        </span>
-      </div>
 
       {/* Description tooltip on hover */}
       {table.description && (

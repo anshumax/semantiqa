@@ -10,7 +10,6 @@ interface TableDetails {
   name: string;
   type: string;
   schema?: string;
-  rowCount: number;
   columnCount: number;
   description?: string;
   columns: Array<{
@@ -20,7 +19,6 @@ interface TableDetails {
     isPrimaryKey: boolean;
     isForeignKey: boolean;
     nullPercent?: number;
-    distinctCount?: number;
     sampleValues?: Array<string | number | boolean>;
   }>;
   indexes?: Array<{ name: string; columns: string[]; unique: boolean }>;
@@ -123,10 +121,6 @@ export function InspectorTablePanel({ sourceId, tableId, onClose }: InspectorTab
         <section className="inspector-section">
           <h3 className="inspector-section__title">Overview</h3>
           <dl className="inspector-section__list">
-            <div className="inspector-section__row">
-              <dt>Rows</dt>
-              <dd className="inspector-section__value--large">{formatNumber(details.rowCount)}</dd>
-            </div>
             <div className="inspector-section__row">
               <dt>Columns</dt>
               <dd className="inspector-section__value--large">{details.columnCount}</dd>

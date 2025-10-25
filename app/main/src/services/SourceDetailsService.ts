@@ -18,9 +18,7 @@ export interface SourceDetailsResponse {
   statistics: {
     tableCount: number;
     totalColumns: number;
-    totalRows?: number;
     schemas?: Array<{ name: string; tableCount: number }>;
-    topTables?: Array<{ name: string; rowCount: number; columnCount: number }>;
   };
 }
 
@@ -98,40 +96,6 @@ export class SourceDetailsService {
         tableCount: row.table_count,
       }));
 
-      // Get top 5 tables by row count
-      const topTableRows = db.prepare(`
-        SELECT 
-          json_extract(props, '$.name') as name,
-          COALESCE(json_extract(props, '$.rowCount'), 0) as row_count,
-          (
-            SELECT COUNT(*) 
-            FROM nodes as col
-            WHERE col.type IN ('column', 'field')
-            AND json_extract(col.props, '$.tableId') = nodes.id
-          ) as column_count
-        FROM nodes 
-        WHERE type IN ('table', 'collection')
-        AND json_extract(props, '$.sourceId') = ?
-        ORDER BY row_count DESC
-        LIMIT 5
-      `).all(sourceId) as Array<{ name: string; row_count: number; column_count: number }>;
-
-      const topTables = topTableRows.map(row => ({
-        name: row.name,
-        rowCount: row.row_count,
-        columnCount: row.column_count,
-      }));
-
-      // Calculate total rows (sum of all table row counts)
-      const totalRowsResult = db.prepare(`
-        SELECT SUM(COALESCE(json_extract(props, '$.rowCount'), 0)) as total
-        FROM nodes 
-        WHERE type IN ('table', 'collection')
-        AND json_extract(props, '$.sourceId') = ?
-      `).get(sourceId) as { total: number | null } | undefined;
-
-      const totalRows = totalRowsResult?.total || undefined;
-
       return {
         sourceId: sourceRow.id,
         name: sourceRow.name,
@@ -145,9 +109,7 @@ export class SourceDetailsService {
         statistics: {
           tableCount,
           totalColumns,
-          totalRows,
           schemas: schemas.length > 0 ? schemas : undefined,
-          topTables: topTables.length > 0 ? topTables : undefined,
         },
       };
     } catch (error) {

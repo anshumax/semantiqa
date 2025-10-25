@@ -78,7 +78,6 @@ interface InspectorMetadata {
 }
 
 interface InspectorStats {
-  rowCount?: number;
   columnCount?: number;
   profile?: TableProfile;
 }
@@ -448,24 +447,22 @@ function buildMetadata(node: ExplorerTreeNode, source?: ExplorerSource): Inspect
 }
 
 function buildStats(node: ExplorerTreeNode): InspectorStats | null {
-  const meta = node.meta as { profile?: TableProfile; columnCount?: number; rowCount?: number; stats?: { rowCount?: number; columnCount?: number } };
+  const meta = node.meta as { profile?: TableProfile; columnCount?: number; stats?: { columnCount?: number } };
 
   if (!meta) {
     return null;
   }
 
-  const rowCount = meta.rowCount ?? meta.stats?.rowCount;
   const columnCount = meta.columnCount ?? meta.stats?.columnCount;
   const profile = meta.profile;
   const hasProfile = Boolean(meta.profile);
-  const hasCounts = typeof rowCount === 'number' || typeof columnCount === 'number';
+  const hasCounts = typeof columnCount === 'number';
 
   if (!hasProfile && !hasCounts) {
     return null;
   }
 
   return {
-    rowCount,
     columnCount,
     profile,
   } satisfies InspectorStats;

@@ -34,7 +34,6 @@ export interface TableInfo {
   name: string;
   type: 'table' | 'view' | 'collection';
   sourceId: string;
-  rowCount?: number;
   schema?: string;
   description?: string;
 }

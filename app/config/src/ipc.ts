@@ -89,9 +89,7 @@ type HandlerMap = {
       statistics: {
         tableCount: number;
         totalColumns: number;
-        totalRows?: number;
         schemas?: Array<{ name: string; tableCount: number }>;
-        topTables?: Array<{ name: string; rowCount: number; columnCount: number }>;
       };
     } | SemantiqaError;
   };
@@ -183,7 +181,7 @@ type HandlerMap = {
   /** Lists all tables/collections for a data source (used in drill-down view) */
   'tables:list': {
     request: { sourceId: string };
-    response: { tables: Array<{ id: string; name: string; type: string; schema: string; rowCount: number }> } | SemantiqaError;
+    response: { tables: Array<{ id: string; name: string; type: string; schema: string }> } | SemantiqaError;
   };
   /** 
    * Fetches detailed statistics and metadata for a specific table/collection.
@@ -198,7 +196,6 @@ type HandlerMap = {
       name: string;
       type: string;
       schema?: string;
-      rowCount: number;
       columnCount: number;
       description?: string;
       columns: Array<{
@@ -208,7 +205,6 @@ type HandlerMap = {
         isPrimaryKey: boolean;
         isForeignKey: boolean;
         nullPercent?: number;
-        distinctCount?: number;
         sampleValues?: Array<string | number | boolean>;
       }>;
       indexes?: Array<{ name: string; columns: string[]; unique: boolean }>;

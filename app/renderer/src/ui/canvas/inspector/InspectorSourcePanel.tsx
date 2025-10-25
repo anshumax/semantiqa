@@ -17,9 +17,7 @@ interface SourceDetails {
   statistics: {
     tableCount: number;
     totalColumns: number;
-    totalRows?: number;
     schemas?: Array<{ name: string; tableCount: number }>;
-    topTables?: Array<{ name: string; rowCount: number; columnCount: number }>;
   };
 }
 
@@ -236,21 +234,6 @@ export function InspectorSourcePanel({ sourceId, onClose }: InspectorSourcePanel
               <dt>Columns</dt>
               <dd className="inspector-section__value--large">{formatNumber(details.statistics.totalColumns)}</dd>
             </div>
-            <div className="inspector-section__row">
-              <dt>Total Rows</dt>
-              <dd className="inspector-section__value--large">
-                {details.statistics.totalRows !== null && details.statistics.totalRows !== undefined ? (
-                  formatNumber(details.statistics.totalRows)
-                ) : (
-                  <Tooltip content="Row count unavailable. Database user may need elevated permissions to access statistics tables (pg_stat_user_tables, information_schema.TABLES, etc).">
-                    <span className="unavailable-stat">
-                      <span>Unknown</span>
-                      <span className="info-icon">ⓘ</span>
-                    </span>
-                  </Tooltip>
-                )}
-              </dd>
-            </div>
           </dl>
 
           {/* Schemas breakdown */}
@@ -262,23 +245,6 @@ export function InspectorSourcePanel({ sourceId, onClose }: InspectorSourcePanel
                   <li key={schema.name} className="inspector-subsection__item">
                     <span className="inspector-subsection__name">{schema.name}</span>
                     <span className="inspector-subsection__count">{schema.tableCount} tables</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Top tables */}
-          {details.statistics.topTables && details.statistics.topTables.length > 0 && (
-            <div className="inspector-subsection">
-              <h4 className="inspector-subsection__title">Largest Tables</h4>
-              <ul className="inspector-subsection__list">
-                {details.statistics.topTables.map(table => (
-                  <li key={table.name} className="inspector-subsection__item">
-                    <span className="inspector-subsection__name">{table.name}</span>
-                    <span className="inspector-subsection__meta">
-                      {formatNumber(table.rowCount)} rows · {table.columnCount} cols
-                    </span>
                   </li>
                 ))}
               </ul>

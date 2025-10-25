@@ -11,7 +11,6 @@ export interface TableDetailsResponse {
   name: string;
   type: string;
   schema?: string;
-  rowCount: number;
   columnCount: number;
   description?: string;
   columns: Array<{
@@ -21,7 +20,6 @@ export interface TableDetailsResponse {
     isPrimaryKey: boolean;
     isForeignKey: boolean;
     nullPercent?: number;
-    distinctCount?: number;
     sampleValues?: Array<string | number | boolean>;
   }>;
   indexes?: Array<{ name: string; columns: string[]; unique: boolean }>;
@@ -72,7 +70,6 @@ export class TableDetailsService {
           isPrimaryKey: props.isPrimaryKey === true,
           isForeignKey: props.isForeignKey === true,
           nullPercent: props.nullPercent,
-          distinctCount: props.distinctCount,
           sampleValues: props.sampleValues,
         };
       });
@@ -141,7 +138,6 @@ export class TableDetailsService {
         name: tableProps.name,
         type: tableProps.tableType || tableRow.type,
         schema: tableProps.schema,
-        rowCount: tableProps.rowCount || 0,
         columnCount: columns.length,
         description: tableProps.description,
         columns,

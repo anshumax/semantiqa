@@ -113,7 +113,6 @@ export const ColumnSampleSchema = z.object({
 export type ColumnSample = z.infer<typeof ColumnSampleSchema>;
 
 export const TableProfileSchema = z.object({
-  rowCount: z.number().int().nonnegative().optional(),
   columns: z.array(
     z.object({
       name: NonEmptyString,

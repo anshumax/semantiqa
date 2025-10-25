@@ -97,9 +97,7 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
       statistics: z.object({
         tableCount: z.number(),
         totalColumns: z.number(),
-        totalRows: z.number().optional(),
         schemas: z.array(z.object({ name: z.string(), tableCount: z.number() })).optional(),
-        topTables: z.array(z.object({ name: z.string(), rowCount: z.number(), columnCount: z.number() })).optional(),
       }),
     }),
     SemantiqaErrorSchema
@@ -137,8 +135,7 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
         name: z.string(), 
         type: z.string(), 
         sourceId: z.string(),
-        schema: z.string(), 
-        rowCount: z.number() 
+        schema: z.string()
       })) 
     }), 
     SemantiqaErrorSchema
@@ -150,7 +147,6 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
       name: z.string(),
       type: z.string(),
       schema: z.string().optional(),
-      rowCount: z.number(),
       columnCount: z.number(),
       description: z.string().optional(),
       columns: z.array(z.object({
@@ -160,7 +156,6 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
         isPrimaryKey: z.boolean(),
         isForeignKey: z.boolean(),
         nullPercent: z.number().optional(),
-        distinctCount: z.number().optional(),
         sampleValues: z.array(z.union([z.string(), z.number(), z.boolean()])).optional(),
       })),
       indexes: z.array(z.object({ name: z.string(), columns: z.array(z.string()), unique: z.boolean() })).optional(),

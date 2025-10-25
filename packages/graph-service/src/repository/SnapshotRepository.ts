@@ -63,6 +63,35 @@ export class SnapshotRepository {
   }
 
   private persistRelationalSnapshot(sourceId: string, snapshot: RelationalSnapshot, stats?: unknown): void {
+    // Parse stats to extract column profiles
+    const columnProfilesMap = new Map<string, Map<string, any>>();
+    
+    if (stats && typeof stats === 'object') {
+      const statsObj = stats as any;
+      
+      // Extract column profiles
+      const profilesData = Array.isArray(statsObj.data) ? statsObj.data : statsObj;
+      if (Array.isArray(profilesData)) {
+        for (const tableProfile of profilesData) {
+          const tableKey = `${tableProfile.schema}.${tableProfile.name}`;
+          const colMap = new Map<string, any>();
+          
+          if (Array.isArray(tableProfile.columns)) {
+            for (const col of tableProfile.columns) {
+              colMap.set(col.column, {
+                nullFraction: col.nullFraction,
+                distinctFraction: col.distinctFraction,
+                min: col.min,
+                max: col.max,
+              });
+            }
+          }
+          
+          columnProfilesMap.set(tableKey, colMap);
+        }
+      }
+    }
+
     const checkNode = this.db.prepare<{ id: string }>(`SELECT id FROM nodes WHERE id = @id`);
     const insertNode = this.db.prepare<{
       id: string;
@@ -153,6 +182,10 @@ export class SnapshotRepository {
 
     for (const table of snapshot.tables) {
       const tableId = `tbl_${sourceId}_${table.schema}_${table.name}`;
+      const tableKey = `${table.schema}.${table.name}`;
+      
+      // Get column profiles from stats
+      const columnProfiles = columnProfilesMap.get(tableKey);
 
       // Upsert table node
       upsertNode({
@@ -164,6 +197,7 @@ export class SnapshotRepository {
           name: table.name,
           tableType: table.type,
           comment: table.comment,
+          tableId, // Add tableId for columns to reference
         }),
         owner_ids: null,
         tags: null,
@@ -186,18 +220,28 @@ export class SnapshotRepository {
       // Upsert column nodes and edges
       for (const column of table.columns) {
         const columnId = `col_${tableId}_${column.name}`;
+        
+        // Get column profile from stats
+        const colProfile = columnProfiles?.get(column.name);
 
         upsertNode({
           id: columnId,
           type: 'column',
           props: JSON.stringify({
             sourceId,
+            tableId, // Reference to parent table
             tableName: `${table.schema}.${table.name}`,
             name: column.name,
             dataType: column.type,
             nullable: column.nullable,
             defaultValue: column.defaultValue,
             comment: column.comment,
+            // Add profiling stats if available
+            nullPercent: colProfile?.nullFraction !== null && colProfile?.nullFraction !== undefined 
+              ? Math.round(colProfile.nullFraction * 100) 
+              : undefined,
+            min: colProfile?.min,
+            max: colProfile?.max,
           }),
           owner_ids: null,
           tags: null,

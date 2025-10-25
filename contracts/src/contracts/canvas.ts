@@ -132,6 +132,8 @@ export const CanvasRelationshipSchema = z.object({
   targetTableId: NonEmptyString,
   sourceColumnName: z.string().optional(),
   targetColumnName: z.string().optional(),
+  sourceHandle: z.string().optional(), // ReactFlow handle ID (e.g., 'right-source', 'left-target')
+  targetHandle: z.string().optional(), // ReactFlow handle ID (e.g., 'right-source', 'left-target')
   relationshipType: CanvasRelationshipTypeSchema.default('semantic_link'),
   confidenceScore: z.number().min(0).max(1).default(1.0),
   visualStyle: CanvasRelationshipStyleSchema.default('solid'),

@@ -550,6 +550,8 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         id: rel.id,
         source: sourceNodeId,
         target: targetNodeId,
+        sourceHandle: rel.sourceHandle || undefined,
+        targetHandle: rel.targetHandle || undefined,
         type: 'default',
         animated: false,
         style: {
@@ -665,7 +667,6 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       style: {
         stroke: '#22c55e',
         strokeWidth: 2,
-        strokeDasharray: '5,5',
       },
       label: `${sourceTableName} → ${targetTableName}`,
       data: {
@@ -687,6 +688,8 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       targetTableId: relationship.targetTable,
       sourceColumnName: relationship.sourceColumn,
       targetColumnName: relationship.targetColumn,
+      sourceHandle: connectionModal.connection.sourceHandle || undefined,
+      targetHandle: connectionModal.connection.targetHandle || undefined,
       relationshipType: 'semantic_link',
       confidenceScore: 1.0,
       visualStyle: 'solid',
@@ -828,7 +831,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
           minZoom={0.1}
           maxZoom={3}
           proOptions={{ hideAttribution: true }}
-          connectionLineType="default"
+          connectionLineType={'default' as any}
           defaultEdgeOptions={{
             type: 'default',
             animated: false,

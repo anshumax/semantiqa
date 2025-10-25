@@ -98,16 +98,16 @@ export function DataSourceNode({ data, selected, onRetryCrawl, onContextMenu }: 
     >
       {/* Connection handles on all sides */}
       <Handle type="target" position={Position.Top} id="top" />
-      <Handle type="source" position={Position.Top} id="top-source" />
+      <Handle type="source" position={Position.Top} id="top" />
       
       <Handle type="target" position={Position.Right} id="right" />
-      <Handle type="source" position={Position.Right} id="right-source" />
+      <Handle type="source" position={Position.Right} id="right" />
       
       <Handle type="target" position={Position.Bottom} id="bottom" />
-      <Handle type="source" position={Position.Bottom} id="bottom-source" />
+      <Handle type="source" position={Position.Bottom} id="bottom" />
       
       <Handle type="target" position={Position.Left} id="left" />
-      <Handle type="source" position={Position.Left} id="left-source" />
+      <Handle type="source" position={Position.Left} id="left" />
 
       {/* Header with icon and kind */}
       <div className="data-source-node__header">

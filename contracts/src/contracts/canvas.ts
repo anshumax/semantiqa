@@ -119,9 +119,11 @@ export type EnrichedCanvasBlock = z.infer<typeof EnrichedCanvasBlockSchema>;
 // Canvas relationship with visual properties
 export const CanvasRelationshipStyleSchema = z.enum(['solid', 'dashed', 'dotted']);
 export const CanvasRelationshipTypeSchema = z.enum(['semantic_link', 'foreign_key', 'derives_from']);
+export const CanvasHandlePositionSchema = z.enum(['top', 'right', 'bottom', 'left']);
 
 export type CanvasRelationshipStyle = z.infer<typeof CanvasRelationshipStyleSchema>;
 export type CanvasRelationshipType = z.infer<typeof CanvasRelationshipTypeSchema>;
+export type CanvasHandlePosition = z.infer<typeof CanvasHandlePositionSchema>;
 
 export const CanvasRelationshipSchema = z.object({
   id: NonEmptyString,
@@ -132,8 +134,8 @@ export const CanvasRelationshipSchema = z.object({
   targetTableId: NonEmptyString,
   sourceColumnName: z.string().optional(),
   targetColumnName: z.string().optional(),
-  sourceHandle: z.string().optional(), // ReactFlow handle ID (e.g., 'right-source', 'left-target')
-  targetHandle: z.string().optional(), // ReactFlow handle ID (e.g., 'right-source', 'left-target')
+  sourceHandle: CanvasHandlePositionSchema.optional(), // ReactFlow handle position (top/right/bottom/left)
+  targetHandle: CanvasHandlePositionSchema.optional(), // ReactFlow handle position (top/right/bottom/left)
   relationshipType: CanvasRelationshipTypeSchema.default('semantic_link'),
   confidenceScore: z.number().min(0).max(1).default(1.0),
   visualStyle: CanvasRelationshipStyleSchema.default('solid'),

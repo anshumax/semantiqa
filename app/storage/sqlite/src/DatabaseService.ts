@@ -298,6 +298,8 @@ export class DatabaseService {
       target_table_id TEXT NOT NULL,
       source_column_name TEXT,
       target_column_name TEXT,
+      source_handle TEXT,
+      target_handle TEXT,
       relationship_type TEXT NOT NULL DEFAULT 'semantic_link',
       confidence_score REAL DEFAULT 1.0,
       visual_style TEXT DEFAULT 'solid',

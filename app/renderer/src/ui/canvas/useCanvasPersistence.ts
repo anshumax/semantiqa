@@ -68,6 +68,13 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
       
       console.log('💾 Blocks to save:', blocks.map(b => ({ id: b.id, position: b.position })));
       console.log('💾 Table blocks to save:', tableBlocks.map(tb => ({ id: tb.id, position: tb.position })));
+      console.log('💾 Relationships to save:', relationships.map(r => ({ 
+        id: r.id, 
+        sourceTableId: r.sourceTableId?.split('_').pop(),
+        targetTableId: r.targetTableId?.split('_').pop(),
+        sourceHandle: r.sourceHandle,
+        targetHandle: r.targetHandle 
+      })));
       
       const request: CanvasUpdateRequest = {
         canvasId,
@@ -333,8 +340,6 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
 
   // Block position update (memory-first)
   const updateBlockPosition = useCallback((blockId: string, position: CanvasPosition) => {
-    console.log('📍 Updating block position:', { blockId, position });
-    
     // Check if it's a table block (starts with 'table-')
     if (blockId.startsWith('table-')) {
       setInMemoryTableBlocks(prev => {
@@ -345,7 +350,6 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
         }
         const updated = new Map(prev);
         updated.set(blockId, { ...block, position });
-        console.log('📍 Table block position updated in memory');
         return updated;
       });
     } else {
@@ -358,7 +362,6 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
         }
         const updated = new Map(prev);
         updated.set(blockId, { ...block, position });
-        console.log('📍 Block position updated in memory');
         return updated;
       });
     }
@@ -411,6 +414,13 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
 
   // Create relationship (memory-first)
   const createRelationship = useCallback((relationship: Omit<CanvasRelationship, 'id' | 'canvasId' | 'createdAt' | 'updatedAt'>) => {
+    console.log('🔷 createRelationship called with:', {
+      sourceHandle: relationship.sourceHandle,
+      targetHandle: relationship.targetHandle,
+      sourceTableId: relationship.sourceTableId,
+      targetTableId: relationship.targetTableId
+    });
+    
     const newRel: CanvasRelationship = {
       ...relationship,
       id: `rel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -418,6 +428,12 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+    
+    console.log('🔷 newRel created:', {
+      id: newRel.id,
+      sourceHandle: newRel.sourceHandle,
+      targetHandle: newRel.targetHandle
+    });
     
     setInMemoryRelationships(prev => {
       const updated = new Map(prev);
@@ -431,9 +447,13 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
 
   // Delete relationship (memory-first)
   const deleteRelationship = useCallback((relationshipId: string) => {
+    console.log('🗑️ deleteRelationship called for:', relationshipId);
+    
     setInMemoryRelationships(prev => {
       const updated = new Map(prev);
+      const existed = updated.has(relationshipId);
       updated.delete(relationshipId);
+      console.log('🗑️ Relationship deleted from memory:', { relationshipId, existed, remainingCount: updated.size });
       return updated;
     });
     setHasUnsavedChanges(true);

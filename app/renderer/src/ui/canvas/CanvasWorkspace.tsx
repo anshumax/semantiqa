@@ -261,10 +261,21 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
 
   // Handle relationship deletion from context menu
   const handleDeleteRelationship = useCallback((relationshipId: string) => {
-    console.log('Deleting relationship:', relationshipId);
+    console.log('🗑️ handleDeleteRelationship called with:', relationshipId);
+    console.log('🗑️ Current edges before delete:', edges.map(e => e.id));
+    
+    // Also remove from ReactFlow edges state
+    setEdges((eds) => {
+      const filtered = eds.filter(e => e.id !== relationshipId);
+      console.log('🗑️ Edges after filter:', filtered.map(e => e.id));
+      return filtered;
+    });
+    
+    // Remove from persistence layer
     deleteRelationship(relationshipId);
-    refreshCanvas();  // Refresh to update UI
-  }, [deleteRelationship, refreshCanvas]);
+    
+    console.log('🗑️ Deletion complete, refreshing canvas');
+  }, [deleteRelationship, edges, setEdges]);
 
   // Handle block deletion from context menu - show confirmation dialog
   const handleDeleteBlock = useCallback((blockId: string, sourceId: string) => {
@@ -634,6 +645,11 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     targetColumn: string;
   }) => {
     console.log('💾 Saving relationship:', relationship);
+    console.log('💾 Connection modal data:', {
+      connection: connectionModal.connection,
+      sourceHandle: connectionModal.connection?.sourceHandle,
+      targetHandle: connectionModal.connection?.targetHandle
+    });
     
     if (!connectionModal.connection) {
       console.error('Missing connection data for relationship creation');

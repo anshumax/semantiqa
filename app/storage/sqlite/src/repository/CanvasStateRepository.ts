@@ -56,6 +56,8 @@ export interface CanvasRelationshipRow {
   target_table_id: string;
   source_column_name?: string;
   target_column_name?: string;
+  source_handle?: string;
+  target_handle?: string;
   relationship_type: string;
   confidence_score: number;
   visual_style: string;
@@ -106,9 +108,9 @@ export class CanvasStateRepository {
     // Get canvas relationships
     const relationshipsStatement = this.db.prepare<{ canvas_id: string }>(`
       SELECT id, canvas_id, source_id, target_id, source_table_id, target_table_id,
-             source_column_name, target_column_name, relationship_type,
-             confidence_score, visual_style, line_color, line_width, curve_path,
-             is_selected, created_at, updated_at
+             source_column_name, target_column_name, source_handle, target_handle,
+             relationship_type, confidence_score, visual_style, line_color, line_width,
+             curve_path, is_selected, created_at, updated_at
       FROM canvas_relationships WHERE canvas_id = @canvas_id
       ORDER BY created_at ASC
     `);
@@ -159,6 +161,8 @@ export class CanvasStateRepository {
       targetTableId: row.target_table_id,
       sourceColumnName: row.source_column_name || undefined,
       targetColumnName: row.target_column_name || undefined,
+      sourceHandle: row.source_handle || undefined,
+      targetHandle: row.target_handle || undefined,
       relationshipType: row.relationship_type as any,
       confidenceScore: row.confidence_score,
       visualStyle: row.visual_style as any,
@@ -560,7 +564,9 @@ export class CanvasStateRepository {
             source_table_id = @source_table_id, 
             target_table_id = @target_table_id,
             source_column_name = @source_column_name, 
-            target_column_name = @target_column_name, 
+            target_column_name = @target_column_name,
+            source_handle = @source_handle,
+            target_handle = @target_handle,
             relationship_type = @relationship_type, 
             confidence_score = @confidence_score,
             visual_style = @visual_style, 
@@ -581,6 +587,8 @@ export class CanvasStateRepository {
         target_table_id: validatedRelationship.targetTableId,
         source_column_name: validatedRelationship.sourceColumnName || null,
         target_column_name: validatedRelationship.targetColumnName || null,
+        source_handle: validatedRelationship.sourceHandle || null,
+        target_handle: validatedRelationship.targetHandle || null,
         relationship_type: validatedRelationship.relationshipType,
         confidence_score: validatedRelationship.confidenceScore,
         visual_style: validatedRelationship.visualStyle,
@@ -602,14 +610,14 @@ export class CanvasStateRepository {
       const insertStmt = this.db.prepare(`
         INSERT INTO canvas_relationships (
           id, canvas_id, source_id, target_id, source_table_id, target_table_id,
-          source_column_name, target_column_name, relationship_type, confidence_score,
-          visual_style, line_color, line_width, curve_path, is_selected,
-          created_at, updated_at
+          source_column_name, target_column_name, source_handle, target_handle,
+          relationship_type, confidence_score, visual_style, line_color, line_width,
+          curve_path, is_selected, created_at, updated_at
         ) VALUES (
           @id, @canvas_id, @source_id, @target_id, @source_table_id, @target_table_id,
-          @source_column_name, @target_column_name, @relationship_type, @confidence_score,
-          @visual_style, @line_color, @line_width, @curve_path, @is_selected,
-          @created_at, @updated_at
+          @source_column_name, @target_column_name, @source_handle, @target_handle,
+          @relationship_type, @confidence_score, @visual_style, @line_color, @line_width,
+          @curve_path, @is_selected, @created_at, @updated_at
         )
       `);
 
@@ -622,6 +630,8 @@ export class CanvasStateRepository {
         target_table_id: validatedRelationship.targetTableId,
         source_column_name: validatedRelationship.sourceColumnName || null,
         target_column_name: validatedRelationship.targetColumnName || null,
+        source_handle: validatedRelationship.sourceHandle || null,
+        target_handle: validatedRelationship.targetHandle || null,
         relationship_type: validatedRelationship.relationshipType,
         confidence_score: validatedRelationship.confidenceScore,
         visual_style: validatedRelationship.visualStyle,
@@ -690,9 +700,9 @@ export class CanvasStateRepository {
   getCanvasRelationships(canvasId: string = 'default'): CanvasRelationship[] {
     const statement = this.db.prepare<{ canvas_id: string }>(`
       SELECT id, canvas_id, source_id, target_id, source_table_id, target_table_id,
-             source_column_name, target_column_name, relationship_type,
-             confidence_score, visual_style, line_color, line_width, curve_path,
-             is_selected, created_at, updated_at
+             source_column_name, target_column_name, source_handle, target_handle,
+             relationship_type, confidence_score, visual_style, line_color, line_width,
+             curve_path, is_selected, created_at, updated_at
       FROM canvas_relationships 
       WHERE canvas_id = @canvas_id
       ORDER BY created_at ASC
@@ -705,7 +715,9 @@ export class CanvasStateRepository {
       relationships: rows.map(r => ({
         id: r.id,
         sourceTableId: r.source_table_id,
-        targetTableId: r.target_table_id
+        targetTableId: r.target_table_id,
+        sourceHandle: r.source_handle,
+        targetHandle: r.target_handle
       }))
     });
     
@@ -718,6 +730,8 @@ export class CanvasStateRepository {
       targetTableId: row.target_table_id,
       sourceColumnName: row.source_column_name || undefined,
       targetColumnName: row.target_column_name || undefined,
+      sourceHandle: row.source_handle || undefined,
+      targetHandle: row.target_handle || undefined,
       relationshipType: row.relationship_type as any,
       confidenceScore: row.confidence_score,
       visualStyle: row.visual_style as any,

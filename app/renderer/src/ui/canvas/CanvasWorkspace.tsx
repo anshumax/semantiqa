@@ -4,7 +4,6 @@ import ReactFlow, {
   Edge,
   Controls,
   Background,
-  MiniMap,
   useNodesState,
   useEdgesState,
   addEdge,
@@ -828,6 +827,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
           fitView
           minZoom={0.1}
           maxZoom={3}
+          proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{
             type: 'smoothstep',
             animated: false,
@@ -835,19 +835,6 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="rgba(150, 150, 150, 0.3)" />
           <Controls showInteractive={false} />
-          <MiniMap 
-            nodeColor={(node) => {
-              const data = node.data as DataSourceNodeData;
-              switch (data.kind) {
-                case 'postgres': return '#336791';
-                case 'mysql': return '#00758F';
-                case 'mongo': return '#4DB33D';
-                case 'duckdb': return '#FFA500';
-                default: return '#6B7280';
-              }
-            }}
-            maskColor="rgba(0, 0, 0, 0.6)"
-          />
           
           {/* Floating Plus Button */}
           <Panel position="bottom-right">

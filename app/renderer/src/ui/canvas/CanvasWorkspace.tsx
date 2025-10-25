@@ -30,6 +30,8 @@ import { TableContextMenu } from './TableContextMenu';
 import { RelationshipContextMenu } from './RelationshipContextMenu';
 import { CanvasLoadingScreen } from './CanvasLoadingScreen';
 import { CanvasInspector, type InspectorSelection } from './inspector/CanvasInspector';
+import { ConfirmDialog } from './ConfirmDialog';
+import { IPC_CHANNELS } from '@semantiqa/app-config';
 import './CanvasWorkspace.css';
 
 // Custom node types for ReactFlow
@@ -104,6 +106,17 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
   
   // Tables data for tables view
   const [tablesData, setTablesData] = useState<TableInfo[]>([]);
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    sourceId: string;
+    sourceName: string;
+  }>({
+    isOpen: false,
+    sourceId: '',
+    sourceName: '',
+  });
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -254,12 +267,58 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     refreshCanvas();  // Refresh to update UI
   }, [deleteRelationship, refreshCanvas]);
 
-  // Handle block deletion from context menu
+  // Handle block deletion from context menu - show confirmation dialog
   const handleDeleteBlock = useCallback((blockId: string, sourceId: string) => {
-    console.log('Deleting block:', { blockId, sourceId });
-    deleteBlock(blockId, sourceId);
-    refreshCanvas();  // Refresh to update UI
-  }, [deleteBlock, refreshCanvas]);
+    console.log('Delete data source requested:', { blockId, sourceId });
+    
+    // Find the source name from nodes
+    const sourceNode = nodes.find(n => n.id === blockId);
+    const sourceName = sourceNode?.data?.name || 'this data source';
+    
+    // Show confirmation dialog
+    setConfirmDialog({
+      isOpen: true,
+      sourceId,
+      sourceName,
+    });
+    
+    // Close context menu
+    setContextMenu(prev => ({ ...prev, visible: false }));
+  }, [nodes]);
+
+  // Confirm deletion of data source
+  const handleConfirmDelete = useCallback(async () => {
+    const { sourceId, sourceName } = confirmDialog;
+    console.log('🗑️ Confirming deletion of data source:', { sourceId, sourceName });
+    
+    try {
+      // Call backend to delete data source comprehensively
+      const response = await window.semantiqa?.api.invoke(
+        IPC_CHANNELS.SOURCES_DELETE,
+        { sourceId }
+      );
+      
+      if (response && 'success' in response && response.success) {
+        console.log('✅ Data source deleted successfully:', response.deletedCounts);
+        // Refresh canvas to update UI
+        await refreshCanvas();
+      } else {
+        console.error('❌ Failed to delete data source:', response);
+        alert('Failed to delete data source. Please try again.');
+      }
+    } catch (error) {
+      console.error('❌ Error deleting data source:', error);
+      alert('An error occurred while deleting the data source.');
+    } finally {
+      // Close confirmation dialog
+      setConfirmDialog({ isOpen: false, sourceId: '', sourceName: '' });
+    }
+  }, [confirmDialog, refreshCanvas]);
+
+  // Cancel deletion
+  const handleCancelDelete = useCallback(() => {
+    setConfirmDialog({ isOpen: false, sourceId: '', sourceName: '' });
+  }, []);
 
   // Close relationship context menu
   const handleCloseRelationshipContextMenu = useCallback(() => {
@@ -895,6 +954,18 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       <CanvasInspector
         selection={inspectorSelection}
         onClose={() => setInspectorSelection(null)}
+      />
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title="Delete Data Source"
+        message={`Are you sure you want to permanently delete "${confirmDialog.sourceName}"? This will remove all metadata, tables, relationships, embeddings, and canvas blocks associated with this data source. This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmDangerous={true}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
       />
     </div>
   );

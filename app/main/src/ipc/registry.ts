@@ -45,6 +45,7 @@ const channelToSchema: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
     connection: z.record(z.unknown()) 
   }),
   'sources:get-details': z.object({ sourceId: z.string() }),
+  'sources:delete': z.object({ sourceId: z.string() }),
   'metadata:crawl': MetadataCrawlRequestSchema,
   'sources:test-connection': z.object({ sourceId: z.string() }),
   'sources:crawl-all': z.undefined(),
@@ -101,6 +102,13 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
         topTables: z.array(z.object({ name: z.string(), rowCount: z.number(), columnCount: z.number() })).optional(),
       }),
     }),
+    SemantiqaErrorSchema
+  ]),
+  'sources:delete': z.union([
+    z.object({ 
+      success: z.boolean(),
+      deletedCounts: z.record(z.number())
+    }), 
     SemantiqaErrorSchema
   ]),
   'metadata:crawl': z.union([MetadataCrawlResponseSchema, SemantiqaErrorSchema]),

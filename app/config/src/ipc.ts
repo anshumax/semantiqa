@@ -31,6 +31,7 @@ export type IpcChannel =
   | 'sources:add:secure'
   | 'sources:check-duplicate'
   | 'sources:get-details'
+  | 'sources:delete'
   | 'metadata:crawl'
   | 'sources:test-connection'
   | 'sources:crawl-all'
@@ -93,6 +94,11 @@ type HandlerMap = {
         topTables?: Array<{ name: string; rowCount: number; columnCount: number }>;
       };
     } | SemantiqaError;
+  };
+  /** Permanently deletes a data source and all associated metadata, canvas blocks, and relationships */
+  'sources:delete': {
+    request: { sourceId: string };
+    response: { success: boolean; deletedCounts: Record<string, number> } | SemantiqaError;
   };
   /** Triggers metadata crawl for a data source to introspect schema, tables, and columns */
   'metadata:crawl': {
@@ -233,6 +239,7 @@ export const IPC_CHANNELS = {
   SOURCES_ADD: 'sources:add' as const,
   SOURCES_CHECK_DUPLICATE: 'sources:check-duplicate' as const,
   SOURCES_GET_DETAILS: 'sources:get-details' as const,
+  SOURCES_DELETE: 'sources:delete' as const,
   METADATA_CRAWL: 'metadata:crawl' as const,
   SOURCES_TEST_CONNECTION: 'sources:test-connection' as const,
   SOURCES_CRAWL_ALL: 'sources:crawl-all' as const,
@@ -267,6 +274,7 @@ export type SafeRendererChannels = Pick<
   | 'SOURCES_ADD'
   | 'SOURCES_CHECK_DUPLICATE'
   | 'SOURCES_GET_DETAILS'
+  | 'SOURCES_DELETE'
   | 'METADATA_CRAWL'
   | 'SOURCES_RETRY_CRAWL'
   | 'SOURCES_CRAWL_ALL'
@@ -297,6 +305,7 @@ export const SAFE_RENDERER_CHANNEL_VALUES = Object.values({
   SOURCES_ADD: IPC_CHANNELS.SOURCES_ADD,
   SOURCES_CHECK_DUPLICATE: IPC_CHANNELS.SOURCES_CHECK_DUPLICATE,
   SOURCES_GET_DETAILS: IPC_CHANNELS.SOURCES_GET_DETAILS,
+  SOURCES_DELETE: IPC_CHANNELS.SOURCES_DELETE,
   METADATA_CRAWL: IPC_CHANNELS.METADATA_CRAWL,
   SOURCES_RETRY_CRAWL: IPC_CHANNELS.SOURCES_RETRY_CRAWL,
   SOURCES_CRAWL_ALL: IPC_CHANNELS.SOURCES_CRAWL_ALL,

@@ -150,14 +150,16 @@ export class DatabaseService {
 
     this.db.exec(`CREATE TABLE IF NOT EXISTS embeddings (
       id TEXT PRIMARY KEY,
-      doc_id TEXT NOT NULL,
+      owner_type TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      vec BLOB NOT NULL,
+      dim INTEGER NOT NULL,
       model TEXT NOT NULL,
-      embedding BLOB NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (doc_id) REFERENCES docs(id) ON DELETE CASCADE
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (owner_type, owner_id)
     )`);
 
-    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_embeddings_doc ON embeddings(doc_id)`);
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_embeddings_owner ON embeddings(owner_type, owner_id)`);
 
     this.db.exec(`CREATE TABLE IF NOT EXISTS provenance (
       id TEXT PRIMARY KEY,

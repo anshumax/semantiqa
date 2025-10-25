@@ -53,8 +53,46 @@ export class SourceProvisioningService {
     // Check for existing connection before creating
     const existing = sourceService.findExistingConnection(request);
     if (existing) {
-      const errorMessage = `A source with the same connection already exists: "${existing.name}" (ID: ${existing.id})`;
       logger.warn('Duplicate connection detected', { existing, request: { kind: request.kind, name: request.name } });
+      
+      // Check if a canvas block already exists for this source
+      if (this.deps.canvasService) {
+        try {
+          const canvasData = await this.deps.canvasService.getCanvas({
+            canvasId: 'default',
+            includeBlocks: true,
+            includeRelationships: false,
+            includeLevelData: false
+          });
+          
+          const blockExists = canvasData.blocks?.some(block => block.sourceId === existing.id);
+          
+          if (!blockExists) {
+            logger.info('Canvas block does not exist for duplicate source - creating one', { sourceId: existing.id });
+            await this.createCanvasBlockForSource(existing.id, existing.name);
+            audit({
+              action: 'sources.add.duplicate_canvas_block_created',
+              sourceId: existing.id,
+              status: 'success',
+              details: { sourceName: existing.name },
+            });
+            
+            // Return success since we created the canvas block
+            return { sourceId: existing.id };
+          }
+          
+          logger.info('Canvas block already exists for duplicate source', { sourceId: existing.id });
+        } catch (canvasError) {
+          logger.warn('Failed to check/create canvas block for duplicate source', { 
+            error: canvasError, 
+            sourceId: existing.id 
+          });
+          // Continue with error response if canvas block check/creation fails
+        }
+      }
+      
+      // Canvas block already exists or canvas service unavailable - return error
+      const errorMessage = `A source with the same connection already exists: "${existing.name}" (ID: ${existing.id})`;
       audit({
         action: 'sources.add.duplicate_rejected',
         status: 'failure',

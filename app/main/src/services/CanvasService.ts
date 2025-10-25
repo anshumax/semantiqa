@@ -248,14 +248,6 @@ export class CanvasService {
   }
 
   /**
-   * Update just a block position (for frequent drag operations)
-   */
-  async updateBlockPosition(blockId: string, position: { x: number; y: number }): Promise<void> {
-    this.canvasRepo.updateBlockPosition(blockId, position);
-  }
-
-
-  /**
    * Delete a canvas relationship
    */
   async deleteCanvasRelationship(relationshipId: string): Promise<boolean> {

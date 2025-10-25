@@ -291,5 +291,150 @@ export class SourceRepository {
 
     transaction();
   }
+
+  /**
+   * Comprehensive deletion of a data source and all its associated data
+   * Includes: canvas blocks, relationships, nodes, edges, embeddings, and audit logs
+   */
+  deleteSourceCascade(sourceId: string): { deletedCounts: Record<string, number> } {
+    const counts: Record<string, number> = {};
+    
+    const transaction = this.db.transaction(() => {
+      // 1. Delete canvas relationships where this source is involved
+      const deleteCanvasRelationships = this.db.prepare(`
+        DELETE FROM canvas_relationships 
+        WHERE source_id = ? OR target_id = ?
+      `);
+      const relResult = deleteCanvasRelationships.run(sourceId, sourceId);
+      counts.canvasRelationships = relResult.changes ?? 0;
+      
+      // 2. Delete canvas table blocks for this source
+      const deleteTableBlocks = this.db.prepare(`
+        DELETE FROM canvas_table_blocks WHERE source_id = ?
+      `);
+      const tableBlockResult = deleteTableBlocks.run(sourceId);
+      counts.canvasTableBlocks = tableBlockResult.changes ?? 0;
+      
+      // 3. Delete canvas source block (will cascade due to FK)
+      const deleteSourceBlock = this.db.prepare(`
+        DELETE FROM canvas_source_blocks WHERE source_id = ?
+      `);
+      const sourceBlockResult = deleteSourceBlock.run(sourceId);
+      counts.canvasSourceBlocks = sourceBlockResult.changes ?? 0;
+      
+      // 4. Get all nodes owned by this source (tables, columns, etc.)
+      const getOwnedNodes = this.db.prepare(`
+        SELECT id FROM nodes 
+        WHERE owner_ids IS NOT NULL 
+        AND json_extract(owner_ids, '$[0]') = ?
+      `);
+      const ownedNodes = getOwnedNodes.all(sourceId) as Array<{ id: string }>;
+      const ownedNodeIds = ownedNodes.map(n => n.id);
+      counts.nodesFound = ownedNodeIds.length;
+      
+      // 5. Delete embeddings for this source's nodes and the source itself
+      if (ownedNodeIds.length > 0) {
+        const placeholders = ownedNodeIds.map(() => '?').join(',');
+        const deleteEmbeddings = this.db.prepare(`
+          DELETE FROM embeddings 
+          WHERE owner_id IN (${placeholders})
+          OR owner_id = ?
+        `);
+        const embResult = deleteEmbeddings.run(...ownedNodeIds, sourceId);
+        counts.embeddings = embResult.changes ?? 0;
+      } else {
+        const deleteSourceEmbedding = this.db.prepare(`
+          DELETE FROM embeddings WHERE owner_id = ?
+        `);
+        const embResult = deleteSourceEmbedding.run(sourceId);
+        counts.embeddings = embResult.changes ?? 0;
+      }
+      
+      // 6. Delete edges connected to this source's nodes
+      if (ownedNodeIds.length > 0) {
+        const placeholders = ownedNodeIds.map(() => '?').join(',');
+        const deleteEdges = this.db.prepare(`
+          DELETE FROM edges 
+          WHERE src_id IN (${placeholders})
+          OR dst_id IN (${placeholders})
+        `);
+        const edgeResult = deleteEdges.run(...ownedNodeIds, ...ownedNodeIds);
+        counts.edges = edgeResult.changes ?? 0;
+      } else {
+        counts.edges = 0;
+      }
+      
+      // 7. Delete semantic relationships involving this source's tables
+      if (ownedNodeIds.length > 0) {
+        const placeholders = ownedNodeIds.map(() => '?').join(',');
+        const deleteSemanticRels = this.db.prepare(`
+          DELETE FROM semantic_relationships 
+          WHERE source_table_id IN (${placeholders})
+          OR target_table_id IN (${placeholders})
+        `);
+        const semRelResult = deleteSemanticRels.run(...ownedNodeIds, ...ownedNodeIds);
+        counts.semanticRelationships = semRelResult.changes ?? 0;
+      } else {
+        counts.semanticRelationships = 0;
+      }
+      
+      // 8. Delete all nodes owned by this source
+      if (ownedNodeIds.length > 0) {
+        const placeholders = ownedNodeIds.map(() => '?').join(',');
+        const deleteNodes = this.db.prepare(`
+          DELETE FROM nodes WHERE id IN (${placeholders})
+        `);
+        const nodeResult = deleteNodes.run(...ownedNodeIds);
+        counts.nodes = nodeResult.changes ?? 0;
+      } else {
+        counts.nodes = 0;
+      }
+      
+      // 9. Delete the source node itself
+      const deleteSourceNode = this.db.prepare(`
+        DELETE FROM nodes WHERE id = ?
+      `);
+      const sourceNodeResult = deleteSourceNode.run(sourceId);
+      counts.sourceNode = sourceNodeResult.changes ?? 0;
+      
+      // 10. Delete provenance records
+      if (ownedNodeIds.length > 0) {
+        const placeholders = ownedNodeIds.map(() => '?').join(',');
+        const deleteProvenance = this.db.prepare(`
+          DELETE FROM provenance 
+          WHERE owner_id IN (${placeholders})
+          OR owner_id = ?
+        `);
+        const provResult = deleteProvenance.run(...ownedNodeIds, sourceId);
+        counts.provenance = provResult.changes ?? 0;
+      } else {
+        const deleteSourceProv = this.db.prepare(`
+          DELETE FROM provenance WHERE owner_id = ?
+        `);
+        const provResult = deleteSourceProv.run(sourceId);
+        counts.provenance = provResult.changes ?? 0;
+      }
+      
+      // 11. Delete changelog entries related to this source
+      const deleteChangelog = this.db.prepare(`
+        DELETE FROM changelog WHERE entity_id = ?
+      `);
+      const changelogResult = deleteChangelog.run(sourceId);
+      counts.changelog = changelogResult.changes ?? 0;
+      
+      // 12. Finally, delete the source itself from sources table
+      const deleteSource = this.db.prepare(`
+        DELETE FROM sources WHERE id = ?
+      `);
+      const sourceResult = deleteSource.run(sourceId);
+      counts.source = sourceResult.changes ?? 0;
+      
+      console.log('🗑️ Source deletion completed:', { sourceId, counts });
+    });
+
+    transaction();
+    
+    return { deletedCounts: counts };
+  }
 }
 

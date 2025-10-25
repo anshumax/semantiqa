@@ -491,23 +491,6 @@ export class CanvasStateRepository {
     });
   }
 
-  /**
-   * Update block position only (for frequent drag updates)
-   */
-  updateBlockPosition(blockId: string, position: CanvasPosition): void {
-    const statement = this.db.prepare(`
-      UPDATE canvas_blocks 
-      SET position_x = @x, position_y = @y, updated_at = @updated_at
-      WHERE id = @id
-    `);
-
-    statement.run({
-      id: blockId,
-      x: position.x,
-      y: position.y,
-      updated_at: new Date().toISOString(),
-    });
-  }
 
   /**
    * Delete a canvas block and its associated relationships
@@ -534,13 +517,7 @@ export class CanvasStateRepository {
       `);
       const tableResult = deleteTableBlockStmt.run(blockId);
 
-      // Delete from legacy canvas_blocks table for backward compatibility
-      const deleteLegacyBlockStmt = this.db.prepare(`
-        DELETE FROM canvas_blocks WHERE id = ?
-      `);
-      const legacyResult = deleteLegacyBlockStmt.run(blockId);
-
-      return (sourceResult.changes ?? 0) + (tableResult.changes ?? 0) + (legacyResult.changes ?? 0);
+      return (sourceResult.changes ?? 0) + (tableResult.changes ?? 0);
     });
 
     return transaction();
@@ -706,36 +683,6 @@ export class CanvasStateRepository {
     return (result.changes ?? 0) > 0;
   }
 
-  /**
-   * Get all blocks for a canvas
-   */
-  getCanvasBlocks(canvasId: string = 'default'): CanvasBlock[] {
-    const statement = this.db.prepare<{ canvas_id: string }>(`
-      SELECT id, canvas_id, source_id, position_x, position_y, width, height, 
-             z_index, color_theme, is_selected, is_minimized, custom_title,
-             created_at, updated_at
-      FROM canvas_blocks 
-      WHERE canvas_id = @canvas_id
-      ORDER BY z_index ASC, created_at ASC
-    `);
-    
-    const rows = statement.all({ canvas_id: canvasId }) as CanvasBlockRow[];
-    
-    return rows.map(row => ({
-      id: row.id,
-      canvasId: row.canvas_id,
-      sourceId: row.source_id,
-      position: { x: row.position_x, y: row.position_y },
-      size: { width: row.width, height: row.height },
-      zIndex: row.z_index,
-      colorTheme: row.color_theme as any,
-      isSelected: Boolean(row.is_selected),
-      isMinimized: Boolean(row.is_minimized),
-      customTitle: row.custom_title,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    }));
-  }
 
   /**
    * Get all relationships for a canvas

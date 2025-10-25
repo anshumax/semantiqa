@@ -446,6 +446,22 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     [IPC_CHANNELS.CANVAS_DELETE_BLOCK]: (request) => canvasService.deleteBlock(request),
     [IPC_CHANNELS.TABLES_LIST]: async (request: { sourceId: string }) => tablesService.listTables(request.sourceId),
     [IPC_CHANNELS.SOURCES_GET_DETAILS]: async (request: { sourceId: string }) => sourceDetailsService.getSourceDetails(request.sourceId),
+    [IPC_CHANNELS.SOURCES_DELETE]: async (request: { sourceId: string }) => {
+      console.log('🗑️ Delete source request received:', request.sourceId);
+      try {
+        const sourceService = new SourceService({ openDatabase: graphDbFactory });
+        const result = sourceService.deleteSourceCascade(request.sourceId);
+        console.log('✅ Source deleted successfully:', result);
+        return { success: true, ...result };
+      } catch (error) {
+        console.error('❌ Failed to delete source:', error);
+        return {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to delete data source',
+          details: { error: (error as Error).message },
+        };
+      }
+    },
     [IPC_CHANNELS.TABLES_GET_DETAILS]: async (request: { sourceId: string; tableId: string }) => tableDetailsService.getTableDetails(request.sourceId, request.tableId),
   };
 

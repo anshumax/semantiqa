@@ -107,7 +107,7 @@ export function DataSourceContextMenu({
         className="data-source-context-menu__item data-source-context-menu__item--delete"
         onClick={handleDelete}
       >
-        🗑️ Delete block
+        🗑️ Delete data source
       </div>
     </div>
   );

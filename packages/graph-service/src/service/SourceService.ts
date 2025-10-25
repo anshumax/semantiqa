@@ -53,6 +53,15 @@ export class SourceService {
   }
 
   /**
+   * Comprehensive deletion of a data source and all its associated data
+   * Atomically deletes: canvas blocks, relationships, nodes, edges, embeddings, and audit logs
+   */
+  deleteSourceCascade(sourceId: string): { deletedCounts: Record<string, number> } {
+    const repo = this.ensureRepository();
+    return repo.deleteSourceCascade(sourceId);
+  }
+
+  /**
    * Check if a source with the same connection already exists
    */
   findExistingConnection(payload: SourcesAddRequest): { id: string; name: string } | null {

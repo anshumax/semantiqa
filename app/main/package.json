@@ -13,23 +13,25 @@
     "start": "pnpm run build && cross-env NODE_ENV=development electron ."
   },
   "dependencies": {
+    "@semantiqa/adapter-duckdb": "workspace:^0.1.0",
+    "@semantiqa/adapter-mongo": "workspace:^0.1.0",
+    "@semantiqa/adapter-mysql": "workspace:^0.1.0",
+    "@semantiqa/adapter-postgres": "workspace:^0.1.0",
+    "@semantiqa/adapters-runtime": "workspace:^0.1.0",
     "@semantiqa/app-config": "workspace:^0.1.0",
     "@semantiqa/contracts": "workspace:^0.1.0",
     "@semantiqa/graph-service": "workspace:^0.1.0",
-    "@semantiqa/adapters-runtime": "workspace:^0.1.0",
-    "@semantiqa/adapter-postgres": "workspace:^0.1.0",
-    "@semantiqa/adapter-mysql": "workspace:^0.1.0",
-    "@semantiqa/adapter-mongo": "workspace:^0.1.0",
-    "@semantiqa/adapter-duckdb": "workspace:^0.1.0",
+    "@types/dagre": "^0.7.53",
+    "dagre": "^0.8.5",
     "electron": "^32.3.3",
     "keytar": "^7.9.0",
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.7.1",
     "@semantiqa/storage-sqlite": "workspace:^0.1.0",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^11.1.2",
-    "@electron/rebuild": "^3.7.1",
     "cross-env": "^7.0.3"
   }
 }

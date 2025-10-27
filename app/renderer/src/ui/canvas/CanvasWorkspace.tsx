@@ -27,10 +27,13 @@ import type { CanvasTableBlock } from '@semantiqa/contracts';
 import { DataSourceContextMenu } from './DataSourceContextMenu';
 import { TableContextMenu } from './TableContextMenu';
 import { RelationshipContextMenu } from './RelationshipContextMenu';
+import { CanvasPaneContextMenu } from './CanvasPaneContextMenu';
 import { CanvasLoadingScreen } from './CanvasLoadingScreen';
+import { CrawlFinalizingOverlay } from './CrawlFinalizingOverlay';
 import { CanvasInspector, type InspectorSelection } from './inspector/CanvasInspector';
 import { ConfirmDialog } from './ConfirmDialog';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
+import { applyAutoLayout, updateEdgeHandles } from './layoutService';
 import './CanvasWorkspace.css';
 
 // Custom node types for ReactFlow
@@ -72,6 +75,9 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
 
   // Initial load state
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
+  // Crawl finalizing overlay state
+  const [finalizingSource, setFinalizingSource] = useState<string | null>(null);
   
   // ReactFlow state
   const [nodes, setNodes, onNodesChange] = useNodesState<DataSourceNodeData>([]);
@@ -158,6 +164,17 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     y: 0,
     tableId: '',
     sourceId: '',
+  });
+
+  // Pane context menu state
+  const [paneContextMenu, setPaneContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
   });
   
   // Inspector selection state
@@ -340,7 +357,84 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     setContextMenu(prev => ({ ...prev, visible: false }));
     setTableContextMenu(prev => ({ ...prev, visible: false }));
     setRelationshipContextMenu(prev => ({ ...prev, visible: false }));
+    setPaneContextMenu(prev => ({ ...prev, visible: false }));
     setInspectorSelection(null);
+  }, []);
+
+  // Handle pane context menu (right-click on canvas background)
+  const onPaneContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    
+    setPaneContextMenu({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+    });
+    
+    // Close other menus
+    setContextMenu(prev => ({ ...prev, visible: false }));
+    setTableContextMenu(prev => ({ ...prev, visible: false }));
+    setRelationshipContextMenu(prev => ({ ...prev, visible: false }));
+  }, []);
+
+  // Handle auto-arrange action
+  const handleAutoArrange = useCallback(() => {
+    console.log('🎨 Auto-arranging nodes...');
+    
+    if (nodes.length === 0) {
+      console.log('No nodes to arrange');
+      return;
+    }
+    
+    // Apply dagre layout algorithm
+    const layoutedNodes = applyAutoLayout(nodes, edges, {
+      direction: 'TB',
+      nodeWidth: 250,
+      nodeHeight: 120,
+      rankSep: 150,
+      nodeSep: 100,
+    });
+    
+    // Calculate optimal connection handles based on new positions
+    const updatedEdges = updateEdgeHandles(layoutedNodes, edges, 250, 120);
+    
+    console.log('🔗 Updated edges with optimal handles:', updatedEdges.map(e => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      sourceHandle: e.sourceHandle,
+      targetHandle: e.targetHandle
+    })));
+    
+    // Update nodes with new positions
+    setNodes(layoutedNodes);
+    
+    // Update edges with new handles
+    setEdges(updatedEdges);
+    
+    // Update block positions in persistence layer
+    layoutedNodes.forEach(node => {
+      updateBlockPosition(node.id, node.position);
+    });
+    
+    // Update relationship handles in persistence layer
+    if (canvasData?.relationships && updatedEdges.length > 0) {
+      const relationshipUpdates = updatedEdges.map(edge => ({
+        id: edge.id,
+        sourceHandle: edge.sourceHandle || undefined,
+        targetHandle: edge.targetHandle || undefined,
+      }));
+      
+      console.log('💾 Updating relationship handles:', relationshipUpdates);
+      updateCanvas({ relationships: relationshipUpdates });
+    }
+    
+    console.log('✅ Auto-arrange complete');
+  }, [nodes, edges, setNodes, setEdges, updateBlockPosition, updateCanvas, canvasData?.relationships]);
+
+  // Close pane context menu
+  const handleClosePaneContextMenu = useCallback(() => {
+    setPaneContextMenu(prev => ({ ...prev, visible: false }));
   }, []);
 
   // Handle "View Details" from data source context menu
@@ -427,6 +521,8 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
   const initializedTablesRef = useRef<Set<string>>(new Set());
   // Track if we've already created nodes for this view (to prevent recreation)
   const nodesCreatedRef = useRef(false);
+  // Track if auto-arrange has been applied for current view
+  const autoArrangeAppliedRef = useRef(false);
 
   // Convert table data to ReactFlow nodes for tables view (separate effect to avoid recreation)
   useEffect(() => {
@@ -504,6 +600,73 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       nodesCreatedRef.current = false;
     }
   }, [tablesData, state.currentLevel, state.sourceKind, state.sourceId, canvasData?.tableBlocks, setNodes, updateCanvas, handleTableContextMenu]);
+
+  // Auto-arrange on first view
+  useEffect(() => {
+    // Don't auto-arrange if already done or no nodes
+    if (autoArrangeAppliedRef.current || nodes.length === 0) {
+      return;
+    }
+    
+    // Check if this view has been auto-arranged before using localStorage
+    const storageKey = state.currentLevel === 'tables' 
+      ? `auto-arranged-tables-${state.sourceId}` 
+      : `auto-arranged-sources`;
+    
+    const hasBeenArranged = localStorage.getItem(storageKey) === 'true';
+    
+    if (!hasBeenArranged) {
+      console.log(`🎨 Applying automatic layout for ${state.currentLevel} view (first time)`);
+      
+      // Small delay to ensure nodes are fully initialized
+      setTimeout(() => {
+        const layoutedNodes = applyAutoLayout(nodes, edges, {
+          direction: 'TB',
+          nodeWidth: 250,
+          nodeHeight: 120,
+          rankSep: 150,
+          nodeSep: 100,
+        });
+        
+        // Calculate optimal connection handles based on new positions
+        const updatedEdges = updateEdgeHandles(layoutedNodes, edges, 250, 120);
+        
+        setNodes(layoutedNodes);
+        setEdges(updatedEdges);
+        
+        // Update positions in persistence
+        layoutedNodes.forEach(node => {
+          updateBlockPosition(node.id, node.position);
+        });
+        
+        // Update relationship handles in persistence layer
+        if (canvasData?.relationships && updatedEdges.length > 0) {
+          const relationshipUpdates = updatedEdges.map(edge => ({
+            id: edge.id,
+            sourceHandle: edge.sourceHandle || undefined,
+            targetHandle: edge.targetHandle || undefined,
+          }));
+          
+          console.log('💾 Updating relationship handles (auto-layout):', relationshipUpdates);
+          updateCanvas({ relationships: relationshipUpdates });
+        }
+        
+        // Mark as arranged
+        localStorage.setItem(storageKey, 'true');
+        autoArrangeAppliedRef.current = true;
+        
+        console.log('✅ Automatic layout applied');
+      }, 100);
+    } else {
+      // Already arranged previously
+      autoArrangeAppliedRef.current = true;
+    }
+  }, [nodes, edges, state.currentLevel, state.sourceId, setNodes, setEdges, updateBlockPosition, updateCanvas, canvasData?.relationships]);
+
+  // Reset auto-arrange flag when changing views
+  useEffect(() => {
+    autoArrangeAppliedRef.current = false;
+  }, [state.currentLevel, state.sourceId]);
 
   // Convert canvas relationships to ReactFlow edges
   useEffect(() => {
@@ -782,12 +945,50 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     loadInitialState();
   }, [refreshCanvas]);
 
+  // Listen for crawl completion to show finalizing overlay
+  useEffect(() => {
+    const handleStatusChange = (event: any, payload: any) => {
+      console.log('🎯 Source status changed:', payload);
+      
+      // Show overlay when crawl completes
+      if (payload.crawlStatus === 'crawled' && payload.connectionStatus === 'connected') {
+        const sourceName = payload.sourceName || 'Data Source';
+        console.log(`✨ Showing finalizing overlay for: ${sourceName}`);
+        setFinalizingSource(sourceName);
+        
+        // Brief delay to allow DB writes to complete, then refresh
+        setTimeout(async () => {
+          console.log('🔄 Refreshing canvas after crawl completion');
+          await refreshCanvas();
+          
+          // Hide overlay after refresh
+          setTimeout(() => {
+            console.log('✅ Hiding finalizing overlay');
+            setFinalizingSource(null);
+          }, 300);
+        }, 800);
+      }
+    };
+    
+    // Subscribe to source status changes
+    window.electron?.ipcRenderer?.on('sources:status', handleStatusChange);
+    
+    // Cleanup
+    return () => {
+      window.electron?.ipcRenderer?.off('sources:status', handleStatusChange);
+    };
+  }, [refreshCanvas]);
+
   // Note: Auto-save is handled by the debounced save mechanism
   // Changes are automatically saved after 5 seconds of inactivity
 
   return (
     <div className={`canvas-workspace ${className}`}>
       <CanvasLoadingScreen visible={isInitialLoad} message="Creating map..." />
+      <CrawlFinalizingOverlay 
+        isVisible={!!finalizingSource} 
+        sourceName={finalizingSource || ''} 
+      />
       
       {/* Breadcrumb navigation */}
       <CanvasBreadcrumbs 
@@ -842,6 +1043,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
           onNodeDoubleClick={handleNodeDoubleClick}
           onEdgeContextMenu={onEdgeContextMenu}
           onPaneClick={onPaneClick}
+          onPaneContextMenu={onPaneContextMenu}
           nodeTypes={nodeTypes}
           fitView
           minZoom={0.1}
@@ -954,6 +1156,15 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         relationshipId={relationshipContextMenu.relationshipId}
         onClose={handleCloseRelationshipContextMenu}
         onDelete={handleDeleteRelationship}
+      />
+
+      {/* Pane Context Menu */}
+      <CanvasPaneContextMenu
+        x={paneContextMenu.x}
+        y={paneContextMenu.y}
+        visible={paneContextMenu.visible}
+        onClose={handleClosePaneContextMenu}
+        onAutoArrange={handleAutoArrange}
       />
 
       {/* Canvas Inspector */}

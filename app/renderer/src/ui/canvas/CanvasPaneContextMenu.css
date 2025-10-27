@@ -1,0 +1,26 @@
+.canvas-pane-context-menu {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  min-width: 180px;
+}
+
+.canvas-pane-context-menu__item {
+  padding: 12px 16px;
+  cursor: pointer;
+  color: #f9fafb;
+  font-size: 14px;
+  transition: background-color 0.15s ease;
+  user-select: none;
+}
+
+.canvas-pane-context-menu__item:hover {
+  background-color: #374151;
+}
+
+.canvas-pane-context-menu__item:active {
+  background-color: #4b5563;
+}
+

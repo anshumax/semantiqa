@@ -280,6 +280,9 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     await keytar.setPassword('semantiqa', `${sourceId}:${key}`, secret);
   };
 
+  // Canvas service - create early for use in metadata crawl
+  const canvasService = new CanvasService(graphDbFactory());
+
   // Metadata crawl service
   const metadataCrawlService = new MetadataCrawlService({
     openSourcesDb: graphDbFactory,
@@ -297,6 +300,7 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     },
     audit,
     logger: console,
+    canvasService,
   });
 
   const crawlQueue = new CrawlQueue({
@@ -358,9 +362,6 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     audit,
     logger: console,
   });
-
-  // Canvas service - use graphStore instance to ensure single connection
-  const canvasService = new CanvasService(graphDbFactory());
 
   // Source provisioning service
   const sourceProvisioningService = new SourceProvisioningService({

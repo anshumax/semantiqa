@@ -1,6 +1,8 @@
 import { MysqlAdapter } from '../mysqlAdapter';
 
 import { z } from 'zod';
+import { CrawlWarning, AvailableFeatures, EnhancedCrawlResult } from './types';
+import { getForeignKeys, type ForeignKeyConstraint } from './foreignKeys';
 
 const TableRowSchema = z.object({
   table_schema: z.string(),
@@ -40,6 +42,7 @@ export interface SchemaTable {
 
 export interface SchemaSnapshot {
   tables: SchemaTable[];
+  foreignKeys?: ForeignKeyConstraint[];
 }
 
 const TABLE_QUERY = `
@@ -114,6 +117,45 @@ export async function crawlSchema(mysqlAdapter: MysqlAdapter): Promise<SchemaSna
   } finally {
     connection.release();
   }
+}
+
+export async function crawlSchemaWithForeignKeys(mysqlAdapter: MysqlAdapter): Promise<EnhancedCrawlResult<SchemaSnapshot>> {
+  const warnings: CrawlWarning[] = [];
+  const features: AvailableFeatures = {
+    hasRowCounts: false,
+    hasStatistics: false,
+    hasComments: false,
+    hasPermissionErrors: false,
+  };
+  
+  // Crawl schema with error handling for tier fallbacks
+  let tables: SchemaTable[];
+  try {
+    const schemaResult = await crawlSchema(mysqlAdapter);
+    tables = schemaResult.tables;
+  } catch (error) {
+    warnings.push({
+      level: 'error',
+      feature: 'schema_crawl',
+      message: `Failed to crawl schema: ${(error as Error).message}`,
+      suggestion: 'Verify database permissions and connectivity.'
+    });
+    features.hasPermissionErrors = true;
+    tables = [];
+  }
+  
+  // Discover foreign keys
+  const { foreignKeys, warnings: fkWarnings } = await getForeignKeys(mysqlAdapter);
+  warnings.push(...fkWarnings);
+  
+  return {
+    data: {
+      tables,
+      foreignKeys: foreignKeys.length > 0 ? foreignKeys : undefined,
+    },
+    warnings,
+    availableFeatures: features,
+  };
 }
 
 

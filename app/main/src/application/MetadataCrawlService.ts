@@ -3,12 +3,12 @@ import type { Database as BetterSqliteDatabase } from 'better-sqlite3';
 
 import {
   PostgresAdapter,
-  crawlSchema as crawlPostgres,
+  crawlSchemaWithForeignKeys as crawlPostgres,
   profileTables as profilePostgres,
 } from '@semantiqa/adapter-postgres';
 import {
   MysqlAdapter,
-  crawlSchema as crawlMysql,
+  crawlSchemaWithForeignKeys as crawlMysql,
   profileTables as profileMysql,
 } from '@semantiqa/adapter-mysql';
 import {
@@ -18,7 +18,7 @@ import {
 } from '@semantiqa/adapter-mongo';
 import {
   DuckDbAdapter,
-  crawlDuckDbSchema,
+  crawlDuckDbSchemaWithForeignKeys as crawlDuckDbSchema,
   profileDuckDbTables,
 } from '@semantiqa/adapter-duckdb';
 import { SourceService } from '@semantiqa/graph-service';
@@ -59,6 +59,9 @@ export interface MetadataCrawlDeps {
     info(message: string, meta?: Record<string, unknown>): void;
     warn(message: string, meta?: Record<string, unknown>): void;
     error(message: string, meta?: Record<string, unknown>): void;
+  };
+  canvasService?: {
+    createRelationshipsFromForeignKeys(sourceId: string, canvasId?: string): Promise<number>;
   };
 }
 
@@ -199,6 +202,17 @@ export class MetadataCrawlService {
         stats: (stats as any).data || stats,
         warnings: allWarnings,
       });
+
+      // Auto-create canvas relationships from discovered FKs
+      if (this.deps.canvasService && (snapshot as any).data?.foreignKeys?.length > 0) {
+        try {
+          const count = await this.deps.canvasService.createRelationshipsFromForeignKeys(sourceId, 'default');
+          logger.info('Auto-created canvas relationships from FKs', { sourceId, count });
+        } catch (error) {
+          logger.error('Failed to create canvas relationships', { sourceId, error });
+          // Non-fatal - don't block crawl completion
+        }
+      }
 
       await updateCrawlStatus(sourceId, 'crawled');
       sourceService.setCrawlStatus(sourceId, 'crawled');

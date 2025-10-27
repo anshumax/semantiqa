@@ -1,6 +1,16 @@
 import type { Database } from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 
+interface ForeignKeyConstraint {
+  constraintName: string;
+  sourceSchema: string;
+  sourceTable: string;
+  sourceColumn: string;
+  targetSchema: string;
+  targetTable: string;
+  targetColumn: string;
+}
+
 interface RelationalSnapshot {
   tables: Array<{
     schema: string;
@@ -15,6 +25,7 @@ interface RelationalSnapshot {
       comment: string | null;
     }>;
   }>;
+  foreignKeys?: ForeignKeyConstraint[];
 }
 
 interface MongoSnapshot {
@@ -49,6 +60,16 @@ export class SnapshotRepository {
         features: [...new Set(params.warnings.map(w => w.feature))],
       };
       console.log(`[SnapshotRepository] Stored snapshot with warnings for ${params.sourceId}:`, warningsSummary);
+    }
+
+    // Debug: Log if foreignKeys are present
+    if (params.kind !== 'mongo') {
+      const relSnapshot = params.snapshot as RelationalSnapshot;
+      if (relSnapshot.foreignKeys) {
+        console.log(`[SnapshotRepository] Snapshot has ${relSnapshot.foreignKeys.length} foreign keys`);
+      } else {
+        console.log(`[SnapshotRepository] Snapshot has NO foreign keys field`);
+      }
     }
 
     const transaction = this.db.transaction(() => {
@@ -259,6 +280,42 @@ export class SnapshotRepository {
           props: null,
           origin_device_id: null,
         });
+      }
+    }
+
+    // Persist foreign key edges
+    if (snapshot.foreignKeys && snapshot.foreignKeys.length > 0) {
+      console.log(`Persisting ${snapshot.foreignKeys.length} foreign key relationships for source ${sourceId}`);
+      
+      for (const fk of snapshot.foreignKeys) {
+        const srcTableId = `tbl_${sourceId}_${fk.sourceSchema}_${fk.sourceTable}`;
+        const srcColumnId = `col_${srcTableId}_${fk.sourceColumn}`;
+        
+        const dstTableId = `tbl_${sourceId}_${fk.targetSchema}_${fk.targetTable}`;
+        const dstColumnId = `col_${dstTableId}_${fk.targetColumn}`;
+        
+        const fkEdgeId = `fk_${srcColumnId}_${dstColumnId}`;
+        
+        try {
+          upsertEdge({
+            id: fkEdgeId,
+            src_id: srcColumnId,
+            dst_id: dstColumnId,
+            type: 'FOREIGN_KEY',
+            props: JSON.stringify({ 
+              constraintName: fk.constraintName,
+              sourceSchema: fk.sourceSchema,
+              sourceTable: fk.sourceTable,
+              sourceColumn: fk.sourceColumn,
+              targetSchema: fk.targetSchema,
+              targetTable: fk.targetTable,
+              targetColumn: fk.targetColumn,
+            }),
+            origin_device_id: null,
+          });
+        } catch (error) {
+          console.warn(`Failed to persist FK edge ${fkEdgeId}:`, error);
+        }
       }
     }
 

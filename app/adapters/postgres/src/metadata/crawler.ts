@@ -2,6 +2,7 @@ import type { PostgresAdapter } from '../postgresAdapter';
 
 import { z } from 'zod';
 import { CrawlWarning, AvailableFeatures, EnhancedCrawlResult } from './types';
+import { getForeignKeys, type ForeignKeyConstraint } from './foreignKeys';
 
 const TableRowSchema = z.object({
   table_schema: z.string(),
@@ -41,6 +42,7 @@ export interface SchemaTable {
 
 export interface SchemaSnapshot {
   tables: SchemaTable[];
+  foreignKeys?: ForeignKeyConstraint[];
 }
 
 const TABLE_QUERY = `
@@ -156,5 +158,25 @@ export async function crawlSchema(postgresAdapter: PostgresAdapter): Promise<Enh
   } finally {
     client.release();
   }
+}
+
+export async function crawlSchemaWithForeignKeys(postgresAdapter: PostgresAdapter): Promise<EnhancedCrawlResult<SchemaSnapshot>> {
+  // First crawl schema
+  const schemaResult = await crawlSchema(postgresAdapter);
+  
+  // Then discover foreign keys
+  const { foreignKeys, warnings: fkWarnings } = await getForeignKeys(postgresAdapter);
+  
+  // Merge warnings
+  const allWarnings = [...schemaResult.warnings, ...fkWarnings];
+  
+  return {
+    data: {
+      tables: schemaResult.data.tables,
+      foreignKeys: foreignKeys.length > 0 ? foreignKeys : undefined,
+    },
+    warnings: allWarnings,
+    availableFeatures: schemaResult.availableFeatures,
+  };
 }
 

@@ -176,7 +176,7 @@ export class CanvasService {
             relationshipType: rel.relationshipType || 'semantic_link',
             confidenceScore: rel.confidenceScore ?? 1.0,
             visualStyle: rel.visualStyle || 'solid',
-            lineColor: rel.lineColor || '#8bb4f7',
+            lineColor: rel.lineColor || '#22c55e',
             lineWidth: rel.lineWidth ?? 3,
             isSelected: rel.isSelected ?? false,
           });
@@ -252,5 +252,109 @@ export class CanvasService {
    */
   async deleteCanvasRelationship(relationshipId: string): Promise<boolean> {
     return this.canvasRepo.deleteCanvasRelationship(relationshipId);
+  }
+
+  /**
+   * Create canvas relationships from discovered foreign keys
+   * Called automatically after metadata crawl completes
+   */
+  async createRelationshipsFromForeignKeys(sourceId: string, canvasId: string = 'default'): Promise<number> {
+    console.log(`🔗 Creating canvas relationships from foreign keys for source ${sourceId}`);
+    
+    try {
+      // Query all FOREIGN_KEY edges for this source
+      const fkEdges = this.db.prepare(`
+        SELECT 
+          e.id as edge_id,
+          e.src_id, 
+          e.dst_id, 
+          e.props,
+          src_col.props as src_col_props,
+          dst_col.props as dst_col_props
+        FROM edges e
+        JOIN nodes src_col ON e.src_id = src_col.id
+        JOIN nodes dst_col ON e.dst_id = dst_col.id
+        WHERE e.type = 'FOREIGN_KEY'
+          AND json_extract(src_col.props, '$.sourceId') = ?
+      `).all(sourceId) as Array<{ 
+        edge_id: string;
+        src_id: string; 
+        dst_id: string; 
+        props: string;
+        src_col_props: string;
+        dst_col_props: string;
+      }>;
+      
+      if (fkEdges.length === 0) {
+        console.log('No foreign keys found for source');
+        return 0;
+      }
+      
+      console.log(`Found ${fkEdges.length} foreign key edges to convert to canvas relationships`);
+      
+      let created = 0;
+      for (const edge of fkEdges) {
+        try {
+          const srcColProps = JSON.parse(edge.src_col_props);
+          const dstColProps = JSON.parse(edge.dst_col_props);
+          const fkProps = JSON.parse(edge.props || '{}');
+          
+          // Extract table IDs from column props
+          const sourceTableId = srcColProps.tableId;
+          const targetTableId = dstColProps.tableId;
+          
+          if (!sourceTableId || !targetTableId) {
+            console.warn('Missing table IDs for FK edge:', edge.edge_id);
+            continue;
+          }
+          
+          // Create a unique relationship ID
+          const relationshipId = `rel_fk_${edge.edge_id}`;
+          
+          // Check if relationship already exists
+          const existing = this.db.prepare(`
+            SELECT id FROM canvas_relationships 
+            WHERE id = ? AND canvas_id = ?
+          `).get(relationshipId, canvasId);
+          
+          if (existing) {
+            console.log(`Relationship ${relationshipId} already exists, skipping`);
+            continue;
+          }
+          
+          // Insert canvas relationship (using default semantic_link type)
+          this.db.prepare(`
+            INSERT INTO canvas_relationships (
+              id, canvas_id, source_id, target_id,
+              source_table_id, target_table_id,
+              source_column_name, target_column_name,
+              confidence_score
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            relationshipId,
+            canvasId,
+            sourceId, // Both source and target are the same source (intra-source FK)
+            sourceId,
+            sourceTableId,
+            targetTableId,
+            srcColProps.name, // source column name
+            dstColProps.name, // target column name
+            1.0 // Full confidence since it's a discovered FK
+            // relationship_type, visual_style, line_color, line_width will use DB defaults
+          );
+          
+          created++;
+          console.log(`✓ Created canvas relationship ${relationshipId} (${srcColProps.tableName}.${srcColProps.name} → ${dstColProps.tableName}.${dstColProps.name})`);
+        } catch (error) {
+          console.warn(`Failed to create canvas relationship for FK edge ${edge.edge_id}:`, error);
+        }
+      }
+      
+      console.log(`✅ Created ${created} canvas relationships from foreign keys`);
+      return created;
+    } catch (error) {
+      console.error('Failed to create canvas relationships from foreign keys:', error);
+      throw error;
+    }
   }
 }

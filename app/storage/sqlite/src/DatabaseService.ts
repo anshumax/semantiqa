@@ -303,7 +303,7 @@ export class DatabaseService {
       relationship_type TEXT NOT NULL DEFAULT 'semantic_link',
       confidence_score REAL DEFAULT 1.0,
       visual_style TEXT DEFAULT 'solid',
-      line_color TEXT DEFAULT '#8bb4f7',
+      line_color TEXT DEFAULT '#22c55e',
       line_width INTEGER DEFAULT 2,
       curve_path TEXT,
       is_selected BOOLEAN DEFAULT FALSE,

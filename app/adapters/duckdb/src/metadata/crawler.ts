@@ -1,4 +1,6 @@
 import type { DuckDbAdapter } from '../duckdbAdapter';
+import { CrawlWarning, AvailableFeatures, EnhancedCrawlResult } from './types';
+import { getForeignKeys, type ForeignKeyConstraint } from './foreignKeys';
 
 export interface DuckDbSchemaColumn {
   name: string;
@@ -14,6 +16,7 @@ export interface DuckDbSchemaTable {
 
 export interface DuckDbSchemaSnapshot {
   tables: DuckDbSchemaTable[];
+  foreignKeys?: ForeignKeyConstraint[];
 }
 
 export async function crawlDuckDbSchema(adapter: DuckDbAdapter): Promise<DuckDbSchemaSnapshot> {
@@ -52,6 +55,45 @@ export async function crawlDuckDbSchema(adapter: DuckDbAdapter): Promise<DuckDbS
   }
 
   return { tables: snapshotTables };
+}
+
+export async function crawlDuckDbSchemaWithForeignKeys(adapter: DuckDbAdapter): Promise<EnhancedCrawlResult<DuckDbSchemaSnapshot>> {
+  const warnings: CrawlWarning[] = [];
+  const features: AvailableFeatures = {
+    hasRowCounts: false,
+    hasStatistics: false,
+    hasComments: false,
+    hasPermissionErrors: false,
+  };
+  
+  // Crawl schema
+  let tables: DuckDbSchemaTable[];
+  try {
+    const schemaResult = await crawlDuckDbSchema(adapter);
+    tables = schemaResult.tables;
+  } catch (error) {
+    warnings.push({
+      level: 'error',
+      feature: 'schema_crawl',
+      message: `Failed to crawl schema: ${(error as Error).message}`,
+      suggestion: 'Verify database file permissions and accessibility.'
+    });
+    features.hasPermissionErrors = true;
+    tables = [];
+  }
+  
+  // Discover foreign keys
+  const { foreignKeys, warnings: fkWarnings } = await getForeignKeys(adapter);
+  warnings.push(...fkWarnings);
+  
+  return {
+    data: {
+      tables,
+      foreignKeys: foreignKeys.length > 0 ? foreignKeys : undefined,
+    },
+    warnings,
+    availableFeatures: features,
+  };
 }
 
 

@@ -91,11 +91,45 @@ export async function crawlMongoSchema(
   const results: MongoCollectionSchema[] = [];
 
   for (const collectionName of collections) {
-    try {
-      const documents = await adapter.aggregate<Record<string, JsonValue>>(collectionName, [
-        { $sample: { size: sampleSize } },
-      ]);
-
+    let documents: Record<string, JsonValue>[] = [];
+    let actualSampleSize = sampleSize;
+    let samplingSuccess = false;
+    
+    // Progressive fallback: try full sample, then smaller, then just metadata
+    const sampleSizes = [sampleSize, Math.min(50, sampleSize), 10];
+    
+    for (const trySize of sampleSizes) {
+      try {
+        documents = await adapter.aggregate<Record<string, JsonValue>>(collectionName, [
+          { $sample: { size: trySize } },
+        ]);
+        actualSampleSize = trySize;
+        samplingSuccess = true;
+        
+        if (trySize < sampleSize) {
+          warnings.push({
+            level: 'info',
+            feature: 'collection_sampling',
+            message: `Collection ${collectionName}: Using reduced sample size ${trySize} (requested ${sampleSize})`,
+            suggestion: 'Full sampling may require more memory or permissions.'
+          });
+        }
+        break;
+      } catch (error) {
+        // Try next tier
+        if (trySize === sampleSizes[sampleSizes.length - 1]) {
+          // Last attempt failed
+          warnings.push({
+            level: 'warning',
+            feature: 'collection_sampling',
+            message: `Cannot sample collection ${collectionName}: ${(error as Error).message}`,
+            suggestion: 'Grant read permissions on this collection.'
+          });
+        }
+      }
+    }
+    
+    if (samplingSuccess && documents.length > 0) {
       const accumulators = new Map<string, FieldAccumulator>();
       for (const document of documents) {
         processDocument(accumulators, document);
@@ -114,14 +148,8 @@ export async function crawlMongoSchema(
         documentSampleSize: documents.length,
         fields,
       });
-    } catch (error) {
-      warnings.push({
-        level: 'warning',
-        feature: 'collection_sampling',
-        message: `Cannot sample collection ${collectionName}: ${(error as Error).message}`,
-        suggestion: 'Grant read permissions on this collection.'
-      });
-      
+    } else {
+      // No sampling succeeded
       results.push({
         name: collectionName,
         documentSampleSize: 0,

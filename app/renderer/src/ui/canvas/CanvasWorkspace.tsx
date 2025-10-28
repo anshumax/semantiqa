@@ -1007,7 +1007,6 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
   }, [refreshCanvas]);
 
   // Note: Auto-save is handled by the debounced save mechanism
-  // Changes are automatically saved after 5 seconds of inactivity
 
   return (
     <div className={`canvas-workspace ${className}`}>
@@ -1021,6 +1020,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       <CanvasBreadcrumbs 
         breadcrumbs={state.breadcrumbs}
         onNavigate={handleBreadcrumbNavigation}
+        onHelpClick={() => setShowHelpModal(!showHelpModal)}
       />
       
       {/* Canvas header */}
@@ -1047,15 +1047,6 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
               <span>✓ All changes saved</span>
             </div>
           )}
-        </div>
-        <div className="canvas-workspace__controls">
-          <button 
-            className="canvas-workspace__control-btn"
-            onClick={() => setShowHelpModal(!showHelpModal)}
-            title="Toggle help"
-          >
-            Help
-          </button>
         </div>
       </div>
 

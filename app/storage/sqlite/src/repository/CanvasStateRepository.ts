@@ -651,30 +651,30 @@ export class CanvasStateRepository {
       wasUpdate: !!existing
     });
 
-    // Debug: Show all relationships in the table after saving
-    try {
-      console.log('💾 Starting detailed save logging...');
+    // // Debug: Show all relationships in the table after saving
+    // try {
+    //   console.log('💾 Starting detailed save logging...');
       
-      // Check the table contents immediately after saving
-      const allRelationshipsAfterSave = this.db.prepare(`SELECT * FROM canvas_relationships`).all();
-      console.log('💾 ALL RELATIONSHIPS IN TABLE AFTER SAVE:', allRelationshipsAfterSave);
+    //   // Check the table contents immediately after saving
+    //   const allRelationshipsAfterSave = this.db.prepare(`SELECT * FROM canvas_relationships`).all();
+    //   console.log('💾 ALL RELATIONSHIPS IN TABLE AFTER SAVE:', allRelationshipsAfterSave);
       
-      // Check specifically for our canvas
-      const canvasRelationshipsAfterSave = this.db.prepare(`SELECT * FROM canvas_relationships WHERE canvas_id = ?`).all(validatedRelationship.canvasId);
-      console.log('💾 RELATIONSHIPS FOR CANVAS AFTER SAVE:', canvasRelationshipsAfterSave);
+    //   // Check specifically for our canvas
+    //   const canvasRelationshipsAfterSave = this.db.prepare(`SELECT * FROM canvas_relationships WHERE canvas_id = ?`).all(validatedRelationship.canvasId);
+    //   console.log('💾 RELATIONSHIPS FOR CANVAS AFTER SAVE:', canvasRelationshipsAfterSave);
       
-      // Check if our specific relationship exists
-      const specificRelAfterSave = this.db.prepare(`SELECT * FROM canvas_relationships WHERE id = ?`).get(validatedRelationship.id);
-      console.log('💾 SPECIFIC RELATIONSHIP AFTER SAVE:', specificRelAfterSave);
+    //   // Check if our specific relationship exists
+    //   const specificRelAfterSave = this.db.prepare(`SELECT * FROM canvas_relationships WHERE id = ?`).get(validatedRelationship.id);
+    //   console.log('💾 SPECIFIC RELATIONSHIP AFTER SAVE:', specificRelAfterSave);
       
-      console.log('💾 Detailed save logging completed successfully');
-    } catch (error) {
-      console.error('💾 ERROR in detailed save logging:', error);
-      console.error('💾 Error details:', {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      });
-    }
+    //   console.log('💾 Detailed save logging completed successfully');
+    // } catch (error) {
+    //   console.error('💾 ERROR in detailed save logging:', error);
+    //   console.error('💾 Error details:', {
+    //     message: error instanceof Error ? error.message : String(error),
+    //     stack: error instanceof Error ? error.stack : undefined
+    //   });
+    // }
 
     // Note: PRAGMA synchronous is set at database level, not per transaction
     

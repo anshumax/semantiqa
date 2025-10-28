@@ -40,7 +40,7 @@ export function useCanvasPersistence(options: CanvasPersistenceOptions = {}) {
   const {
     canvasId = 'default',
     autoSave = true,
-    autoSaveDelay = 5000, // 5 seconds
+    autoSaveDelay = 2000, // 2 seconds
   } = options;
 
   const [state, setState] = useState<CanvasPersistenceState>({ status: 'idle', data: null });

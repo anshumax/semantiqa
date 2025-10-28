@@ -144,7 +144,6 @@ export class CanvasService {
       if (request.tableBlocks && request.tableBlocks.length > 0) {
         console.log('📦 Inserting table blocks:', request.tableBlocks.length);
         for (const tableBlock of request.tableBlocks) {
-          console.log('📦 Saving table block:', { id: tableBlock.id, tableId: tableBlock.tableId, position: tableBlock.position });
           this.canvasRepo.saveCanvasTableBlock({
             ...tableBlock,
             canvasId: tableBlock.canvasId || canvasId,

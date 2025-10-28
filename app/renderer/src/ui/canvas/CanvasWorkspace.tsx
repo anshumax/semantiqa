@@ -33,7 +33,7 @@ import { CrawlFinalizingOverlay } from './CrawlFinalizingOverlay';
 import { CanvasInspector, type InspectorSelection } from './inspector/CanvasInspector';
 import { ConfirmDialog } from './ConfirmDialog';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
-import { applyAutoLayout, updateEdgeHandles } from './layoutService';
+import { applyAutoLayout, updateEdgeHandles, calculateOptimalHandles } from './layoutService';
 import './CanvasWorkspace.css';
 
 // Custom node types for ReactFlow
@@ -279,12 +279,10 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
   // Handle relationship deletion from context menu
   const handleDeleteRelationship = useCallback((relationshipId: string) => {
     console.log('🗑️ handleDeleteRelationship called with:', relationshipId);
-    console.log('🗑️ Current edges before delete:', edges.map(e => e.id));
     
     // Also remove from ReactFlow edges state
     setEdges((eds) => {
       const filtered = eds.filter(e => e.id !== relationshipId);
-      console.log('🗑️ Edges after filter:', filtered.map(e => e.id));
       return filtered;
     });
     
@@ -398,13 +396,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     // Calculate optimal connection handles based on new positions
     const updatedEdges = updateEdgeHandles(layoutedNodes, edges, 250, 120);
     
-    console.log('🔗 Updated edges with optimal handles:', updatedEdges.map(e => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.sourceHandle,
-      targetHandle: e.targetHandle
-    })));
+    console.log(`🔗 Updated ${updatedEdges.length} edges with optimal handles`);
     
     // Update nodes with new positions
     setNodes(layoutedNodes);
@@ -419,14 +411,30 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     
     // Update relationship handles in persistence layer
     if (canvasData?.relationships && updatedEdges.length > 0) {
-      const relationshipUpdates = updatedEdges.map(edge => ({
-        id: edge.id,
-        sourceHandle: edge.sourceHandle || undefined,
-        targetHandle: edge.targetHandle || undefined,
-      }));
+      // Create a map of edge handles by edge ID
+      const edgeHandlesMap = new Map(
+        updatedEdges.map(edge => [edge.id, { 
+          sourceHandle: edge.sourceHandle, 
+          targetHandle: edge.targetHandle 
+        }])
+      );
       
-      console.log('💾 Updating relationship handles:', relationshipUpdates);
-      updateCanvas({ relationships: relationshipUpdates });
+      // Update relationships with new handles while preserving all fields
+      const relationshipUpdates = canvasData.relationships
+        .filter(rel => edgeHandlesMap.has(rel.id))
+        .map(rel => {
+          const handles = edgeHandlesMap.get(rel.id)!;
+          return {
+            ...rel, // Preserve all existing fields
+            sourceHandle: handles.sourceHandle || undefined,
+            targetHandle: handles.targetHandle || undefined,
+          };
+        });
+      
+      if (relationshipUpdates.length > 0) {
+        console.log(`💾 Updating ${relationshipUpdates.length} relationship handles`);
+        updateCanvas({ relationships: relationshipUpdates });
+      }
     }
     
     console.log('✅ Auto-arrange complete');
@@ -641,14 +649,30 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         
         // Update relationship handles in persistence layer
         if (canvasData?.relationships && updatedEdges.length > 0) {
-          const relationshipUpdates = updatedEdges.map(edge => ({
-            id: edge.id,
-            sourceHandle: edge.sourceHandle || undefined,
-            targetHandle: edge.targetHandle || undefined,
-          }));
+          // Create a map of edge handles by edge ID
+          const edgeHandlesMap = new Map(
+            updatedEdges.map(edge => [edge.id, { 
+              sourceHandle: edge.sourceHandle, 
+              targetHandle: edge.targetHandle 
+            }])
+          );
           
-          console.log('💾 Updating relationship handles (auto-layout):', relationshipUpdates);
-          updateCanvas({ relationships: relationshipUpdates });
+          // Update relationships with new handles while preserving all fields
+          const relationshipUpdates = canvasData.relationships
+            .filter(rel => edgeHandlesMap.has(rel.id))
+            .map(rel => {
+              const handles = edgeHandlesMap.get(rel.id)!;
+              return {
+                ...rel, // Preserve all existing fields
+                sourceHandle: handles.sourceHandle || undefined,
+                targetHandle: handles.targetHandle || undefined,
+              };
+            });
+          
+          if (relationshipUpdates.length > 0) {
+            console.log(`💾 Updating ${relationshipUpdates.length} relationship handles (auto-layout)`);
+            updateCanvas({ relationships: relationshipUpdates });
+          }
         }
         
         // Mark as arranged
@@ -698,18 +722,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       return false;
     });
 
-    console.log('🔗 Converting relationships to edges:', {
-      currentLevel: state.currentLevel,
-      totalRelationships: canvasData.relationships.length,
-      filteredRelationships: filteredRelationships.length,
-      relationships: filteredRelationships.map(r => ({
-        id: r.id,
-        sourceTableId: r.sourceTableId,
-        targetTableId: r.targetTableId,
-        sourceId: r.sourceId,
-        targetId: r.targetId
-      }))
-    });
+    console.log(`🔗 Converting ${filteredRelationships.length} relationships to edges`);
 
     const flowEdges: Edge[] = filteredRelationships.map((rel) => {
       // For table relationships, we need to map table IDs to ReactFlow node IDs
@@ -834,13 +847,27 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     const sourceTableName = sourceTableInfo?.name || relationship.sourceTable.split('_').pop() || 'unknown';
     const targetTableName = targetTableInfo?.name || relationship.targetTable.split('_').pop() || 'unknown';
 
-    // Create new edge with relationship metadata
+    // Calculate optimal handles based on node positions
+    const sourceNode = nodes.find(n => n.id === connectionModal.connection?.source);
+    const targetNode = nodes.find(n => n.id === connectionModal.connection?.target);
+    let optimalHandles = {
+      sourceHandle: connectionModal.connection.sourceHandle,
+      targetHandle: connectionModal.connection.targetHandle
+    };
+    
+    if (sourceNode && targetNode) {
+      const { sourceHandle, targetHandle } = calculateOptimalHandles(sourceNode, targetNode);
+      optimalHandles = { sourceHandle, targetHandle };
+      console.log('🎯 Calculated optimal handles:', optimalHandles);
+    }
+
+    // Create new edge with relationship metadata and optimal handles
     const newEdge: Edge = {
       id: `edge-${Date.now()}`,
       source: connectionModal.connection.source!,
       target: connectionModal.connection.target!,
-      sourceHandle: connectionModal.connection.sourceHandle,
-      targetHandle: connectionModal.connection.targetHandle,
+      sourceHandle: optimalHandles.sourceHandle,
+      targetHandle: optimalHandles.targetHandle,
       type: 'default',
       animated: false,
       style: {
@@ -867,8 +894,8 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       targetTableId: relationship.targetTable,
       sourceColumnName: relationship.sourceColumn,
       targetColumnName: relationship.targetColumn,
-      sourceHandle: connectionModal.connection.sourceHandle || undefined,
-      targetHandle: connectionModal.connection.targetHandle || undefined,
+      sourceHandle: optimalHandles.sourceHandle || undefined,
+      targetHandle: optimalHandles.targetHandle || undefined,
       relationshipType: 'semantic_link',
       confidenceScore: 1.0,
       visualStyle: 'solid',
@@ -881,7 +908,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     setConnectionModal({ isOpen: false });
     
     console.log('✅ Relationship created successfully');
-  }, [connectionModal, setEdges, createRelationship, tablesData]);
+  }, [connectionModal, setEdges, createRelationship, tablesData, nodes, state.sourceId]);
 
   // Plus button handler
   const handleAddDataSource = useCallback(() => {
@@ -1033,7 +1060,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
       </div>
 
       {/* ReactFlow Canvas */}
-      <div className="canvas-workspace__content" style={{ width: '100%', height: 'calc(100vh - 120px)' }}>
+      <div className="canvas-workspace__content" style={{ width: '100%', flex: 1 }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}

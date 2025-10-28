@@ -185,7 +185,7 @@ export function registerIpcHandlers(handlerMap: IpcHandlerMap) {
     }
 
     ipcMain.handle(channel, async (event, rawPayload) => {
-      console.log(`🔌 IPC Handler called for ${channel}:`, rawPayload);
+      console.log(`🔌 IPC Handler called for ${channel} with length ${Object.keys(rawPayload).length}`);
       const parseResult = payloadSchema.safeParse(rawPayload);
       if (!parseResult.success) {
         console.error(`❌ Validation failed for ${channel}:`, parseResult.error.flatten());

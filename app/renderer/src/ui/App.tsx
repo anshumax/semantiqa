@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
+import { AppShell } from '@mantine/core';
 import { AppStateProvider } from './state';
-import { StatusBadge, StatusBadgeLabel, StatusBadgeValue } from './components';
 import { NavigationShell } from './navigation';
 import { GlobalStatusBar } from './status/GlobalStatusBar';
 import './App.css';
@@ -62,31 +62,18 @@ function RootContent() {
   }, []);
 
   return (
-    <div className="app-frame">
-      <header className="app-frame__header">
-        <div className="header-brand">
-          <div className="brand-mark" aria-hidden />
-          <div className="brand-meta">
-            <span className="brand-title">Semantiqa</span>
-            <span className="brand-subtitle">Local semantic explorer</span>
-          </div>
-        </div>
-        <div className="header-status">
-          <StatusBadge tone="neutral">
-            <StatusBadgeLabel>Environment</StatusBadgeLabel>
-            <StatusBadgeValue>{env}</StatusBadgeValue>
-          </StatusBadge>
-          <StatusBadge tone={pingStatus === 'ok' ? 'positive' : pingStatus === 'error' ? 'negative' : 'neutral'}>
-            <StatusBadgeLabel>IPC</StatusBadgeLabel>
-            <StatusBadgeValue>
-              {pingStatus === 'pending' ? 'checking…' : pingStatus === 'ok' ? `ok @ ${pingTimestamp}` : 'error'}
-            </StatusBadgeValue>
-          </StatusBadge>
-        </div>
-      </header>
+    <AppShell
+      navbar={{ width: 220, breakpoint: 'sm' }}
+      footer={{ height: 36 }}
+      padding={0}
+    >
       <NavigationShell />
-      <GlobalStatusBar />
-    </div>
+      <GlobalStatusBar 
+        env={env}
+        pingStatus={pingStatus}
+        pingTimestamp={pingTimestamp}
+      />
+    </AppShell>
   );
 }
 

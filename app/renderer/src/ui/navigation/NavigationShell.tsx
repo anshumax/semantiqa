@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'react';
+import { AppShell, NavLink, Stack } from '@mantine/core';
+import { IconSearch, IconDatabase, IconChartBar } from '@tabler/icons-react';
 import { ExplorerShell } from '../explorer';
 import { ModelsScreen } from '../models';
 import { CanvasWorkspace } from '../canvas';
@@ -8,85 +10,42 @@ type NavigationScreen = 'search-ask' | 'sources' | 'reports-dashboards';
 
 export function NavigationShell() {
   const [activeScreen, setActiveScreen] = useState<NavigationScreen>('sources');
-  const [isNavCollapsed, setIsNavCollapsed] = useState(false);
 
   const handleNavigate = useCallback((screen: NavigationScreen) => {
     setActiveScreen(screen);
   }, []);
 
-  const handleKeyDown = useCallback((event: React.KeyboardEvent, screen: NavigationScreen) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      handleNavigate(screen);
-    }
-  }, [handleNavigate]);
-
-  const toggleNavCollapse = useCallback(() => {
-    setIsNavCollapsed(prev => !prev);
-  }, []);
-
   return (
-    <div className="navigation-shell">
-      <nav 
-        className={`navigation-shell__nav ${isNavCollapsed ? 'navigation-shell__nav--collapsed' : ''}`} 
-        role="navigation" 
-        aria-label="Main navigation"
-      >
-        <button
-          type="button"
-          className="navigation-shell__collapse-toggle"
-          onClick={toggleNavCollapse}
-          aria-label={isNavCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-          title={isNavCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-        >
-          {isNavCollapsed ? '→' : '←'}
-        </button>
-        <ul className="nav-list">
-          <li>
-            <button
-              type="button"
-              className={`nav-item ${activeScreen === 'search-ask' ? 'nav-item--active' : ''}`}
-              onClick={() => handleNavigate('search-ask')}
-              onKeyDown={(e) => handleKeyDown(e, 'search-ask')}
-              aria-current={activeScreen === 'search-ask' ? 'page' : undefined}
-            >
-              <span className="nav-item__icon" aria-hidden="true">🔍</span>
-              <span className="nav-item__label">Search & Ask</span>
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              className={`nav-item ${activeScreen === 'sources' ? 'nav-item--active' : ''}`}
-              onClick={() => handleNavigate('sources')}
-              onKeyDown={(e) => handleKeyDown(e, 'sources')}
-              aria-current={activeScreen === 'sources' ? 'page' : undefined}
-            >
-              <span className="nav-item__icon" aria-hidden="true">🎨</span>
-              <span className="nav-item__label">Sources</span>
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              className={`nav-item ${activeScreen === 'reports-dashboards' ? 'nav-item--active' : ''}`}
-              onClick={() => handleNavigate('reports-dashboards')}
-              onKeyDown={(e) => handleKeyDown(e, 'reports-dashboards')}
-              aria-current={activeScreen === 'reports-dashboards' ? 'page' : undefined}
-            >
-              <span className="nav-item__icon" aria-hidden="true">📊</span>
-              <span className="nav-item__label">Reports & Dashboards</span>
-            </button>
-          </li>
-        </ul>
-      </nav>
+    <>
+      <AppShell.Navbar p="md">
+        <Stack gap="xs">
+          <NavLink
+            label="Search & Ask"
+            leftSection={<IconSearch size={18} stroke={1.5} />}
+            active={activeScreen === 'search-ask'}
+            onClick={() => handleNavigate('search-ask')}
+          />
+          <NavLink
+            label="Sources"
+            leftSection={<IconDatabase size={18} stroke={1.5} />}
+            active={activeScreen === 'sources'}
+            onClick={() => handleNavigate('sources')}
+          />
+          <NavLink
+            label="Reports & Dashboards"
+            leftSection={<IconChartBar size={18} stroke={1.5} />}
+            active={activeScreen === 'reports-dashboards'}
+            onClick={() => handleNavigate('reports-dashboards')}
+          />
+        </Stack>
+      </AppShell.Navbar>
 
-      <main className="navigation-shell__content">
+      <AppShell.Main>
         {activeScreen === 'search-ask' && <SearchAskScreen />}
         {activeScreen === 'sources' && <CanvasWorkspaceScreen />}
         {activeScreen === 'reports-dashboards' && <ReportsDashboardsScreen />}
-      </main>
-    </div>
+      </AppShell.Main>
+    </>
   );
 }
 
@@ -113,7 +72,11 @@ function SearchAskScreen() {
 }
 
 function CanvasWorkspaceScreen() {
-  return <CanvasWorkspace />;
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <CanvasWorkspace />
+    </div>
+  );
 }
 
 function ReportsDashboardsScreen() {

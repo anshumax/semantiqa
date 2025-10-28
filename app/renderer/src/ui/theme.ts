@@ -91,6 +91,51 @@ export const theme = createTheme({
   
   // Component-specific overrides
   components: {
+    AppShell: {
+      styles: {
+        navbar: {
+          background: 'rgba(15, 18, 26, 0.72)',
+          borderRight: '1px solid rgba(214, 216, 224, 0.12)',
+          backdropFilter: 'blur(12px)',
+        },
+        main: {
+          background: 'transparent',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          height: '100%',
+        },
+        footer: {
+          background: 'rgba(15, 18, 26, 0.72)',
+          borderTop: '1px solid rgba(214, 216, 224, 0.12)',
+          backdropFilter: 'blur(12px)',
+        },
+      },
+    },
+
+    NavLink: {
+      styles: {
+        root: {
+          borderRadius: '12px',
+          color: 'var(--color-text-muted)',
+          '&:hover': {
+            background: 'rgba(214, 216, 224, 0.08)',
+          },
+          '&[data-active]': {
+            background: 'rgba(80, 123, 255, 0.15)',
+            color: 'var(--color-text)',
+            '&:hover': {
+              background: 'rgba(80, 123, 255, 0.18)',
+            },
+          },
+        },
+        label: {
+          fontWeight: 500,
+          letterSpacing: '0.02em',
+        },
+      },
+    },
+
     Button: {
       defaultProps: {
         radius: 'xl',

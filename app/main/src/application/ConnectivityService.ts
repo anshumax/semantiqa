@@ -225,6 +225,10 @@ export class ConnectivityQueue {
     return queuedCount;
   }
 
+  getPendingCount(): number {
+    return this.pending.size;
+  }
+
   private async processQueue(): Promise<void> {
     if (this.running) {
       return;
@@ -257,5 +261,31 @@ export class ConnectivityQueue {
     }
 
     this.running = false;
+  }
+}
+
+export class ConnectivityMonitor {
+  private intervalId: NodeJS.Timeout | null = null;
+  
+  constructor(
+    private readonly queue: ConnectivityQueue,
+    private readonly service: ConnectivityService,
+    private readonly intervalMs: number = 5 * 60 * 1000,
+  ) {}
+  
+  start() {
+    this.intervalId = setInterval(() => {
+      const sourceIds = this.service.listSourceIds();
+      for (const sourceId of sourceIds) {
+        this.queue.queueCheck(sourceId);
+      }
+    }, this.intervalMs);
+  }
+  
+  stop() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
   }
 }

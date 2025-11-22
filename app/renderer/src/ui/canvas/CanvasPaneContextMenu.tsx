@@ -7,6 +7,8 @@ export interface CanvasPaneContextMenuProps {
   visible: boolean;
   onClose: () => void;
   onAutoArrange?: () => void;
+  hasConnectivityErrors?: boolean;
+  onRetryAllConnectivity?: () => void;
 }
 
 export function CanvasPaneContextMenu({
@@ -15,6 +17,8 @@ export function CanvasPaneContextMenu({
   visible,
   onClose,
   onAutoArrange,
+  hasConnectivityErrors = false,
+  onRetryAllConnectivity,
 }: CanvasPaneContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -24,6 +28,13 @@ export function CanvasPaneContextMenu({
     }
     onClose();
   }, [onAutoArrange, onClose]);
+
+  const handleRetryAllConnectivity = useCallback(() => {
+    if (onRetryAllConnectivity) {
+      onRetryAllConnectivity();
+    }
+    onClose();
+  }, [onRetryAllConnectivity, onClose]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -69,6 +80,14 @@ export function CanvasPaneContextMenu({
           onClick={handleAutoArrange}
         >
           ✨ Auto Arrange
+        </div>
+      )}
+      {hasConnectivityErrors && onRetryAllConnectivity && (
+        <div
+          className="canvas-pane-context-menu__item"
+          onClick={handleRetryAllConnectivity}
+        >
+          🔄 Retry Connectivity Check for All
         </div>
       )}
     </div>

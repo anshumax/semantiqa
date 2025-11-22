@@ -79,6 +79,17 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
   // Crawl finalizing overlay state
   const [finalizingSource, setFinalizingSource] = useState<string | null>(null);
   
+  // Connectivity check state
+  const [connectivityCheck, setConnectivityCheck] = useState<{
+    checking: boolean;
+    total: number;
+    completed: number;
+  }>({
+    checking: false,
+    total: 0,
+    completed: 0,
+  });
+  
   // ReactFlow state
   const [nodes, setNodes, onNodesChange] = useNodesState<DataSourceNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -251,6 +262,13 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     }
     handleCloseContextMenu();
   }, [contextMenu.sourceId, handleRetryCrawl, handleCloseContextMenu]);
+
+  const handleContextMenuRetryConnection = useCallback(async () => {
+    if (contextMenu.sourceId) {
+      await window.semantiqa?.api.invoke('sources:test-connection', { sourceId: contextMenu.sourceId });
+    }
+    handleCloseContextMenu();
+  }, [contextMenu.sourceId, handleCloseContextMenu]);
 
   const handleDeleteTableBlock = useCallback((tableId: string) => {
     console.log('Deleting table block:', tableId);
@@ -439,6 +457,26 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     
     console.log('✅ Auto-arrange complete');
   }, [nodes, edges, setNodes, setEdges, updateBlockPosition, updateCanvas, canvasData?.relationships]);
+
+  // Handle retry all connectivity checks
+  const handleRetryAllConnectivity = useCallback(async () => {
+    if (!canvasData?.blocks) return;
+    
+    const sourceIdsWithErrors = canvasData.blocks
+      .filter(b => b.type === 'source' && b.connectionStatus === 'error')
+      .map(b => b.sourceId);
+    
+    console.log(`🔄 Retrying connectivity for ${sourceIdsWithErrors.length} sources with errors`);
+    
+    for (const sourceId of sourceIdsWithErrors) {
+      await window.semantiqa?.api.invoke('sources:test-connection', { sourceId });
+    }
+  }, [canvasData?.blocks]);
+
+  // Check if there are any connectivity errors
+  const hasConnectivityErrors = useMemo(() => {
+    return canvasData?.blocks?.some(b => b.type === 'source' && b.connectionStatus === 'error') ?? false;
+  }, [canvasData?.blocks]);
 
   // Close pane context menu
   const handleClosePaneContextMenu = useCallback(() => {
@@ -733,6 +771,16 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         ? `table-${rel.targetTableId}` 
         : rel.targetId;
 
+      // Check if either endpoint has connectivity error (for source-level relationships only)
+      let hasConnectivityError = false;
+      if (state.currentLevel === 'sources') {
+        const sourceBlock = canvasData?.blocks?.find(b => b.sourceId === rel.sourceId);
+        const targetBlock = canvasData?.blocks?.find(b => b.sourceId === rel.targetId);
+        hasConnectivityError = 
+          sourceBlock?.connectionStatus === 'error' || 
+          targetBlock?.connectionStatus === 'error';
+      }
+
       return {
         id: rel.id,
         source: sourceNodeId,
@@ -742,7 +790,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         type: 'default',
         animated: false,
         style: {
-          stroke: rel.lineColor || '#22c55e',
+          stroke: hasConnectivityError ? '#ef4444' : (rel.lineColor || '#22c55e'),
           strokeWidth: rel.lineWidth || 2,
           strokeDasharray: rel.visualStyle === 'dashed' ? '5,5' : undefined,
           cursor: 'pointer',
@@ -753,7 +801,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     });
 
     setEdges(flowEdges);
-  }, [canvasData?.relationships, setEdges, state.currentLevel, state.sourceId]);
+  }, [canvasData?.relationships, canvasData?.blocks, setEdges, state.currentLevel, state.sourceId]);
 
   // Handle new connections
   const onConnect = useCallback((connection: Connection) => {
@@ -972,10 +1020,108 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     loadInitialState();
   }, [refreshCanvas]);
 
-  // Listen for crawl completion to show finalizing overlay
+  // Trigger connectivity check on canvas mount (after initial load)
+  useEffect(() => {
+    const startConnectivityCheck = async () => {
+      if (!canvasData?.blocks) return;
+      
+      // Get unique source IDs from canvas blocks
+      const sourceIds = [...new Set(
+        canvasData.blocks
+          .filter(b => b.type === 'source')
+          .map(b => b.sourceId)
+      )];
+      
+      if (sourceIds.length === 0) return;
+      
+      setConnectivityCheck({
+        checking: true,
+        total: sourceIds.length,
+        completed: 0,
+      });
+      
+      // Queue checks for all sources (async, non-blocking)
+      for (const sourceId of sourceIds) {
+        await window.semantiqa?.api.invoke('sources:test-connection', { sourceId });
+      }
+    };
+    
+    if (canvasData && !isInitialLoad) {
+      void startConnectivityCheck();
+    }
+  }, [canvasData, isInitialLoad]);
+
+  // Listen for connectivity updates
+  useEffect(() => {
+    const handleConnectionStatus = (event: any, payload: any) => {
+      if (payload.kind === 'connection') {
+        setConnectivityCheck(prev => ({
+          ...prev,
+          completed: prev.completed + 1,
+        }));
+        
+        // Update node status in-place (no DB refresh)
+        setNodes(nodes => 
+          nodes.map(node => 
+            node.id === payload.sourceId
+              ? { ...node, data: { ...node.data, connectionStatus: payload.connectionStatus } }
+              : node
+          )
+        );
+      }
+    };
+    
+    window.electron?.ipcRenderer?.on('sources:status', handleConnectionStatus);
+    return () => {
+      window.electron?.ipcRenderer?.off('sources:status', handleConnectionStatus);
+    };
+  }, [setNodes]);
+
+  // Listen for crawl completion to show finalizing overlay and update status in-memory
   useEffect(() => {
     const handleStatusChange = (event: any, payload: any) => {
       console.log('🎯 Source status changed:', payload);
+      
+      // Update connection status in-memory
+      if (payload.kind === 'connection') {
+        setNodes(nodes =>
+          nodes.map(node =>
+            node.id === payload.sourceId
+              ? { ...node, data: { ...node.data, connectionStatus: payload.connectionStatus } }
+              : node
+          )
+        );
+        
+        // Re-compute edge colors when connectivity changes
+        setEdges(edges =>
+          edges.map(edge => {
+            const sourceNode = nodes.find(n => n.id === edge.source);
+            const targetNode = nodes.find(n => n.id === edge.target);
+            const hasError =
+              sourceNode?.data?.connectionStatus === 'error' ||
+              targetNode?.data?.connectionStatus === 'error';
+            
+            return {
+              ...edge,
+              style: {
+                ...edge.style,
+                stroke: hasError ? '#ef4444' : (edge.style?.stroke || '#22c55e'),
+              },
+            };
+          })
+        );
+      }
+      
+      // Update crawl status and metadata in-memory
+      if (payload.kind === 'crawl') {
+        setNodes(nodes =>
+          nodes.map(node =>
+            node.id === payload.sourceId
+              ? { ...node, data: { ...node.data, crawlStatus: payload.crawlStatus, tableCount: payload.tableCount } }
+              : node
+          )
+        );
+      }
       
       // Show overlay when crawl completes
       if (payload.crawlStatus === 'crawled' && payload.connectionStatus === 'connected') {
@@ -983,17 +1129,30 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         console.log(`✨ Showing finalizing overlay for: ${sourceName}`);
         setFinalizingSource(sourceName);
         
-        // Brief delay to allow DB writes to complete, then refresh
-        setTimeout(async () => {
-          console.log('🔄 Refreshing canvas after crawl completion');
-          await refreshCanvas();
-          
-          // Hide overlay after refresh
-          setTimeout(() => {
-            console.log('✅ Hiding finalizing overlay');
-            setFinalizingSource(null);
-          }, 300);
-        }, 800);
+        // Hide overlay after brief delay (no DB refresh needed)
+        setTimeout(() => {
+          console.log('✅ Hiding finalizing overlay');
+          setFinalizingSource(null);
+        }, 1100);
+      }
+      
+      // Add new source block when source is added
+      if (payload.kind === 'source_added' && payload.block) {
+        const newNode = {
+          id: payload.sourceId,
+          type: 'dataSource',
+          position: payload.block.position,
+          data: {
+            id: payload.sourceId,
+            name: payload.sourceName,
+            kind: payload.block.kind,
+            connectionStatus: payload.connectionStatus,
+            crawlStatus: payload.crawlStatus,
+            onRetryCrawl: handleRetryCrawl,
+            onContextMenu: (event: React.MouseEvent) => handleContextMenu(event, payload.block.id, payload.sourceId),
+          },
+        };
+        setNodes(nodes => [...nodes, newNode]);
       }
     };
     
@@ -1004,7 +1163,7 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
     return () => {
       window.electron?.ipcRenderer?.off('sources:status', handleStatusChange);
     };
-  }, [refreshCanvas]);
+  }, [nodes, setNodes, setEdges, handleRetryCrawl, handleContextMenu]);
 
   // Note: Auto-save is handled by the debounced save mechanism
 
@@ -1049,6 +1208,25 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
           )}
         </div>
       </div>
+
+      {/* Connectivity check progress banner */}
+      {connectivityCheck.checking && connectivityCheck.completed < connectivityCheck.total && (
+        <div style={{
+          position: 'absolute',
+          top: '60px',
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+          padding: '12px',
+          background: 'rgba(66, 153, 225, 0.9)',
+          color: 'white',
+          textAlign: 'center',
+          fontSize: '14px',
+          fontWeight: 500,
+        }}>
+          Checking connectivity: {connectivityCheck.completed} / {connectivityCheck.total}
+        </div>
+      )}
 
       {/* ReactFlow Canvas */}
       <div className="canvas-workspace__content" style={{ width: '100%', flex: 1 }}>
@@ -1146,10 +1324,15 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         onClose={handleCloseContextMenu}
         onViewDetails={handleViewSourceDetails}
         onRetryCrawl={handleContextMenuRetry}
+        onRetryConnection={handleContextMenuRetryConnection}
         onDelete={handleDeleteBlock}
         canRetryCrawl={contextMenu.sourceId ? 
           canvasData?.blocks?.find(b => b.sourceId === contextMenu.sourceId)?.source?.crawlStatus === 'error' ||
           canvasData?.blocks?.find(b => b.sourceId === contextMenu.sourceId)?.source?.connectionStatus === 'error'
+          : false
+        }
+        hasConnectionError={contextMenu.sourceId ?
+          canvasData?.blocks?.find(b => b.sourceId === contextMenu.sourceId)?.connectionStatus === 'error'
           : false
         }
       />
@@ -1183,6 +1366,8 @@ function CanvasWorkspaceContent({ className = '' }: CanvasWorkspaceProps) {
         visible={paneContextMenu.visible}
         onClose={handleClosePaneContextMenu}
         onAutoArrange={handleAutoArrange}
+        hasConnectivityErrors={hasConnectivityErrors}
+        onRetryAllConnectivity={handleRetryAllConnectivity}
       />
 
       {/* Canvas Inspector */}

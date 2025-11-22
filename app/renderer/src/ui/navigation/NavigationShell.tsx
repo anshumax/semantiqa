@@ -41,9 +41,15 @@ export function NavigationShell() {
       </AppShell.Navbar>
 
       <AppShell.Main>
-        {activeScreen === 'search-ask' && <SearchAskScreen />}
-        {activeScreen === 'sources' && <CanvasWorkspaceScreen />}
-        {activeScreen === 'reports-dashboards' && <ReportsDashboardsScreen />}
+        <div style={{ display: activeScreen === 'search-ask' ? 'block' : 'none', width: '100%', height: '100%' }}>
+          <SearchAskScreen />
+        </div>
+        <div style={{ display: activeScreen === 'sources' ? 'block' : 'none', width: '100%', height: '100%' }}>
+          <CanvasWorkspaceScreen />
+        </div>
+        <div style={{ display: activeScreen === 'reports-dashboards' ? 'block' : 'none', width: '100%', height: '100%' }}>
+          <ReportsDashboardsScreen />
+        </div>
       </AppShell.Main>
     </>
   );

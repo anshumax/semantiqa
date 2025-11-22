@@ -323,8 +323,8 @@ export function CanvasConnectWizard({ isOpen, onClose }: CanvasConnectWizardProp
 
       setCreatedBlocks(newBlocks);
       
-      // Refresh canvas to show new blocks
-      await refreshCanvas();
+      // Note: Canvas will update via IPC events (sources:status with kind 'source_added')
+      // No need to refresh from DB
       
       setCurrentStep('success');
     } catch (err) {

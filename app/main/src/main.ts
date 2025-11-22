@@ -7,7 +7,7 @@ import { IPC_CHANNELS } from '@semantiqa/app-config';
 import { registerIpcHandlers, type IpcHandlerMap } from './ipc/registry';
 import { SourceProvisioningService } from './application/SourceProvisioningService';
 import { MetadataCrawlService } from './application/MetadataCrawlService';
-import { ConnectivityQueue, ConnectivityService } from './application/ConnectivityService';
+import { ConnectivityQueue, ConnectivityService, ConnectivityMonitor } from './application/ConnectivityService';
 import { CrawlQueue } from './application/CrawlQueue';
 import { ModelManagerService } from './services/ModelManagerService';
 import { CanvasService } from './services/CanvasService';
@@ -23,6 +23,7 @@ let graphServices: {
 } | null = null;
 
 let databaseService: DatabaseService | null = null;
+let connectivityMonitor: ConnectivityMonitor | null = null;
 
 type UiStatus = 'queued' | 'running' | 'connecting' | 'ready' | 'error' | 'warning' | 'needs_attention';
 
@@ -353,8 +354,13 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     logger: console,
   });
 
-  // Run connectivity checks on startup (async) - DISABLED: No demo sources
-  // void connectivityQueue.queueStartupSweep();
+  // Create and start periodic connectivity monitor (checks every 5 minutes)
+  connectivityMonitor = new ConnectivityMonitor(
+    connectivityQueue,
+    connectivityService,
+    5 * 60 * 1000
+  );
+  connectivityMonitor.start();
 
   // Model manager service
   const modelManagerService = new ModelManagerService({
@@ -483,6 +489,12 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
 // Force database checkpoint before app quits to ensure data persistence
 app.on('before-quit', async () => {
   console.log('🔄 App shutting down, forcing database checkpoint...');
+  
+  // Stop connectivity monitor
+  if (connectivityMonitor) {
+    connectivityMonitor.stop();
+    console.log('✅ Connectivity monitor stopped');
+  }
   
   if (databaseService) {
     try {

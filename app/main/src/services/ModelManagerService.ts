@@ -1,5 +1,7 @@
 import { promises as fs } from 'node:fs';
+import { createReadStream, createWriteStream } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { app } from 'electron';
 import { loadModelManifest } from '../../../../core/dist/models';
 import type { 
@@ -109,27 +111,126 @@ export class ModelManagerService {
   }
 
   async downloadModel(request: ModelsDownloadRequest): Promise<{ ok: true } | SemantiqaError> {
-    const { logger, audit } = this.deps;
+    const { logger, audit, openSourcesDb } = this.deps;
 
     try {
       logger.info('Download model requested', { modelId: request.id });
       audit({ action: 'models.download.started', modelId: request.id, status: 'success' });
 
-      // For now, we'll return a placeholder response
-      // In a real implementation, this would:
-      // 1. Load the manifest to get download URL
-      // 2. Create resumable download with progress events
-      // 3. Verify SHA256 checksum
-      // 4. Move to models directory
-      // 5. Register in database
+      // Ensure models directory exists
+      await this.ensureModelsDir();
 
-      logger.warn('Model download not yet implemented', { modelId: request.id });
+      // Load manifest to get model details
+      const manifest = await loadModelManifest();
+      const modelEntry = manifest.find(m => m.id === request.id);
       
-      return {
-        code: 'INTERNAL_ERROR',
-        message: 'Model download functionality not yet implemented',
-        details: { modelId: request.id }
-      };
+      if (!modelEntry) {
+        logger.warn('Model not found in manifest', { modelId: request.id });
+        return {
+          code: 'NOT_FOUND',
+          message: 'Model not found in manifest',
+          details: { modelId: request.id }
+        };
+      }
+
+      // Get the raw manifest to access download URL
+      const manifestRaw = await this.loadRawManifest();
+      const modelRaw = manifestRaw.models.find((m: any) => m.id === request.id);
+      
+      if (!modelRaw?.url) {
+        logger.error('Model URL not found in manifest', { modelId: request.id });
+        return {
+          code: 'INTERNAL_ERROR',
+          message: 'Model download URL not configured',
+          details: { modelId: request.id }
+        };
+      }
+
+      const downloadUrl = modelRaw.url;
+      const modelFileName = `${request.id}.model`;
+      const tempPath = join(this.modelsDir, `${modelFileName}.download`);
+      const finalPath = join(this.modelsDir, modelFileName);
+
+      logger.info('Starting model download', { 
+        modelId: request.id, 
+        url: downloadUrl,
+        expectedSize: modelEntry.sizeMb 
+      });
+
+      // Download with resumable support
+      const downloadedPath = await this.downloadWithResume(
+        downloadUrl,
+        tempPath,
+        modelEntry.sizeMb,
+        logger
+      );
+
+      // Verify SHA256 checksum
+      logger.info('Verifying model checksum', { modelId: request.id });
+      const actualHash = await this.computeSHA256(downloadedPath);
+      
+      if (actualHash !== modelEntry.sha256) {
+        logger.error('Checksum mismatch', { 
+          modelId: request.id, 
+          expected: modelEntry.sha256, 
+          actual: actualHash 
+        });
+        
+        // Clean up invalid download
+        await fs.unlink(downloadedPath).catch(() => {});
+        
+        return {
+          code: 'VALIDATION_ERROR',
+          message: 'Downloaded model failed SHA256 verification',
+          details: { 
+            modelId: request.id,
+            expected: modelEntry.sha256,
+            actual: actualHash
+          }
+        };
+      }
+
+      logger.info('Checksum verified successfully', { modelId: request.id });
+
+      // Move to final location
+      await fs.rename(downloadedPath, finalPath);
+
+      // Register in database
+      const db = openSourcesDb();
+      const now = new Date().toISOString();
+      
+      db.prepare(`
+        INSERT INTO models (id, name, kind, size_mb, path, sha256, enabled_tasks, installed_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          path = excluded.path,
+          installed_at = excluded.installed_at,
+          updated_at = excluded.updated_at
+      `).run(
+        modelEntry.id,
+        modelEntry.name,
+        modelEntry.kind,
+        modelEntry.sizeMb,
+        finalPath,
+        modelEntry.sha256,
+        JSON.stringify(modelEntry.kind === 'generator' ? ['summaries', 'nlsql'] : []),
+        now,
+        now
+      );
+
+      logger.info('Model downloaded and registered successfully', { 
+        modelId: request.id,
+        path: finalPath 
+      });
+      
+      audit({ 
+        action: 'models.download.completed', 
+        modelId: request.id, 
+        status: 'success',
+        details: { path: finalPath, size: modelEntry.sizeMb }
+      });
+
+      return { ok: true };
     } catch (error) {
       logger.error('Model download failed', { modelId: request.id, error });
       audit({ 
@@ -145,6 +246,102 @@ export class ModelManagerService {
         details: { error: (error as Error).message }
       };
     }
+  }
+
+  private async loadRawManifest(): Promise<{ version: string; models: any[] }> {
+    const manifestPath = join(process.cwd(), 'models', 'models.json');
+    const raw = await fs.readFile(manifestPath, 'utf-8');
+    return JSON.parse(raw);
+  }
+
+  private async downloadWithResume(
+    url: string,
+    destPath: string,
+    expectedSizeMb: number,
+    logger: ModelManagerDeps['logger']
+  ): Promise<string> {
+    // Check if partial download exists
+    let startByte = 0;
+    try {
+      const stats = await fs.stat(destPath);
+      startByte = stats.size;
+      logger.info('Resuming download from byte', { startByte });
+    } catch {
+      // File doesn't exist, start from beginning
+    }
+
+    return new Promise((resolve, reject) => {
+      const https = require('https');
+      const http = require('http');
+      const protocol = url.startsWith('https') ? https : http;
+
+      const options = {
+        headers: startByte > 0 ? { 'Range': `bytes=${startByte}-` } : {}
+      };
+
+      const request = protocol.get(url, options, (response: any) => {
+        if (response.statusCode === 416) {
+          // Range not satisfiable - file already complete
+          logger.info('File already downloaded');
+          resolve(destPath);
+          return;
+        }
+
+        if (response.statusCode !== 200 && response.statusCode !== 206) {
+          reject(new Error(`Download failed with status ${response.statusCode}`));
+          return;
+        }
+
+        const fileStream = createWriteStream(destPath, { flags: startByte > 0 ? 'a' : 'w' });
+        let downloaded = startByte;
+        const totalSize = expectedSizeMb * 1024 * 1024;
+
+        response.on('data', (chunk: Buffer) => {
+          downloaded += chunk.length;
+          const progress = Math.round((downloaded / totalSize) * 100);
+          if (downloaded % (10 * 1024 * 1024) < chunk.length) { // Log every 10MB
+            logger.info('Download progress', { 
+              downloadedMb: Math.round(downloaded / (1024 * 1024)), 
+              totalMb: Math.round(totalSize / (1024 * 1024)),
+              progress: `${progress}%` 
+            });
+          }
+        });
+
+        response.pipe(fileStream);
+
+        fileStream.on('finish', () => {
+          fileStream.close();
+          logger.info('Download completed');
+          resolve(destPath);
+        });
+
+        fileStream.on('error', (err: Error) => {
+          fs.unlink(destPath).catch(() => {});
+          reject(err);
+        });
+      });
+
+      request.on('error', (err: Error) => {
+        reject(err);
+      });
+
+      request.setTimeout(30000, () => {
+        request.destroy();
+        reject(new Error('Download timeout'));
+      });
+    });
+  }
+
+  private async computeSHA256(filePath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const hash = createHash('sha256');
+      const stream = createReadStream(filePath);
+
+      stream.on('data', (data) => hash.update(data));
+      stream.on('end', () => resolve(hash.digest('hex')));
+      stream.on('error', reject);
+    });
   }
 
   async enableModel(request: ModelsEnableRequest): Promise<{ ok: true } | SemantiqaError> {

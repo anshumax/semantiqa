@@ -10,8 +10,10 @@ export interface DataSourceContextMenuProps {
   onClose: () => void;
   onViewDetails?: () => void;
   onRetryCrawl?: () => void;
+  onRetryConnection?: () => void;
   onDelete?: (blockId: string, sourceId: string) => void;
   canRetryCrawl?: boolean;
+  hasConnectionError?: boolean;
 }
 
 export function DataSourceContextMenu({
@@ -23,8 +25,10 @@ export function DataSourceContextMenu({
   onClose,
   onViewDetails,
   onRetryCrawl,
+  onRetryConnection,
   onDelete,
   canRetryCrawl = false,
+  hasConnectionError = false,
 }: DataSourceContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -41,6 +45,13 @@ export function DataSourceContextMenu({
     }
     onClose();
   }, [onRetryCrawl, onClose]);
+
+  const handleRetryConnection = useCallback(() => {
+    if (onRetryConnection) {
+      onRetryConnection();
+    }
+    onClose();
+  }, [onRetryConnection, onClose]);
 
   const handleDelete = useCallback(() => {
     if (onDelete) {
@@ -101,6 +112,14 @@ export function DataSourceContextMenu({
           onClick={handleRetryCrawl}
         >
           🔄 Retry crawl
+        </div>
+      )}
+      {hasConnectionError && onRetryConnection && (
+        <div
+          className="data-source-context-menu__item"
+          onClick={handleRetryConnection}
+        >
+          🔌 Retry connectivity check
         </div>
       )}
       <div

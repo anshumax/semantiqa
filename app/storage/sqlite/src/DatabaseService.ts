@@ -188,13 +188,24 @@ export class DatabaseService {
     this.db.exec(`CREATE TABLE IF NOT EXISTS models (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      type TEXT NOT NULL,
-      provider TEXT,
-      config TEXT,
+      kind TEXT NOT NULL,
+      size_mb INTEGER NOT NULL,
+      path TEXT,
+      sha256 TEXT NOT NULL,
+      enabled_tasks TEXT DEFAULT '[]',
+      installed_at TEXT,
       status TEXT DEFAULT 'available',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )`);
+
+    // Migration: Add new columns to models table if they don't exist
+    this.addColumnIfNotExists('models', 'kind', 'TEXT');
+    this.addColumnIfNotExists('models', 'size_mb', 'INTEGER DEFAULT 0');
+    this.addColumnIfNotExists('models', 'path', 'TEXT');
+    this.addColumnIfNotExists('models', 'sha256', 'TEXT DEFAULT ""');
+    this.addColumnIfNotExists('models', 'enabled_tasks', 'TEXT DEFAULT "[]"');
+    this.addColumnIfNotExists('models', 'installed_at', 'TEXT');
 
     this.db.exec(`CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
@@ -370,6 +381,24 @@ export class DatabaseService {
       }
       
       console.log('✅ CHECKPOINT: Checkpoint completed for:', this.dbPath);
+    }
+  }
+
+  /**
+   * Add a column to a table if it doesn't already exist
+   */
+  private addColumnIfNotExists(tableName: string, columnName: string, columnDef: string): void {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      // Check if column exists by trying to select it
+      this.db.prepare(`SELECT ${columnName} FROM ${tableName} LIMIT 1`).get();
+      // Column exists, no action needed
+    } catch (error) {
+      // Column doesn't exist, add it
+      this.db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`);
     }
   }
 

@@ -13,7 +13,7 @@
 
 ## Progress Summary
 
-**Overall Progress:** 38/83 tasks completed (46%)
+**Overall Progress:** 40/83 tasks completed (48%)
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
@@ -22,7 +22,7 @@
 | Phase 2: Connections & Metadata | ✅ Complete | 16/16 |
 | Phase 3: Embeddings & Search | ✅ Complete | 3/3 |
 | Phase 4: UI Foundations (Canvas) | ✅ Complete | 15/15 |
-| Phase 5: Model Manager | ⬜ Not Started | 0/4 |
+| Phase 5: Model Manager | ✅ Complete | 4/4 |
 | Phase 6: Summaries & Docs | ⬜ Not Started | 0/3 |
 | Phase 7: Canvas-Integrated Relationships | ⬜ Not Started | 0/5 |
 | Phase 8: Federated Query | ⬜ Not Started | 0/7 |
@@ -31,7 +31,7 @@
 | Phase 11: Export & Packaging | ⬜ Not Started | 0/5 |
 | Phase 12: Golden Tests | ⬜ Not Started | 0/4 |
 
-**Next Up:** Phase 5 - Model Manager with T-05-01 (Model manifest + UI)
+**Next Up:** Phase 6 - Summaries & Docs (T-06-01 heuristic skeletons)
 
 ---
 
@@ -405,15 +405,18 @@
 - **Risks:** Proxy env → use system agent; retry w/ backoff.
 - **Notes:** Implemented with automatic resume on connection failure, progress logging every 10MB, and safe migration for existing databases.
 
-### T-05-03: node-llama-cpp wrapper (worker pool) ⬜
-- **Desc:** Load GGUF; expose `summarize`, `rewrite`, `genSqlSkeleton`, `genFederatedQuery`; worker threads.
-- **DoD:** Healthcheck returns tokens/sec & latency; tasks run off main loop.
+### T-05-03: node-llama-cpp wrapper (worker pool) ✅
+- **Status:** Completed (2025-11-22)
+- **Desc:** Worker-thread wrapper around `node-llama-cpp` with fallback heuristics. Exposes summarize, rewrite, SQL skeleton, and federated plan generation APIs.
+- **DoD:** ✅ Worker tasks run outside main loop; ✅ Healthcheck IPC returns latency & tokens/sec; ✅ Generator service respects model task toggles; ✅ Renderer healthcheck button wired.
 - **Deps:** T-05-02
 - **Risks:** CPU perf → quantized models only; batch when idle.
+- **Notes:** Worker falls back to deterministic heuristics when the native binding is unavailable, preserving offline reliability.
 
-### T-05-04: Per-task toggles & caching ⬜
-- **Desc:** Enable generator per feature; content-hash caches; settings persisted.
-- **DoD:** NL chat & AI buttons appear only when enabled; repeat runs <50ms.
+### T-05-04: Per-task toggles & caching ✅
+- **Status:** Completed (2025-11-22)
+- **Desc:** Persisted task toggles for each model plus content-hash cache stored in SQLite settings table for summaries, rewrites, and NL→SQL outputs.
+- **DoD:** ✅ Model UI exposes per-task switches; ✅ Generator service enforces toggles; ✅ Cache hits return instantly (<50 ms) using hashed payload keys.
 - **Deps:** T-05-03, T-04-04
 - **Risks:** Cache invalidation → schema/content hash keys.
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { ModelsListResponse, ModelManifestEntry } from '@semantiqa/contracts';
+import type { ModelsHealthcheckResponse, ModelsListResponse, ModelManifestEntry } from '@semantiqa/contracts';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
 import './ModelsScreen.css';
 
@@ -78,6 +78,24 @@ export function ModelsScreen() {
     }
   };
 
+  const handleHealthcheck = async (modelId: string) => {
+    try {
+      const result = await window.semantiqa?.api.invoke(IPC_CHANNELS.MODELS_HEALTHCHECK, { id: modelId });
+      if (result && 'code' in result) {
+        alert(`Healthcheck failed: ${result.message}`);
+        return;
+      }
+      const data = result as ModelsHealthcheckResponse;
+      alert(
+        `Model ${modelId} is ${data.ok ? 'healthy' : 'unavailable'}\n` +
+          `Latency: ${data.latencyMs} ms\nTokens/sec: ${data.tokensPerSec}\n` +
+          (data.errors.length ? `Notes: ${data.errors.join(', ')}` : ''),
+      );
+    } catch (err) {
+      alert(`Healthcheck failed: ${(err as Error).message}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="models-screen">
@@ -127,6 +145,7 @@ export function ModelsScreen() {
                   model={model}
                   installed={true}
                   onToggleTask={handleToggleTask}
+                  onHealthcheck={() => handleHealthcheck(model.id)}
                 />
               ))}
             </div>
@@ -144,6 +163,7 @@ export function ModelsScreen() {
                   model={model}
                   installed={isInstalled}
                   onDownload={isInstalled ? undefined : () => handleDownload(model.id)}
+                  onHealthcheck={isInstalled ? () => handleHealthcheck(model.id) : undefined}
                 />
               );
             })}
@@ -159,9 +179,10 @@ interface ModelCardProps {
   installed: boolean;
   onDownload?: () => void;
   onToggleTask?: (modelId: string, task: string, currentTasks: string[]) => void;
+  onHealthcheck?: () => void;
 }
 
-function ModelCard({ model, installed, onDownload, onToggleTask }: ModelCardProps) {
+function ModelCard({ model, installed, onDownload, onToggleTask, onHealthcheck }: ModelCardProps) {
   const installedModel = installed ? model as InstalledModel : null;
 
   return (
@@ -233,6 +254,15 @@ function ModelCard({ model, installed, onDownload, onToggleTask }: ModelCardProp
               {installedModel?.enabledTasks?.length || 0} of {model.tasks.length} tasks enabled
             </span>
           </div>
+        )}
+        {installed && onHealthcheck && (
+          <button
+            className="model-card__healthcheck-btn"
+            onClick={onHealthcheck}
+            type="button"
+          >
+            Run Healthcheck
+          </button>
         )}
       </div>
     </div>

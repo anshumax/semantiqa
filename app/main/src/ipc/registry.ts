@@ -16,6 +16,8 @@ import {
   MetadataCrawlResponseSchema,
   ModelsDownloadRequestSchema,
   ModelsEnableRequestSchema,
+  ModelsHealthcheckRequestSchema,
+  ModelsHealthcheckResponseSchema,
   ModelsListResponseSchema,
   NlSqlGenerateRequestSchema,
   NlSqlGenerateResponseSchema,
@@ -55,6 +57,7 @@ const channelToSchema: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'models:list': z.undefined(),
   'models:download': ModelsDownloadRequestSchema,
   'models:enable': ModelsEnableRequestSchema,
+  'models:healthcheck': ModelsHealthcheckRequestSchema,
   'nlsql:generate': NlSqlGenerateRequestSchema,
   'audit:list': AuditListRequestSchema,
   'graph:get': GraphGetRequestSchema,
@@ -118,6 +121,7 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'models:list': z.union([ModelsListResponseSchema, SemantiqaErrorSchema]),
   'models:download': z.union([okResponse, SemantiqaErrorSchema]),
   'models:enable': z.union([okResponse, SemantiqaErrorSchema]),
+  'models:healthcheck': z.union([ModelsHealthcheckResponseSchema, SemantiqaErrorSchema]),
   'nlsql:generate': z.union([NlSqlGenerateResponseSchema, SemantiqaErrorSchema]),
   'audit:list': z.union([auditResponse, SemantiqaErrorSchema]),
   'graph:get': z.union([GraphGetResponseSchema, SemantiqaErrorSchema]),
@@ -185,7 +189,10 @@ export function registerIpcHandlers(handlerMap: IpcHandlerMap) {
     }
 
     ipcMain.handle(channel, async (event, rawPayload) => {
-      console.log(`🔌 IPC Handler called for ${channel} with length ${Object.keys(rawPayload).length}`);
+      const payloadLength = rawPayload && typeof rawPayload === 'object'
+        ? Object.keys(rawPayload).length
+        : 0;
+      console.log(`🔌 IPC Handler called for ${channel} with length ${payloadLength}`);
       const parseResult = payloadSchema.safeParse(rawPayload);
       if (!parseResult.success) {
         console.error(`❌ Validation failed for ${channel}:`, parseResult.error.flatten());
@@ -231,7 +238,7 @@ export function registerIpcHandlers(handlerMap: IpcHandlerMap) {
   }
 
   // Register all handlers
-  (Object.keys(channelToSchema) as IpcChannel[]).forEach(channel => {
+  (Object.keys(channelToSchema) as Array<IpcChannel>).forEach((channel) => {
     registerHandler(channel);
   });
 

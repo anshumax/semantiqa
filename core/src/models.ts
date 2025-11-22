@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 type ModelManifestEntry = {
   id: string;
@@ -12,7 +13,15 @@ type ModelManifestEntry = {
   tasks: string[];
 };
 
+const moduleDir = dirname(fileURLToPath(import.meta.url));
 const MANIFEST_PATH = join(process.cwd(), 'models', 'models.json');
+const MANIFEST_FALLBACK_PATH = join(
+  moduleDir,
+  '..',
+  '..',
+  'models',
+  'models.json',
+);
 
 interface ModelManifestFile {
   version: string;
@@ -28,7 +37,25 @@ interface ModelManifestFile {
 }
 
 export async function loadModelManifest(): Promise<ModelManifestEntry[]> {
-  const raw = await fs.readFile(MANIFEST_PATH, 'utf-8');
+  const candidatePaths = [MANIFEST_PATH, MANIFEST_FALLBACK_PATH];
+  let raw: string | null = null;
+
+  for (const pathCandidate of candidatePaths) {
+    try {
+      raw = await fs.readFile(pathCandidate, 'utf-8');
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
+
+  if (!raw) {
+    throw new Error(
+      `Model manifest not found. Looked in: ${candidatePaths.join(', ')}`,
+    );
+  }
   const manifest = JSON.parse(raw) as ModelManifestFile;
   return manifest.models.map((entry) => ({
     id: entry.id,

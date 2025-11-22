@@ -10,6 +10,7 @@ import { MetadataCrawlService } from './application/MetadataCrawlService';
 import { ConnectivityQueue, ConnectivityService, ConnectivityMonitor } from './application/ConnectivityService';
 import { CrawlQueue } from './application/CrawlQueue';
 import { ModelManagerService } from './services/ModelManagerService';
+import { GeneratorService } from './services/GeneratorService';
 import { CanvasService } from './services/CanvasService';
 import { TablesService } from './services/TablesService';
 import { SourceDetailsService } from './services/SourceDetailsService';
@@ -369,6 +370,12 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     logger: console,
   });
 
+  const generatorService = new GeneratorService({
+    openSourcesDb: graphDbFactory,
+    audit,
+    logger: console,
+  });
+
   // Source provisioning service
   const sourceProvisioningService = new SourceProvisioningService({
     openSourcesDb: graphDbFactory,
@@ -446,6 +453,12 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     },
     [IPC_CHANNELS.MODELS_ENABLE]: async (request) => {
       return modelManagerService.enableModel(request);
+    },
+    [IPC_CHANNELS.MODELS_HEALTHCHECK]: async (request) => {
+      return generatorService.healthcheck(request ?? {});
+    },
+    [IPC_CHANNELS.NLSQL_GENERATE]: async (request) => {
+      return generatorService.generateNlSql(request);
     },
     [IPC_CHANNELS.CANVAS_GET]: (request) => canvasService.getCanvas(request),
     [IPC_CHANNELS.CANVAS_UPDATE]: (request) => canvasService.updateCanvas(request),

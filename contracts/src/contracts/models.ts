@@ -41,6 +41,12 @@ export const ModelsEnableRequestSchema = z.object({
 
 export type ModelsEnableRequest = z.infer<typeof ModelsEnableRequestSchema>;
 
+export const ModelsHealthcheckRequestSchema = z.object({
+  id: NonEmptyString.optional(),
+});
+
+export type ModelsHealthcheckRequest = z.infer<typeof ModelsHealthcheckRequestSchema>;
+
 export const ModelsHealthcheckResponseSchema = z.object({
   id: NonEmptyString,
   ok: z.boolean(),

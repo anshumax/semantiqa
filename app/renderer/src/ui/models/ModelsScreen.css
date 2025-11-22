@@ -238,6 +238,25 @@
   background: rgba(80, 123, 255, 0.18);
   transform: translateY(-1px);
 }
+.model-card__healthcheck-btn {
+  margin-left: auto;
+  padding: 0.35rem 0.85rem;
+  background: rgba(59, 178, 134, 0.12);
+  border: 1px solid rgba(59, 178, 134, 0.32);
+  color: rgba(185, 244, 214, 0.92);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.model-card__healthcheck-btn:hover {
+  border-color: rgba(59, 178, 134, 0.52);
+  background: rgba(59, 178, 134, 0.2);
+  transform: translateY(-1px);
+}
 
 .model-card__download-btn:focus-visible {
   outline: none;

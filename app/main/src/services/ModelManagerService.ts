@@ -1,9 +1,9 @@
 import { promises as fs } from 'node:fs';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { app } from 'electron';
-import { loadModelManifest } from '../../../../core/dist/models';
 import type { 
   ModelsListResponse,
   ModelsDownloadRequest,
@@ -13,6 +13,21 @@ import type {
   SemantiqaError 
 } from '@semantiqa/contracts';
 import type { Database as BetterSqliteDatabase } from 'better-sqlite3';
+
+type LoadModelManifestFn = typeof import('../../../../core/dist/models').loadModelManifest;
+let loadModelManifestRef: LoadModelManifestFn | null = null;
+
+async function getLoadModelManifest(): Promise<LoadModelManifestFn> {
+  if (!loadModelManifestRef) {
+    const moduleUrl = pathToFileURL(join(__dirname, '../../../../core/dist/models.js')).href;
+    const dynamicImport = new Function('specifier', 'return import(specifier);') as (specifier: string) => Promise<
+      typeof import('../../../../core/dist/models')
+    >;
+    const module = await dynamicImport(moduleUrl);
+    loadModelManifestRef = module.loadModelManifest;
+  }
+  return loadModelManifestRef;
+}
 
 export interface ModelManagerDeps {
   openSourcesDb: () => BetterSqliteDatabase;
@@ -57,6 +72,7 @@ export class ModelManagerService {
       audit({ action: 'models.list.started', status: 'success' });
 
       // Load available models from manifest
+      const loadModelManifest = await getLoadModelManifest();
       const available = await loadModelManifest();
       logger.info(`Loaded ${available.length} models from manifest`);
 
@@ -121,6 +137,7 @@ export class ModelManagerService {
       await this.ensureModelsDir();
 
       // Load manifest to get model details
+      const loadModelManifest = await getLoadModelManifest();
       const manifest = await loadModelManifest();
       const modelEntry = manifest.find(m => m.id === request.id);
       

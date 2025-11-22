@@ -10,6 +10,7 @@ interface InstalledModel extends ModelManifestEntry {
   installedAt: string;
   enabledTasks: string[];
   path?: string;
+  isSelected?: boolean;
 }
 
 export function ModelsScreen() {
@@ -152,6 +153,37 @@ export function ModelsScreen() {
     }
   };
 
+  const handleSelectModel = async (modelId: string, kind: 'generator' | 'embedding') => {
+    try {
+      const result = await window.semantiqa?.api.invoke(IPC_CHANNELS.MODELS_SELECT, { id: modelId, kind });
+      
+      if (result && 'code' in result) {
+        notifications.show({
+          title: 'Selection Failed',
+          message: result.message,
+          color: 'red',
+        });
+        return;
+      }
+      
+      notifications.show({
+        title: 'Model Selected',
+        message: `${kind === 'generator' ? 'Generation' : 'Embedding'} model updated`,
+        color: 'green',
+      });
+      
+      // Reload models to reflect the change
+      await loadModels();
+      
+    } catch (err) {
+      notifications.show({
+        title: 'Selection Failed',
+        message: (err as Error).message,
+        color: 'red',
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="models-screen">
@@ -183,6 +215,13 @@ export function ModelsScreen() {
     );
   }
 
+  // Group models by kind
+  const generatorModels = models.installed.filter(m => m.kind === 'generator');
+  const embeddingModels = models.installed.filter(m => m.kind === 'embedding');
+  
+  const availableGenerators = models.available.filter(m => m.kind === 'generator');
+  const availableEmbeddings = models.available.filter(m => m.kind === 'embedding');
+
   return (
     <>
       <div className="models-screen">
@@ -192,15 +231,21 @@ export function ModelsScreen() {
         </header>
 
         <div className="models-screen__content">
-          {models.installed.length > 0 && (
+          {/* Generation Models Section */}
+          {generatorModels.length > 0 && (
             <section className="models-section">
-              <h2>Installed Models</h2>
+              <h2>Generation Models</h2>
+              <p className="models-section__subtitle">
+                For SQL generation and text summarization
+              </p>
               <div className="models-grid">
-                {models.installed.map((model) => (
+                {generatorModels.map((model) => (
                   <ModelCard 
                     key={model.id}
                     model={model}
                     installed={true}
+                    isSelected={model.isSelected}
+                    onSelect={() => handleSelectModel(model.id, model.kind as 'generator')}
                     onToggleTask={handleToggleTask}
                     onHealthcheck={() => handleHealthcheck(model.id, model.name)}
                   />
@@ -209,24 +254,64 @@ export function ModelsScreen() {
             </section>
           )}
 
-          {models.available.length > 0 && (
+          {/* Embedding Models Section */}
+          {embeddingModels.length > 0 && (
             <section className="models-section">
-              <h2>Available Models</h2>
+              <h2>Embedding Models</h2>
+              <p className="models-section__subtitle">
+                For semantic search and vector similarity
+              </p>
               <div className="models-grid">
-                {models.available.map((model) => {
-                  const isInstalled = models.installed.some(installed => installed.id === model.id);
-                  return (
-                    <ModelCard 
-                      key={model.id}
-                      model={model}
-                      installed={isInstalled}
-                      onDownload={isInstalled ? undefined : () => handleDownload(model.id, model.name)}
-                      onHealthcheck={isInstalled ? () => handleHealthcheck(model.id, model.name) : undefined}
-                    />
-                  );
-                })}
+                {embeddingModels.map((model) => (
+                  <ModelCard 
+                    key={model.id}
+                    model={model}
+                    installed={true}
+                    isSelected={model.isSelected}
+                    onSelect={() => handleSelectModel(model.id, model.kind as 'embedding')}
+                    onToggleTask={handleToggleTask}
+                    onHealthcheck={() => handleHealthcheck(model.id, model.name)}
+                  />
+                ))}
               </div>
             </section>
+          )}
+
+          {/* Available Models */}
+          {(availableGenerators.length > 0 || availableEmbeddings.length > 0) && (
+            <>
+              {availableGenerators.length > 0 && (
+                <section className="models-section">
+                  <h2>Available Generation Models</h2>
+                  <div className="models-grid">
+                    {availableGenerators.map((model) => (
+                      <ModelCard 
+                        key={model.id}
+                        model={model}
+                        installed={false}
+                        onDownload={() => handleDownload(model.id, model.name)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+              
+              {availableEmbeddings.length > 0 && (
+                <section className="models-section">
+                  <h2>Available Embedding Models</h2>
+                  <div className="models-grid">
+                    {availableEmbeddings.map((model) => (
+                      <ModelCard 
+                        key={model.id}
+                        model={model}
+                        installed={false}
+                        onDownload={() => handleDownload(model.id, model.name)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -248,29 +333,31 @@ export function ModelsScreen() {
 interface ModelCardProps {
   model: ModelManifestEntry | InstalledModel;
   installed: boolean;
+  isSelected?: boolean;
   onDownload?: () => void;
+  onSelect?: () => void;
   onToggleTask?: (modelId: string, task: string, currentTasks: string[]) => void;
   onHealthcheck?: () => void;
 }
 
-function ModelCard({ model, installed, onDownload, onToggleTask, onHealthcheck }: ModelCardProps) {
+function ModelCard({ model, installed, isSelected, onDownload, onSelect, onToggleTask, onHealthcheck }: ModelCardProps) {
   const installedModel = installed ? model as InstalledModel : null;
-
+  
   return (
-    <div className={`model-card ${installed ? 'model-card--installed' : ''}`}>
+    <div className={`model-card ${installed ? 'model-card--installed' : ''} ${isSelected ? 'model-card--selected' : ''}`}>
       <div className="model-card__header">
         <div className="model-card__info">
-          <h3 className="model-card__name">{model.name}</h3>
+          <div className="model-card__title-row">
+            <h3 className="model-card__name">{model.name}</h3>
+            {isSelected && (
+              <span className="model-card__badge model-card__badge--active">Active</span>
+            )}
+          </div>
           <div className="model-card__meta">
             <span className="model-card__kind">{model.kind.toUpperCase()}</span>
             <span className="model-card__size">{model.sizeMb} MB</span>
           </div>
         </div>
-        {installed && (
-          <div className="model-card__status">
-            <span className="model-card__badge model-card__badge--installed">Installed</span>
-          </div>
-        )}
       </div>
 
       <div className="model-card__body">
@@ -320,20 +407,31 @@ function ModelCard({ model, installed, onDownload, onToggleTask, onHealthcheck }
           </button>
         )}
         {installed && (
-          <div className="model-card__enabled-tasks">
-            <span>
-              {installedModel?.enabledTasks?.length || 0} of {model.tasks.length} tasks enabled
-            </span>
-          </div>
-        )}
-        {installed && onHealthcheck && (
-          <button
-            className="model-card__healthcheck-btn"
-            onClick={onHealthcheck}
-            type="button"
-          >
-            Run Healthcheck
-          </button>
+          <>
+            <div className="model-card__enabled-tasks">
+              <span>
+                {installedModel?.enabledTasks?.length || 0} of {model.tasks.length} tasks enabled
+              </span>
+            </div>
+            {onHealthcheck && (
+              <button
+                className="model-card__healthcheck-btn"
+                onClick={onHealthcheck}
+                type="button"
+              >
+                Run Healthcheck
+              </button>
+            )}
+            {!isSelected && onSelect && (
+              <button
+                className="model-card__select-btn"
+                onClick={onSelect}
+                type="button"
+              >
+                ✓ Use This Model
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>

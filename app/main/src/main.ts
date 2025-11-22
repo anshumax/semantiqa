@@ -479,6 +479,9 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     [IPC_CHANNELS.MODELS_HEALTHCHECK]: async (request) => {
       return generatorService.healthcheck(request ?? {});
     },
+    [IPC_CHANNELS.MODELS_SELECT]: async (request) => {
+      return modelManagerService.selectModel(request);
+    },
     [IPC_CHANNELS.NLSQL_GENERATE]: async (request) => {
       return generatorService.generateNlSql(request);
     },

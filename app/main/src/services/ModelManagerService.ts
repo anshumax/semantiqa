@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import { createReadStream, createWriteStream } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -77,6 +77,9 @@ export class ModelManagerService {
       logger.info('Loading model manifest and installed models');
       audit({ action: 'models.list.started', status: 'success' });
 
+      // Reconcile filesystem models with database records
+      await this.reconcileModels(openSourcesDb());
+
       // Load available models from manifest
       const loadModelManifest = await getLoadModelManifest();
       const available = await loadModelManifest();
@@ -95,6 +98,10 @@ export class ModelManagerService {
       const installedIds = new Set(installed.map(m => m.id));
       const availableOnly = available.filter((model: any) => !installedIds.has(model.id));
 
+      // Get selected model IDs for each kind
+      const selectedGenerator = this.getSelectedModelId(openSourcesDb(), 'generator');
+      const selectedEmbedding = this.getSelectedModelId(openSourcesDb(), 'embedding');
+
       return {
         installed: installed.map(model => ({
           id: model.id,
@@ -108,6 +115,9 @@ export class ModelManagerService {
           installedAt: model.installedAt,
           enabledTasks: model.enabledTasks,
           path: model.path,
+          isSelected: model.kind === 'generator' 
+            ? model.id === selectedGenerator
+            : model.id === selectedEmbedding,
         })),
         available: availableOnly.map((model: any) => ({
           id: model.id,
@@ -566,6 +576,240 @@ export class ModelManagerService {
         message: 'Failed to run model healthcheck',
         details: { error: (error as Error).message }
       };
+    }
+  }
+
+  /**
+   * Reconcile filesystem models with database records
+   * Automatically registers orphaned model files and cleans up stale records
+   */
+  /**
+   * Select a model as the active model for its kind
+   */
+  async selectModel(request: import('@semantiqa/contracts').ModelsSelectRequest): Promise<{ ok: true } | import('@semantiqa/contracts').SemantiqaError> {
+    const { openSourcesDb, logger, audit } = this.deps;
+    
+    try {
+      const db = openSourcesDb();
+      
+      // Verify model exists and is installed
+      const model = db.prepare(
+        'SELECT id, kind FROM models WHERE id = ? AND path IS NOT NULL'
+      ).get(request.id) as { id: string; kind: string } | undefined;
+      
+      if (!model) {
+        return {
+          code: 'NOT_FOUND',
+          message: 'Model not found or not installed',
+          details: { id: request.id }
+        };
+      }
+      
+      if (model.kind !== request.kind) {
+        return {
+          code: 'VALIDATION_ERROR',
+          message: 'Model kind mismatch',
+          details: { expected: request.kind, actual: model.kind }
+        };
+      }
+      
+      // Store selection in settings table
+      const now = new Date().toISOString();
+      db.prepare(`
+        INSERT INTO settings (key, value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET
+          value = excluded.value,
+          updated_at = excluded.updated_at
+      `).run(`selected_model:${request.kind}`, request.id, now);
+      
+      logger.info('Model selected', { modelId: request.id, kind: request.kind });
+      audit({
+        action: 'models.select',
+        status: 'success',
+        details: { modelId: request.id, kind: request.kind }
+      });
+      
+      return { ok: true };
+      
+    } catch (error) {
+      logger.error('Failed to select model', { error });
+      return {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to select model',
+        details: { error: (error as Error).message }
+      };
+    }
+  }
+
+  /**
+   * Get the selected model ID for a given kind
+   * Returns the explicit selection or falls back to most recent
+   */
+  private getSelectedModelId(db: BetterSqliteDatabase, kind: 'generator' | 'embedding'): string | null {
+    // 1. Try explicit selection from settings
+    const setting = db.prepare(
+      "SELECT value FROM settings WHERE key = ?"
+    ).get(`selected_model:${kind}`) as { value: string } | undefined;
+    
+    if (setting) {
+      // Verify the selected model still exists and is installed
+      const model = db.prepare(
+        "SELECT id FROM models WHERE id = ? AND kind = ? AND path IS NOT NULL"
+      ).get(setting.value, kind) as { id: string } | undefined;
+      
+      if (model) {
+        return model.id; // ✅ Valid selection
+      }
+    }
+    
+    // 2. Fallback: Most recently installed model
+    const fallback = db.prepare(
+      `SELECT id FROM models 
+       WHERE kind = ? AND path IS NOT NULL 
+       ORDER BY installed_at DESC 
+       LIMIT 1`
+    ).get(kind) as { id: string } | undefined;
+    
+    return fallback?.id ?? null;
+  }
+
+  private async reconcileModels(db: BetterSqliteDatabase): Promise<void> {
+    const { logger, audit } = this.deps;
+    
+    try {
+      // Ensure models directory exists
+      await fs.mkdir(this.modelsDir, { recursive: true });
+      
+      // Get all .model files from disk
+      const files = await fs.readdir(this.modelsDir);
+      const modelFiles = files.filter(f => f.endsWith('.model') && !f.endsWith('.download'));
+      
+      const dbCount = (db.prepare('SELECT COUNT(*) as count FROM models WHERE path IS NOT NULL').get() as { count: number }).count;
+      if (modelFiles.length === 0 && dbCount === 0) {
+        return; // Nothing to reconcile
+      }
+      
+      logger.info('Reconciling models', { filesOnDisk: modelFiles.length });
+      
+      // Load model manifest for metadata lookup
+      const loadModelManifest = await getLoadModelManifest();
+      const manifestModels = await loadModelManifest();
+      const manifestMap = new Map(manifestModels.map(m => [m.id, m]));
+      
+      let reconciled = 0;
+      let skipped = 0;
+      
+      // Reconcile files on disk
+      for (const fileName of modelFiles) {
+        // Extract model ID from filename: "gen-tinyllama-1.1b-q4_k_m-gguf.model" → "gen-tinyllama-1.1b-q4_k_m-gguf"
+        const modelId = fileName.replace('.model', '');
+        const filePath = join(this.modelsDir, fileName);
+        
+        // Check if model exists in database
+        const existingRecord = db.prepare(
+          'SELECT id, path FROM models WHERE id = ?'
+        ).get(modelId) as { id: string; path: string | null } | undefined;
+        
+        if (existingRecord?.path) {
+          skipped++;
+          continue; // Already registered with path
+        }
+        
+        // Look up metadata from manifest
+        const manifestEntry = manifestMap.get(modelId);
+        if (!manifestEntry) {
+          logger.warn('Found model file without manifest entry', { 
+            modelId, 
+            fileName 
+          });
+          skipped++;
+          continue; // Can't register without metadata
+        }
+        
+        // Get file stats
+        const stats = await fs.stat(filePath);
+        const actualSizeMb = Math.round(stats.size / (1024 * 1024));
+        
+        // Re-register model in database
+        const now = new Date().toISOString();
+        
+        if (existingRecord) {
+          // Update existing record that lost its path
+          db.prepare(`
+            UPDATE models 
+            SET path = ?, 
+                size_mb = ?,
+                installed_at = ?,
+                updated_at = ?
+            WHERE id = ?
+          `).run(filePath, actualSizeMb, stats.mtime.toISOString(), now, modelId);
+        } else {
+          // Insert new record
+          db.prepare(`
+            INSERT INTO models (
+              id, name, kind, size_mb, license, path, sha256, 
+              enabled_tasks, installed_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            manifestEntry.id,
+            manifestEntry.name,
+            manifestEntry.kind,
+            actualSizeMb,
+            manifestEntry.license,
+            filePath,
+            manifestEntry.sha256,
+            JSON.stringify(manifestEntry.kind === 'generator' ? ['summaries', 'nlsql'] : []),
+            stats.mtime.toISOString(),
+            now
+          );
+        }
+        
+        reconciled++;
+        logger.info('Reconciled orphaned model', { 
+          modelId, 
+          name: manifestEntry.name,
+          sizeMb: actualSizeMb 
+        });
+      }
+      
+      // Clean up stale database entries (model file deleted but DB record remains)
+      const dbModels = db.prepare(
+        'SELECT id, path FROM models WHERE path IS NOT NULL'
+      ).all() as Array<{ id: string; path: string }>;
+      
+      let cleaned = 0;
+      for (const dbModel of dbModels) {
+        if (!existsSync(dbModel.path)) {
+          db.prepare('UPDATE models SET path = NULL, installed_at = NULL WHERE id = ?')
+            .run(dbModel.id);
+          cleaned++;
+          logger.info('Cleaned stale model record', { modelId: dbModel.id });
+        }
+      }
+      
+      if (reconciled > 0 || cleaned > 0) {
+        logger.info('Model reconciliation complete', { 
+          reconciled, 
+          skipped, 
+          cleaned 
+        });
+        
+        audit({ 
+          action: 'models.reconcile.completed', 
+          status: 'success',
+          details: { reconciled, skipped, cleaned }
+        });
+      }
+      
+    } catch (error) {
+      logger.error('Model reconciliation failed', { error });
+      audit({ 
+        action: 'models.reconcile.failed', 
+        status: 'failure',
+        details: { error: (error as Error).message }
+      });
     }
   }
 

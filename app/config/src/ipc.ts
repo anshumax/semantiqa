@@ -9,6 +9,7 @@ import type {
   ModelsHealthcheckRequest,
   ModelsHealthcheckResponse,
   ModelsListResponse,
+  ModelsSelectRequest,
   NlSqlGenerateRequest,
   NlSqlGenerateResponse,
   QueryResult,
@@ -44,6 +45,7 @@ export type IpcChannel =
   | 'models:download'
   | 'models:enable'
   | 'models:healthcheck'
+  | 'models:select'
   | 'nlsql:generate'
   | 'audit:list'
   | 'graph:get'
@@ -151,6 +153,11 @@ type HandlerMap = {
     request: ModelsHealthcheckRequest;
     response: ModelsHealthcheckResponse | SemantiqaError;
   };
+  /** Selects a specific model as the active model for a given kind */
+  'models:select': {
+    request: ModelsSelectRequest;
+    response: { ok: true } | SemantiqaError;
+  };
   /** Generates SQL from natural language query (requires model enabled) */
   'nlsql:generate': {
     request: NlSqlGenerateRequest;
@@ -254,6 +261,7 @@ export const IPC_CHANNELS = {
   MODELS_DOWNLOAD: 'models:download' as const,
   MODELS_ENABLE: 'models:enable' as const,
   MODELS_HEALTHCHECK: 'models:healthcheck' as const,
+  MODELS_SELECT: 'models:select' as const,
   NLSQL_GENERATE: 'nlsql:generate' as const,
   AUDIT_LIST: 'audit:list' as const,
   GRAPH_GET: 'graph:get' as const,
@@ -275,6 +283,7 @@ export type SafeRendererChannels = Pick<
   | 'MODELS_DOWNLOAD'
   | 'MODELS_ENABLE'
   | 'MODELS_HEALTHCHECK'
+  | 'MODELS_SELECT'
   | 'AUDIT_LIST'
   | 'GRAPH_GET'
   | 'SOURCES_ADD'
@@ -307,6 +316,7 @@ export const SAFE_RENDERER_CHANNEL_VALUES = Object.values({
   MODELS_DOWNLOAD: IPC_CHANNELS.MODELS_DOWNLOAD,
   MODELS_ENABLE: IPC_CHANNELS.MODELS_ENABLE,
   MODELS_HEALTHCHECK: IPC_CHANNELS.MODELS_HEALTHCHECK,
+  MODELS_SELECT: IPC_CHANNELS.MODELS_SELECT,
   AUDIT_LIST: IPC_CHANNELS.AUDIT_LIST,
   GRAPH_GET: IPC_CHANNELS.GRAPH_GET,
   SOURCES_ADD: IPC_CHANNELS.SOURCES_ADD,

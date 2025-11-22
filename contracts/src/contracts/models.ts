@@ -21,6 +21,7 @@ export const ModelsListResponseSchema = z.object({
       installedAt: NonEmptyString,
       enabledTasks: z.array(ModelTaskSchema),
       path: NonEmptyString.optional(),
+      isSelected: z.boolean().optional(),
     }),
   ),
   available: z.array(ModelManifestEntrySchema),
@@ -56,3 +57,10 @@ export const ModelsHealthcheckResponseSchema = z.object({
 });
 
 export type ModelsHealthcheckResponse = z.infer<typeof ModelsHealthcheckResponseSchema>;
+
+export const ModelsSelectRequestSchema = z.object({
+  id: NonEmptyString,
+  kind: z.enum(['embedding', 'generator']),
+});
+
+export type ModelsSelectRequest = z.infer<typeof ModelsSelectRequestSchema>;

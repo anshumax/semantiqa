@@ -267,3 +267,60 @@
   font-size: 0.75rem;
   color: var(--color-text-muted);
 }
+
+/* Model Selection UI */
+.models-section__subtitle {
+  margin: -0.5rem 0 1rem 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.model-card--selected {
+  border-color: rgba(59, 178, 134, 0.5);
+  background: rgba(59, 178, 134, 0.05);
+}
+
+.model-card__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: 0.25rem;
+}
+
+.model-card__badge--active {
+  padding: 0.25rem 0.5rem;
+  background: rgba(59, 178, 134, 0.2);
+  border: 1px solid rgba(59, 178, 134, 0.4);
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(185, 244, 214, 0.95);
+}
+
+.model-card__select-btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(80, 123, 255, 0.12);
+  border: 1px solid rgba(80, 123, 255, 0.32);
+  color: rgba(161, 190, 255, 0.92);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.model-card__select-btn:hover {
+  border-color: rgba(80, 123, 255, 0.52);
+  background: rgba(80, 123, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.model-card__select-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}

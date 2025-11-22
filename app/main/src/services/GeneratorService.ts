@@ -330,6 +330,18 @@ export class GeneratorService {
 
   private getModelForTask(task: 'summaries' | 'nlsql', preferredId?: string): ActiveModel | SemantiqaError {
     const db = this.deps.openSourcesDb();
+    
+    // If no preference, try to use the selected generator model
+    if (!preferredId) {
+      const setting = db.prepare(
+        "SELECT value FROM settings WHERE key = ?"
+      ).get('selected_model:generator') as { value: string } | undefined;
+      
+      if (setting) {
+        preferredId = setting.value;
+      }
+    }
+    
     const rows = db
       .prepare(
         `
@@ -337,10 +349,12 @@ export class GeneratorService {
         FROM models
         WHERE kind = 'generator'
           AND path IS NOT NULL
-        ORDER BY installed_at DESC
+        ORDER BY 
+          CASE WHEN id = ? THEN 0 ELSE 1 END,
+          installed_at DESC
       `,
       )
-      .all() as Array<{ id: string; path: string | null; enabled_tasks: string | null }>;
+      .all(preferredId || null) as Array<{ id: string; path: string | null; enabled_tasks: string | null }>;
 
     const normalized = rows
       .map<ActiveModel | null>((row) => {
@@ -360,9 +374,6 @@ export class GeneratorService {
       .filter(Boolean) as ActiveModel[];
 
     const candidate = normalized.find((model) => {
-      if (preferredId && model.id !== preferredId) {
-        return false;
-      }
       return model.enabledTasks.includes(task);
     });
 

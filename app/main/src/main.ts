@@ -398,6 +398,15 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     },
   });
 
+  // Summary generator service (depends on generator service)
+  const { SummaryGeneratorService } = await import('./services/SummaryGeneratorService.js');
+  const summaryGeneratorService = new SummaryGeneratorService({
+    openSourcesDb: graphDbFactory,
+    logger: console,
+    audit,
+    generatorService,
+  });
+
   // Source provisioning service
   const sourceProvisioningService = new SourceProvisioningService({
     openSourcesDb: graphDbFactory,
@@ -481,6 +490,35 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     },
     [IPC_CHANNELS.MODELS_SELECT]: async (request) => {
       return modelManagerService.selectModel(request);
+    },
+    [IPC_CHANNELS.SUMMARIES_GENERATE]: async (request) => {
+      return summaryGeneratorService.generateSummary(request);
+    },
+    [IPC_CHANNELS.SUMMARIES_BATCH_GENERATE]: async (request) => {
+      const results = await summaryGeneratorService.generateBatchSummaries(request.nodeIds);
+      const successCount = Array.from(results.values()).filter(r => 'summary' in r).length;
+      const failureCount = results.size - successCount;
+      
+      return {
+        results: Array.from(results.entries()).map(([nodeId, result]) => {
+          if ('code' in result) {
+            return {
+              nodeId,
+              success: false,
+              error: result.message,
+            };
+          }
+          return {
+            nodeId,
+            success: true,
+            summary: result.summary,
+            summaryType: result.summaryType,
+            generatedAt: result.generatedAt,
+          };
+        }),
+        successCount,
+        failureCount,
+      };
     },
     [IPC_CHANNELS.NLSQL_GENERATE]: async (request) => {
       return generatorService.generateNlSql(request);

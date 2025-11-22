@@ -1,5 +1,9 @@
 import type {
   AuditListRequest,
+  GenerateBatchSummariesRequest,
+  GenerateBatchSummariesResponse,
+  GenerateSummaryRequest,
+  GenerateSummaryResponse,
   GraphGetRequest,
   GraphGetResponse,
   MetadataCrawlRequest,
@@ -46,6 +50,8 @@ export type IpcChannel =
   | 'models:enable'
   | 'models:healthcheck'
   | 'models:select'
+  | 'summaries:generate'
+  | 'summaries:batch-generate'
   | 'nlsql:generate'
   | 'audit:list'
   | 'graph:get'
@@ -158,6 +164,16 @@ type HandlerMap = {
     request: ModelsSelectRequest;
     response: { ok: true } | SemantiqaError;
   };
+  /** Generates a heuristic summary for a table or collection */
+  'summaries:generate': {
+    request: GenerateSummaryRequest;
+    response: GenerateSummaryResponse | SemantiqaError;
+  };
+  /** Generates summaries for multiple entities in batch */
+  'summaries:batch-generate': {
+    request: GenerateBatchSummariesRequest;
+    response: GenerateBatchSummariesResponse | SemantiqaError;
+  };
   /** Generates SQL from natural language query (requires model enabled) */
   'nlsql:generate': {
     request: NlSqlGenerateRequest;
@@ -262,6 +278,8 @@ export const IPC_CHANNELS = {
   MODELS_ENABLE: 'models:enable' as const,
   MODELS_HEALTHCHECK: 'models:healthcheck' as const,
   MODELS_SELECT: 'models:select' as const,
+  SUMMARIES_GENERATE: 'summaries:generate' as const,
+  SUMMARIES_BATCH_GENERATE: 'summaries:batch-generate' as const,
   NLSQL_GENERATE: 'nlsql:generate' as const,
   AUDIT_LIST: 'audit:list' as const,
   GRAPH_GET: 'graph:get' as const,
@@ -284,6 +302,8 @@ export type SafeRendererChannels = Pick<
   | 'MODELS_ENABLE'
   | 'MODELS_HEALTHCHECK'
   | 'MODELS_SELECT'
+  | 'SUMMARIES_GENERATE'
+  | 'SUMMARIES_BATCH_GENERATE'
   | 'AUDIT_LIST'
   | 'GRAPH_GET'
   | 'SOURCES_ADD'
@@ -317,6 +337,8 @@ export const SAFE_RENDERER_CHANNEL_VALUES = Object.values({
   MODELS_ENABLE: IPC_CHANNELS.MODELS_ENABLE,
   MODELS_HEALTHCHECK: IPC_CHANNELS.MODELS_HEALTHCHECK,
   MODELS_SELECT: IPC_CHANNELS.MODELS_SELECT,
+  SUMMARIES_GENERATE: IPC_CHANNELS.SUMMARIES_GENERATE,
+  SUMMARIES_BATCH_GENERATE: IPC_CHANNELS.SUMMARIES_BATCH_GENERATE,
   AUDIT_LIST: IPC_CHANNELS.AUDIT_LIST,
   GRAPH_GET: IPC_CHANNELS.GRAPH_GET,
   SOURCES_ADD: IPC_CHANNELS.SOURCES_ADD,

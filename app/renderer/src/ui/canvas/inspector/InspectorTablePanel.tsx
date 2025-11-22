@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { InspectorHeader } from './InspectorHeader';
 import { Tooltip } from '../../components/Tooltip';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
+import { notifications } from '@mantine/notifications';
 import './InspectorTablePanel.css';
+
+// Global tracking of ongoing summary generation requests
+const ongoingGenerations = new Set<string>();
 
 interface TableDetails {
   tableId: string;
@@ -25,6 +29,14 @@ interface TableDetails {
   foreignKeys?: Array<{ name: string; column: string; referencedTable: string; referencedColumn: string }>;
 }
 
+interface SummaryData {
+  summary: string;
+  summaryType: 'heuristic' | 'ai_generated';
+  generatedAt: string;
+}
+
+type SummaryMode = 'auto' | 'ai' | 'heuristic';
+
 export interface InspectorTablePanelProps {
   sourceId: string;
   tableId: string;
@@ -35,6 +47,9 @@ export function InspectorTablePanel({ sourceId, tableId, onClose }: InspectorTab
   const [details, setDetails] = useState<TableDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [showModeSelector, setShowModeSelector] = useState(false);
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -63,7 +78,76 @@ export function InspectorTablePanel({ sourceId, tableId, onClose }: InspectorTab
     };
 
     fetchDetails();
+    fetchSummary(); // Also fetch summary if it exists
+    
+    // Check if generation is ongoing for THIS specific table only
+    const isGenerating = ongoingGenerations.has(tableId);
+    setGeneratingSummary(isGenerating);
   }, [sourceId, tableId]);
+
+  const fetchSummary = async () => {
+    try {
+      const response = await window.semantiqa?.api.invoke(
+        IPC_CHANNELS.SUMMARIES_GENERATE,
+        { nodeId: tableId }
+      );
+      
+      if (response && !('code' in response)) {
+        setSummary({
+          summary: response.summary,
+          summaryType: response.summaryType,
+          generatedAt: response.generatedAt,
+        });
+      }
+    } catch (err) {
+      // Summary doesn't exist yet, that's okay
+      console.debug('No summary found for table:', tableId);
+    }
+  };
+
+  const handleGenerateSummary = async (mode: SummaryMode = 'auto', force = false) => {
+    setGeneratingSummary(true);
+    setShowModeSelector(false);
+    
+    // Track this generation globally
+    ongoingGenerations.add(tableId);
+
+    try {
+      const response = await window.semantiqa?.api.invoke(
+        IPC_CHANNELS.SUMMARIES_GENERATE,
+        { nodeId: tableId, mode, force }
+      );
+      
+      if ('code' in response) {
+        notifications.show({
+          title: 'Failed to generate summary',
+          message: response.message,
+          color: 'red',
+        });
+      } else {
+        setSummary({
+          summary: response.summary,
+          summaryType: response.summaryType,
+          generatedAt: response.generatedAt,
+        });
+        notifications.show({
+          title: 'Summary generated',
+          message: `Successfully generated ${response.summaryType === 'ai_generated' ? 'AI-enhanced' : 'quick'} summary`,
+          color: 'green',
+        });
+      }
+    } catch (err) {
+      notifications.show({
+        title: 'Error generating summary',
+        message: (err as Error).message,
+        color: 'red',
+      });
+    } finally {
+      setGeneratingSummary(false);
+      // Remove from global tracking
+      ongoingGenerations.delete(tableId);
+    }
+  };
 
   const formatNumber = (num?: number) => {
     if (num === undefined || num === null) return '—';
@@ -117,6 +201,87 @@ export function InspectorTablePanel({ sourceId, tableId, onClose }: InspectorTab
       />
 
       <div className="inspector-table-panel__content">
+        {/* Description Section */}
+        <section className="inspector-section inspector-section--description">
+          <div className="inspector-section__header">
+            <h3 className="inspector-section__title">Description</h3>
+            {summary && !generatingSummary && (
+              <span className={`summary-badge summary-badge--${summary.summaryType}`}>
+                {summary.summaryType === 'ai_generated' ? '🤖 AI-enhanced' : '⚡ Auto-generated'}
+              </span>
+            )}
+          </div>
+          
+          {/* Loading Overlay */}
+          {generatingSummary && (
+            <div className="summary-loading-overlay">
+              <div className="summary-loading-content">
+                <div className="summary-loading-spinner"></div>
+                <p className="summary-loading-text">Generating summary...</p>
+              </div>
+            </div>
+          )}
+          
+          {summary ? (
+            <div className="summary-content">
+              <div className="summary-text">{summary.summary}</div>
+              <div className="summary-actions">
+                <button
+                  type="button"
+                  className="summary-action-btn summary-action-btn--regenerate"
+                  onClick={() => setShowModeSelector(!showModeSelector)}
+                  disabled={generatingSummary}
+                >
+                  🔄 Regenerate
+                </button>
+                {showModeSelector && !generatingSummary && (
+                  <div className="mode-selector">
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateSummary('auto', true)}
+                      className="mode-selector__option"
+                    >
+                      <span className="mode-selector__icon">⚡</span>
+                      <span className="mode-selector__label">Auto</span>
+                      <span className="mode-selector__desc">Try AI, fall back to quick</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateSummary('ai', true)}
+                      className="mode-selector__option"
+                    >
+                      <span className="mode-selector__icon">🤖</span>
+                      <span className="mode-selector__label">AI-Enhanced</span>
+                      <span className="mode-selector__desc">Requires model installed</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateSummary('heuristic', true)}
+                      className="mode-selector__option"
+                    >
+                      <span className="mode-selector__icon">⚡</span>
+                      <span className="mode-selector__label">Quick</span>
+                      <span className="mode-selector__desc">Fast, always available</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="summary-empty">
+              <p className="summary-empty__message">No description yet</p>
+              <button
+                type="button"
+                className="summary-action-btn summary-action-btn--generate"
+                onClick={() => handleGenerateSummary('auto')}
+                disabled={generatingSummary}
+              >
+                {generatingSummary ? '⏳ Generating...' : '✨ Generate Description'}
+              </button>
+            </div>
+          )}
+        </section>
+
         {/* Overview Section */}
         <section className="inspector-section">
           <h3 className="inspector-section__title">Overview</h3>

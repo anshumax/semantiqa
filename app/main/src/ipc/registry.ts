@@ -9,6 +9,10 @@ import {
 } from '@semantiqa/app-config';
 import {
   AuditListRequestSchema,
+  GenerateBatchSummariesRequestSchema,
+  GenerateBatchSummariesResponseSchema,
+  GenerateSummaryRequestSchema,
+  GenerateSummaryResponseSchema,
   GraphGetRequestSchema,
   GraphGetResponseSchema,
   GraphUpsertNodeRequestSchema,
@@ -60,6 +64,8 @@ const channelToSchema: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'models:enable': ModelsEnableRequestSchema,
   'models:healthcheck': ModelsHealthcheckRequestSchema,
   'models:select': ModelsSelectRequestSchema,
+  'summaries:generate': GenerateSummaryRequestSchema,
+  'summaries:batch-generate': GenerateBatchSummariesRequestSchema,
   'nlsql:generate': NlSqlGenerateRequestSchema,
   'audit:list': AuditListRequestSchema,
   'graph:get': GraphGetRequestSchema,
@@ -125,6 +131,8 @@ const responseSchemas: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'models:enable': z.union([okResponse, SemantiqaErrorSchema]),
   'models:healthcheck': z.union([ModelsHealthcheckResponseSchema, SemantiqaErrorSchema]),
   'models:select': z.union([okResponse, SemantiqaErrorSchema]),
+  'summaries:generate': z.union([GenerateSummaryResponseSchema, SemantiqaErrorSchema]),
+  'summaries:batch-generate': z.union([GenerateBatchSummariesResponseSchema, SemantiqaErrorSchema]),
   'nlsql:generate': z.union([NlSqlGenerateResponseSchema, SemantiqaErrorSchema]),
   'audit:list': z.union([auditResponse, SemantiqaErrorSchema]),
   'graph:get': z.union([GraphGetResponseSchema, SemantiqaErrorSchema]),

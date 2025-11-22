@@ -13,7 +13,7 @@
 
 ## Progress Summary
 
-**Overall Progress:** 40/83 tasks completed (48%)
+**Overall Progress:** 42/83 tasks completed (51%)
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
@@ -23,7 +23,7 @@
 | Phase 3: Embeddings & Search | ✅ Complete | 3/3 |
 | Phase 4: UI Foundations (Canvas) | ✅ Complete | 15/15 |
 | Phase 5: Model Manager | ✅ Complete | 4/4 |
-| Phase 6: Summaries & Docs | ⬜ Not Started | 0/3 |
+| Phase 6: Summaries & Docs | ✅ Complete (MVP) | 2/2 (1 deferred) |
 | Phase 7: Canvas-Integrated Relationships | ⬜ Not Started | 0/5 |
 | Phase 8: Federated Query | ⬜ Not Started | 0/7 |
 | Phase 9: Reports & Dashboards | ⬜ Not Started | 0/6 |
@@ -31,7 +31,7 @@
 | Phase 11: Export & Packaging | ⬜ Not Started | 0/5 |
 | Phase 12: Golden Tests | ⬜ Not Started | 0/4 |
 
-**Next Up:** Phase 6 - Summaries & Docs (T-06-01 heuristic skeletons)
+**Next Up:** Phase 7 - Canvas-Integrated Relationships (T-07-01 relationship schema)
 
 ---
 
@@ -424,23 +424,28 @@
 
 ## Phase 6 — Summaries & Docs
 
-### T-06-01: Heuristic skeletons (no model) ⬜
+### T-06-01: Heuristic skeletons (no model) ✅
+- **Status:** Completed (2025-11-22)
 - **Desc:** Generate baseline summaries from names/types/stats.
 - **DoD:** Non-empty summaries for all tables/collections without model.
 - **Deps:** T-02-04, T-02-08, T-02-12, T-02-16
 - **Risks:** Quality → keep concise & labeled as heuristic.
+- **Notes:** Implemented SummaryGeneratorService with heuristic generation for tables and collections. Analyzes column/field names, types, and statistics to generate intelligent summaries. Summaries stored in node props with type 'heuristic'. IPC handlers added for single and batch generation.
 
-### T-06-02: AI summaries (optional) ⬜
+### T-06-02: AI summaries (optional) ✅
+- **Status:** Completed (2025-11-22)
 - **Desc:** Use generator to draft; review & save; cache results.
 - **DoD:** 20 entities summarized; cache hit on repeat; edits persist.
 - **Deps:** T-05-04, T-04-04
 - **Risks:** Latency → background queue + progress UI.
+- **Notes:** Extended SummaryGeneratorService with AI generation mode. Added 'auto', 'ai', and 'heuristic' modes with smart fallback. Builds prompts from table/collection metadata. Integrates with GeneratorService for LLM calls. Stores summaries with type indicator.
 
-### T-06-03: Docs as CRDT (Yjs) + history ⬜
+### T-06-03: Docs as CRDT (Yjs) + history ⏸️ (Deferred to Post-MVP)
 - **Desc:** Store descriptions/notes as Yjs; diff & revert UI.
 - **DoD:** Concurrent edits merge; history timeline & revert create new version.
 - **Deps:** T-04-04, T-01-01
 - **Risks:** None.
+- **Notes:** Deferred to post-MVP. Summaries can be manually edited through direct database updates. Collaborative editing and version history will be added later when needed.
 
 ---
 

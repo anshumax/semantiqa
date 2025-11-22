@@ -1,12 +1,12 @@
 import { useState, useCallback } from 'react';
 import { AppShell, NavLink, Stack } from '@mantine/core';
-import { IconSearch, IconDatabase, IconChartBar } from '@tabler/icons-react';
+import { IconSearch, IconDatabase, IconChartBar, IconCpu } from '@tabler/icons-react';
 import { ExplorerShell } from '../explorer';
 import { ModelsScreen } from '../models';
 import { CanvasWorkspace } from '../canvas';
 import './NavigationShell.css';
 
-type NavigationScreen = 'search-ask' | 'sources' | 'reports-dashboards';
+type NavigationScreen = 'search-ask' | 'sources' | 'models' | 'reports-dashboards';
 
 export function NavigationShell() {
   const [activeScreen, setActiveScreen] = useState<NavigationScreen>('sources');
@@ -32,6 +32,12 @@ export function NavigationShell() {
             onClick={() => handleNavigate('sources')}
           />
           <NavLink
+            label="Models"
+            leftSection={<IconCpu size={18} stroke={1.5} />}
+            active={activeScreen === 'models'}
+            onClick={() => handleNavigate('models')}
+          />
+          <NavLink
             label="Reports & Dashboards"
             leftSection={<IconChartBar size={18} stroke={1.5} />}
             active={activeScreen === 'reports-dashboards'}
@@ -46,6 +52,9 @@ export function NavigationShell() {
         </div>
         <div style={{ display: activeScreen === 'sources' ? 'block' : 'none', width: '100%', height: '100%' }}>
           <CanvasWorkspaceScreen />
+        </div>
+        <div style={{ display: activeScreen === 'models' ? 'block' : 'none', width: '100%', height: '100%' }}>
+          <ModelsScreen />
         </div>
         <div style={{ display: activeScreen === 'reports-dashboards' ? 'block' : 'none', width: '100%', height: '100%' }}>
           <ReportsDashboardsScreen />
@@ -100,13 +109,6 @@ function ReportsDashboardsScreen() {
             <li>Visualization and charting</li>
             <li>Export to PDF and Excel</li>
           </ul>
-        </div>
-        
-        {/* Demo the ModelsScreen here temporarily */}
-        <div style={{ marginTop: '2rem', padding: '1rem', border: '1px solid rgba(214, 216, 224, 0.12)', borderRadius: '8px' }}>
-          <h3>Model Manager (Preview)</h3>
-          <p>The Model Manager is available for preview:</p>
-          <ModelsScreen />
         </div>
       </div>
     </div>

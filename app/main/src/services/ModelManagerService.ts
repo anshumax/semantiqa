@@ -3,6 +3,8 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import https from 'node:https';
+import http from 'node:http';
 import { app } from 'electron';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -320,9 +322,6 @@ export class ModelManagerService {
     }
 
     return new Promise((resolve, reject) => {
-      const https = require('https');
-      const http = require('http');
-      
       const makeRequest = (currentUrl: string, redirectCount: number) => {
         if (redirectCount > maxRedirects) {
           reject(new Error('Too many redirects'));

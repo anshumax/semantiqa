@@ -7,6 +7,7 @@ import { theme } from './ui/theme';
 
 // Import Mantine styles
 import '@mantine/core/styles.css';
+import '@mantine/notifications/styles.css';
 import './ui/global.css';
 
 if ((import.meta as any).env.DEV && !(window as any).semantiqa) {

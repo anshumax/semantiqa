@@ -190,6 +190,7 @@ export class DatabaseService {
       name TEXT NOT NULL,
       kind TEXT NOT NULL,
       size_mb INTEGER NOT NULL,
+      license TEXT NOT NULL,
       path TEXT,
       sha256 TEXT NOT NULL,
       enabled_tasks TEXT DEFAULT '[]',

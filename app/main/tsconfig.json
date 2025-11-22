@@ -5,7 +5,8 @@
     "composite": true,
     "rootDir": "src",
     "outDir": "dist",
-    "module": "CommonJS",
+    "module": "ESNext",
+    "moduleResolution": "Node",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "paths": {
       "@semantiqa/storage-sqlite": ["../storage/sqlite/src"],

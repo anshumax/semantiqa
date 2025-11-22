@@ -45,7 +45,7 @@ const api = {
 };
 
 const bridge = {
-  publish(event: 'sources:status', payload: unknown) {
+  publish(event: 'sources:status' | 'models:download:progress', payload: unknown) {
     if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
       window.dispatchEvent(new CustomEvent(event, { detail: payload }));
     }
@@ -54,6 +54,10 @@ const bridge = {
 
 ipcRenderer.on('sources:status', (_event, payload: unknown) => {
   bridge.publish('sources:status', payload);
+});
+
+ipcRenderer.on('models:download:progress', (_event, payload: unknown) => {
+  bridge.publish('models:download:progress', payload);
 });
 
 contextBridge.exposeInMainWorld('semantiqa', Object.freeze({ api, bridge }));

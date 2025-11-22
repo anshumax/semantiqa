@@ -1,9 +1,6 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
-import { Worker } from 'node:worker_threads';
-
 import type {
   ModelsHealthcheckRequest,
   ModelsHealthcheckResponse,
@@ -12,50 +9,8 @@ import type {
   SemantiqaError,
 } from '@semantiqa/contracts';
 import type { Database as BetterSqliteDatabase } from 'better-sqlite3';
-
-type GeneratorTaskType = 'summarize' | 'rewrite' | 'genSqlSkeleton' | 'genFederatedQuery' | 'healthcheck';
-
-interface WorkerReadyMessage {
-  type: 'ready';
-  mode: 'llama' | 'fallback';
-}
-
-interface WorkerResultMessage<T = unknown> {
-  type: 'result';
-  taskId: string;
-  ok: boolean;
-  result?: T;
-  metrics?: {
-    latencyMs: number;
-    tokensEstimated: number;
-    mode: 'llama' | 'fallback';
-  };
-  error?: {
-    message: string;
-  };
-}
-
-type WorkerMessage<T = unknown> = WorkerReadyMessage | WorkerResultMessage<T>;
-
-interface WorkerTaskPayload {
-  type: 'task';
-  taskId: string;
-  taskType: GeneratorTaskType;
-  payload: Record<string, unknown>;
-  modelPath: string;
-}
-
-interface InitPayload {
-  type: 'init';
-  modelPath: string;
-  options?: {
-    threads?: number;
-    batchSize?: number;
-    systemPrompt?: string;
-  };
-}
-
-type OutboundMessage = WorkerTaskPayload | InitPayload;
+import type { ILlmProvider } from './llm/ILlmProvider.js';
+import { LlmProviderFactory, type LlmProviderConfig } from './llm/LlmProviderFactory.js';
 
 interface ActiveModel {
   id: string;
@@ -63,145 +18,64 @@ interface ActiveModel {
   enabledTasks: Array<'summaries' | 'nlsql'>;
 }
 
-interface GeneratorWorkerOptions {
+interface GeneratorServiceOptions {
   threads?: number;
   batchSize?: number;
   systemPrompt?: string;
 }
 
-type PendingTask = {
-  resolve: (value: WorkerResultMessage<unknown>) => void;
-  reject: (error: Error) => void;
-};
-
-class GeneratorWorkerPool {
-  private worker: Worker | null = null;
-  private pendingTasks = new Map<string, PendingTask>();
-  private currentModelPath: string | null = null;
-  private readyResolver: (() => void) | null = null;
-  private readyPromise: Promise<void> | null = null;
-
-  constructor(
-    private readonly options: GeneratorWorkerOptions,
-    private readonly logger: Pick<Console, 'info' | 'warn' | 'error'>,
-  ) {}
-
-  async runTask<T>(
-    taskType: GeneratorTaskType,
-    payload: Record<string, unknown>,
-    modelPath: string,
-  ): Promise<WorkerResultMessage<T>> {
-    await this.ensureWorker(modelPath);
-
-    if (!this.worker) {
-      throw new Error('Generator worker is not available');
-    }
-
-    const taskId = randomUUID();
-    return new Promise<WorkerResultMessage<T>>((resolve, reject) => {
-      this.pendingTasks.set(taskId, {
-        resolve: (value) => resolve(value as WorkerResultMessage<T>),
-        reject,
-      });
-      const message: WorkerTaskPayload = {
-        type: 'task',
-        taskId,
-        taskType,
-        payload,
-        modelPath,
-      };
-      this.worker!.postMessage(message);
-    });
-  }
-
-  async dispose() {
-    if (this.worker) {
-      this.logger.info('[GeneratorWorkerPool] Disposing worker');
-      await this.worker.terminate().catch((error) => {
-        this.logger.warn('[GeneratorWorkerPool] Failed to terminate worker', { error });
-      });
-    }
-    this.worker = null;
-    this.currentModelPath = null;
-    this.pendingTasks.clear();
-  }
-
-  private async ensureWorker(modelPath: string) {
-    if (this.worker && this.currentModelPath === modelPath) {
-      return this.readyPromise;
-    }
-
-    await this.dispose();
-    this.currentModelPath = modelPath;
-
-    const workerPath = path.join(__dirname, '..', 'workers', 'generatorWorker.js');
-    this.worker = new Worker(workerPath);
-
-    this.worker.on('message', (message: WorkerMessage) => {
-      if (message.type === 'ready') {
-        this.logger.info('[GeneratorWorkerPool] Worker ready', { mode: message.mode });
-        this.readyResolver?.();
-        this.readyResolver = null;
-        return;
-      }
-
-      const pending = this.pendingTasks.get(message.taskId);
-      if (!pending) {
-        this.logger.warn('[GeneratorWorkerPool] Received result for unknown task', { taskId: message.taskId });
-        return;
-      }
-
-      this.pendingTasks.delete(message.taskId);
-      if (message.ok) {
-        pending.resolve(message);
-      } else {
-        pending.reject(new Error(message.error?.message ?? 'Generator worker failed'));
-      }
-    });
-
-    this.worker.on('error', (error) => {
-      this.logger.error('[GeneratorWorkerPool] Worker error', { error });
-      for (const pending of this.pendingTasks.values()) {
-        pending.reject(error);
-      }
-      this.pendingTasks.clear();
-    });
-
-    this.worker.on('exit', (code) => {
-      if (code !== 0) {
-        this.logger.error('[GeneratorWorkerPool] Worker exited unexpectedly', { code });
-      }
-      this.worker = null;
-      this.currentModelPath = null;
-    });
-
-    this.readyPromise = new Promise<void>((resolve) => {
-      this.readyResolver = resolve;
-    });
-
-    const initMessage: InitPayload = {
-      type: 'init',
-      modelPath,
-      options: this.options,
-    };
-    this.worker.postMessage(initMessage);
-
-    return this.readyPromise;
-  }
-}
-
-interface GeneratorServiceDeps {
+export interface GeneratorServiceDeps {
   openSourcesDb: () => BetterSqliteDatabase;
   audit: (event: { action: string; status: 'success' | 'failure'; details?: Record<string, unknown> }) => void;
   logger: Pick<Console, 'info' | 'warn' | 'error'>;
+  llmProviderConfig?: LlmProviderConfig;
 }
 
 export class GeneratorService {
-  private readonly workerPool: GeneratorWorkerPool;
+  private readonly llmProvider: ILlmProvider;
+  private readonly options: GeneratorServiceOptions;
 
   constructor(private readonly deps: GeneratorServiceDeps) {
     const cpuCount = Math.max(2, os.cpus().length - 1);
-    this.workerPool = new GeneratorWorkerPool({ threads: Math.min(4, cpuCount) }, deps.logger);
+    this.options = {
+      threads: Math.min(4, cpuCount),
+      batchSize: 256,
+      systemPrompt: 'You are Semantiqa, an offline assistant that helps describe schemas and craft SQL safely.',
+    };
+
+    // Create LLM provider from config or use default (local)
+    this.llmProvider = deps.llmProviderConfig
+      ? LlmProviderFactory.createProvider(deps.llmProviderConfig)
+      : LlmProviderFactory.createDefault();
+  }
+
+  /**
+   * Validates that native modules required for the generator service are properly built.
+   * This is a static method that can be called during app startup.
+   * Returns null if validation passes, or an error message if it fails.
+   */
+  static async validateNativeModules(): Promise<string | null> {
+    try {
+      // Try to import node-llama-cpp
+      const module = await import('node-llama-cpp');
+
+      // Check if the LlamaModel class exists (indicates native bindings are loaded)
+      if (!module.LlamaModel) {
+        return 'node-llama-cpp native bindings not loaded. Run "pnpm install" to rebuild native modules.';
+      }
+
+      return null; // Validation passed
+    } catch (error) {
+      const errorMessage = (error as Error).message || String(error);
+      if (
+        errorMessage.includes('_llama') ||
+        errorMessage.includes('undefined') ||
+        errorMessage.includes('Cannot destructure')
+      ) {
+        return 'node-llama-cpp native bindings not available. Run "pnpm install" to rebuild native modules for Electron.';
+      }
+      return `Failed to load node-llama-cpp: ${errorMessage}`;
+    }
   }
 
   async summarize(input: { text: string }): Promise<{ summary: string; highlights: string[] } | SemantiqaError> {
@@ -219,13 +93,34 @@ export class GeneratorService {
         return cached;
       }
 
-      const result = await this.workerPool.runTask<{ summary: string; highlights: string[] }>(
-        'summarize',
-        payload,
-        model.path,
-      );
+      // Initialize provider if needed
+      if (!this.llmProvider.isReady()) {
+        await this.llmProvider.initialize(model.path, this.options);
+      }
 
-      const finalResult = result.result ?? { summary: '', highlights: [] };
+      // Generate summary using LLM provider
+      const summaryPrompt = `Summarize the following content in 3 bullet points with clear, non-fluffy prose:\n${input.text}`;
+      const result = await this.llmProvider.generateText(summaryPrompt, {
+        maxTokens: 256,
+        temperature: 0.15,
+      });
+
+      let summary = result.text.trim();
+      let highlights: string[];
+
+      if (result.mode === 'fallback') {
+        const heuristic = this.heuristicSummary(input.text);
+        summary = heuristic.summary;
+        highlights = heuristic.highlights;
+      } else {
+        highlights = summary
+          .split(/\n|-/)
+          .map((line) => line.replace(/^[•\-\d.]+/, '').trim())
+          .filter(Boolean)
+          .slice(0, 3);
+      }
+
+      const finalResult = { summary, highlights };
       this.writeCache('summarize', cacheKey, finalResult);
       return finalResult;
     } catch (error) {
@@ -233,7 +128,9 @@ export class GeneratorService {
     }
   }
 
-  async rewrite(input: { text: string; instructions?: string }): Promise<{ output: string; rationale: string } | SemantiqaError> {
+  async rewrite(
+    input: { text: string; instructions?: string },
+  ): Promise<{ output: string; rationale: string } | SemantiqaError> {
     try {
       const model = this.getModelForTask('summaries');
       if (isError(model)) {
@@ -247,13 +144,28 @@ export class GeneratorService {
         return cached;
       }
 
-      const result = await this.workerPool.runTask<{ output: string; rationale: string }>(
-        'rewrite',
-        payload,
-        model.path,
-      );
+      // Initialize provider if needed
+      if (!this.llmProvider.isReady()) {
+        await this.llmProvider.initialize(model.path, this.options);
+      }
 
-      const finalResult = result.result ?? { output: input.text, rationale: 'No changes applied.' };
+      const instruction =
+        input.instructions?.trim() || 'Rewrite this text to be concise, active voice, and business-friendly.';
+      const rewritePrompt = `${instruction}\nText:\n${input.text}`;
+
+      const result = await this.llmProvider.generateText(rewritePrompt, {
+        maxTokens: 512,
+        temperature: 0.2,
+      });
+
+      const finalResult = {
+        output: result.text.trim(),
+        rationale:
+          result.mode === 'fallback'
+            ? 'Generated via deterministic heuristic because node-llama-cpp is unavailable.'
+            : 'Generated via local Llama model.',
+      };
+
       this.writeCache('rewrite', cacheKey, finalResult);
       return finalResult;
     } catch (error) {
@@ -275,29 +187,41 @@ export class GeneratorService {
         return cached;
       }
 
-      const response = await this.workerPool.runTask<{
-        sql: string;
-        reasoning: string;
-        warnings: string[];
-      }>('genSqlSkeleton', { question: request.question, scope: request.scope }, model.path);
+      // Initialize provider if needed
+      if (!this.llmProvider.isReady()) {
+        await this.llmProvider.initialize(model.path, this.options);
+      }
 
-      const payload = response.result ?? {
-        sql: 'SELECT 1;',
-        reasoning: 'Fallback reasoning.',
-        warnings: ['LLM unavailable.'],
-      };
+      const sqlPrompt =
+        `You are Semantiqa. Derive a SQL skeleton for the request: "${request.question}".` +
+        ' Use only table and column names that appear in the scope hints.' +
+        ' Return only SQL, no explanations.';
+
+      const result = await this.llmProvider.generateText(sqlPrompt, {
+        maxTokens: 400,
+        temperature: 0.1,
+      });
+
+      const sql =
+        result.mode === 'fallback'
+          ? this.heuristicSql(request.question, request.scope as any)
+          : result.text.trim();
 
       const finalResponse: NlSqlGenerateResponse = {
         question: request.question,
         candidates: [
           {
-            sql: payload.sql,
-            plan: payload.reasoning,
-            warnings: payload.warnings ?? [],
+            sql,
+            plan:
+              result.mode === 'fallback'
+                ? 'Heuristic SQL skeleton derived from question and hints.'
+                : 'Generated via local Llama model.',
+            warnings: result.mode === 'fallback' ? ['LLM unavailable, heuristic skeleton only'] : [],
             policy: { allowed: true, reasons: [] },
           },
         ],
       };
+
       this.writeCache('nlsql', cacheKey, finalResponse);
       return finalResponse;
     } catch (error) {
@@ -322,13 +246,38 @@ export class GeneratorService {
         return cached;
       }
 
-      const result = await this.workerPool.runTask<{ plan: string[]; narrative: string }>(
-        'genFederatedQuery',
-        payloadForHash,
-        model.path,
-      );
+      // Initialize provider if needed
+      if (!this.llmProvider.isReady()) {
+        await this.llmProvider.initialize(model.path, this.options);
+      }
 
-      const finalResult = result.result ?? { plan: [], narrative: 'No narrative available' };
+      const planPrompt =
+        `Generate a federated query plan for "${input.question}".` +
+        ' Highlight which sources should be queried and how to join them safely.';
+
+      const result = await this.llmProvider.generateText(planPrompt, {
+        maxTokens: 400,
+        temperature: 0.25,
+      });
+
+      const plan =
+        result.mode === 'fallback'
+          ? [
+              `Identify relevant datasets based on relationships: ${input.relationships?.join(', ') || 'none provided'}.`,
+              'Fetch constrained projections from each source.',
+              'Join using semantic keys and apply final filters.',
+            ]
+          : result.text
+              .split(/\n+/)
+              .map((line) => line.trim())
+              .filter(Boolean);
+
+      const finalResult = {
+        plan,
+        narrative:
+          result.mode === 'fallback' ? 'Federated strategy derived heuristically.' : 'Detailed plan from local Llama model.',
+      };
+
       this.writeCache('federated', cacheKey, finalResult);
       return finalResult;
     } catch (error) {
@@ -343,29 +292,43 @@ export class GeneratorService {
         return model;
       }
 
-      const result = await this.workerPool.runTask<{ status: string }>('healthcheck', {}, model.path);
-      const latencyMs = Math.max(1, Math.round(result.metrics?.latencyMs ?? 1));
-      const tokensPerSec = Math.max(1, Math.round(result.metrics?.tokensEstimated ?? 1));
+      // Initialize provider if needed
+      if (!this.llmProvider.isReady()) {
+        await this.llmProvider.initialize(model.path, this.options);
+      }
+
+      const start = performance.now();
+      const hcPrompt = 'You are performing a healthcheck. Respond with "READY" followed by a brief status sentence.';
+
+      const result = await this.llmProvider.generateText(hcPrompt, {
+        maxTokens: 32,
+        temperature: 0.05,
+      });
+
+      const latencyMs = Math.max(1, Math.round(result.latencyMs));
+      const tokensPerSec =
+        latencyMs > 0 ? Math.max(1, Math.round(result.tokensEstimated / (latencyMs / 1000))) : result.tokensEstimated;
 
       return {
         id: model.id,
         ok: true,
         latencyMs,
         tokensPerSec,
-        errors:
-          result.metrics?.mode === 'fallback'
-            ? ['node-llama-cpp unavailable, running in heuristic fallback mode']
-            : [],
+        errors: result.mode === 'fallback' ? ['node-llama-cpp unavailable, running in heuristic fallback mode'] : [],
       };
     } catch (error) {
       return this.internalError('Failed to run model healthcheck', error);
     }
   }
 
-  private getModelForTask(
-    task: 'summaries' | 'nlsql',
-    preferredId?: string,
-  ): ActiveModel | SemantiqaError {
+  /**
+   * Cleanup LLM provider resources
+   */
+  async dispose(): Promise<void> {
+    await this.llmProvider.dispose();
+  }
+
+  private getModelForTask(task: 'summaries' | 'nlsql', preferredId?: string): ActiveModel | SemantiqaError {
     const db = this.deps.openSourcesDb();
     const rows = db
       .prepare(
@@ -480,9 +443,35 @@ export class GeneratorService {
       this.deps.logger.warn('[GeneratorService] Failed to write cache entry', { task, hash, error });
     }
   }
+
+  // Heuristic fallback functions
+  private heuristicSummary(text: string): { summary: string; highlights: string[] } {
+    const sentences = text
+      .replace(/\s+/g, ' ')
+      .split(/(?<=[.!?])\s+/)
+      .filter(Boolean);
+    const summary = sentences.slice(0, 2).join(' ');
+    const highlights = sentences.slice(0, 3).map((s) => s.trim());
+    return { summary: summary || text.slice(0, 160), highlights };
+  }
+
+  private heuristicSql(question: string, scope?: { tableHints?: string[]; columnHints?: string[] }): string {
+    const tables = scope?.tableHints?.length ? scope.tableHints : ['table_one'];
+    const firstTable = tables[0];
+    const sqlLines = [`SELECT`, `  -- columns inferred from: ${question}`, `FROM ${firstTable}`];
+    if (tables.length > 1) {
+      sqlLines.push(
+        ...tables.slice(1).map((table, idx) => {
+          const joinKey = scope?.columnHints?.[idx] ?? 'id';
+          return `JOIN ${table} ON ${firstTable}.${joinKey} = ${table}.${joinKey}`;
+        }),
+      );
+    }
+    sqlLines.push(`WHERE /* add filters derived from natural language */;`);
+    return sqlLines.join('\n');
+  }
 }
 
 function isError(value: ActiveModel | SemantiqaError): value is SemantiqaError {
   return (value as SemantiqaError).code !== undefined;
 }
-

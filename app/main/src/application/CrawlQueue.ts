@@ -1,4 +1,4 @@
-import type { MetadataCrawlService } from './MetadataCrawlService';
+import type { MetadataCrawlService } from './MetadataCrawlService.js';
 
 export type CrawlQueueStatus =
   | { status: 'queued' }

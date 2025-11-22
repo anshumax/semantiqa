@@ -2,20 +2,25 @@ import { app, BrowserWindow, protocol, session, dialog } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 import keytar from 'keytar';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import { IPC_CHANNELS } from '@semantiqa/app-config';
-import { registerIpcHandlers, type IpcHandlerMap } from './ipc/registry';
-import { SourceProvisioningService } from './application/SourceProvisioningService';
-import { MetadataCrawlService } from './application/MetadataCrawlService';
-import { ConnectivityQueue, ConnectivityService, ConnectivityMonitor } from './application/ConnectivityService';
-import { CrawlQueue } from './application/CrawlQueue';
-import { ModelManagerService } from './services/ModelManagerService';
-import { GeneratorService } from './services/GeneratorService';
-import { CanvasService } from './services/CanvasService';
-import { TablesService } from './services/TablesService';
-import { SourceDetailsService } from './services/SourceDetailsService';
-import { TableDetailsService } from './services/TableDetailsService';
-import { logIpcEvent } from './logging/audit';
+import { registerIpcHandlers, type IpcHandlerMap } from './ipc/registry.js';
+import { SourceProvisioningService } from './application/SourceProvisioningService.js';
+import { MetadataCrawlService } from './application/MetadataCrawlService.js';
+import { ConnectivityQueue, ConnectivityService, ConnectivityMonitor } from './application/ConnectivityService.js';
+import { CrawlQueue } from './application/CrawlQueue.js';
+import { ModelManagerService } from './services/ModelManagerService.js';
+import { GeneratorService } from './services/GeneratorService.js';
+import { CanvasService } from './services/CanvasService.js';
+import { TablesService } from './services/TablesService.js';
+import { SourceDetailsService } from './services/SourceDetailsService.js';
+import { TableDetailsService } from './services/TableDetailsService.js';
+import { logIpcEvent } from './logging/audit.js';
 import { SourceService, SnapshotRepository } from '@semantiqa/graph-service';
 import { DatabaseService } from '@semantiqa/storage-sqlite';
 
@@ -116,7 +121,7 @@ function mapConnectionStatusToPayload(
 
 async function ensureGraphServices() {
   if (!graphServices) {
-    const serviceModule = await import('./services/GraphSnapshotService');
+    const serviceModule = await import('./services/GraphSnapshotService.js');
     graphServices = {
       GraphSnapshotService: serviceModule.GraphSnapshotService,
     };
@@ -368,12 +373,29 @@ const audit = ({ action, sourceId, status, details }: { action: string; sourceId
     openSourcesDb: graphDbFactory,
     audit,
     logger: console,
+    emitProgress: (event, payload) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send(event, payload);
+      }
+    },
   });
 
+  // Validate native modules before creating generator service
+  const nativeModuleValidation = await GeneratorService.validateNativeModules();
+  if (nativeModuleValidation) {
+    console.warn('⚠️ Native module validation failed:', nativeModuleValidation);
+    console.warn('⚠️ Generator service will run in fallback mode (heuristics only)');
+  }
+
+  // Configure LLM provider (local by default, can be changed to external)
   const generatorService = new GeneratorService({
     openSourcesDb: graphDbFactory,
     audit,
     logger: console,
+    llmProviderConfig: {
+      type: 'local', // Use local node-llama-cpp in main process
+      // Future: type: 'external', endpoint: 'http://localhost:11434' for Ollama
+    },
   });
 
   // Source provisioning service

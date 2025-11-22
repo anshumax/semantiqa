@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AppShell } from '@mantine/core';
+import { Notifications } from '@mantine/notifications';
 import { AppStateProvider } from './state';
 import { NavigationShell } from './navigation';
 import { GlobalStatusBar } from './status/GlobalStatusBar';
@@ -22,6 +23,7 @@ declare global {
 export default function App() {
   return (
     <AppStateProvider>
+      <Notifications position="top-right" zIndex={10000} />
       <RootContent />
       {/* <DevOverlay /> */}
     </AppStateProvider>

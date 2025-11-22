@@ -37,7 +37,7 @@ import {
   CanvasSaveResponseSchema,
 } from '@semantiqa/contracts';
 
-import { logIpcEvent } from '../logging/audit';
+import { logIpcEvent } from '../logging/audit.js';
 
 const channelToSchema: Partial<Record<IpcChannel, z.ZodTypeAny>> = {
   'health:ping': z.undefined(),

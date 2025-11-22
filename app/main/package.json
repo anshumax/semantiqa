@@ -2,7 +2,7 @@
   "name": "@semantiqa/app-main",
   "version": "0.1.0",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "main": "dist/main.js",
   "types": "dist/main.d.ts",
   "scripts": {
@@ -25,6 +25,7 @@
     "dagre": "^0.8.5",
     "electron": "^32.3.3",
     "keytar": "^7.9.0",
+    "node-llama-cpp": "^3.14.2",
     "zod": "^3.25.0"
   },
   "devDependencies": {

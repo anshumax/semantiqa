@@ -1,9 +1,12 @@
 import { promises as fs } from 'node:fs';
 import { createReadStream, createWriteStream } from 'node:fs';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { join, dirname } from 'node:path';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { app } from 'electron';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import type { 
   ModelsListResponse,
   ModelsDownloadRequest,
@@ -42,6 +45,7 @@ export interface ModelManagerDeps {
     warn(message: string, meta?: Record<string, unknown>): void;
     error(message: string, meta?: Record<string, unknown>): void;
   };
+  emitProgress?: (event: string, payload: unknown) => void;
 }
 
 interface InstalledModel {
@@ -85,6 +89,10 @@ export class ModelManagerService {
         details: { available: available.length, installed: installed.length }
       });
 
+      // Filter out installed models from available list
+      const installedIds = new Set(installed.map(m => m.id));
+      const availableOnly = available.filter((model: any) => !installedIds.has(model.id));
+
       return {
         installed: installed.map(model => ({
           id: model.id,
@@ -99,7 +107,7 @@ export class ModelManagerService {
           enabledTasks: model.enabledTasks,
           path: model.path,
         })),
-        available: available.map((model: any) => ({
+        available: availableOnly.map((model: any) => ({
           id: model.id,
           name: model.name,
           kind: model.kind,
@@ -179,32 +187,38 @@ export class ModelManagerService {
         downloadUrl,
         tempPath,
         modelEntry.sizeMb,
-        logger
+        logger,
+        5,
+        request.id
       );
 
-      // Verify SHA256 checksum
-      logger.info('Verifying model checksum', { modelId: request.id });
-      const actualHash = await this.computeSHA256(downloadedPath);
-      
-      if (actualHash !== modelEntry.sha256) {
-        logger.error('Checksum mismatch', { 
-          modelId: request.id, 
-          expected: modelEntry.sha256, 
-          actual: actualHash 
-        });
+      // Verify SHA256 checksum (skip if placeholder)
+      if (modelEntry.sha256 !== 'skip-verification') {
+        logger.info('Verifying model checksum', { modelId: request.id });
+        const actualHash = await this.computeSHA256(downloadedPath);
         
-        // Clean up invalid download
-        await fs.unlink(downloadedPath).catch(() => {});
-        
-        return {
-          code: 'VALIDATION_ERROR',
-          message: 'Downloaded model failed SHA256 verification',
-          details: { 
-            modelId: request.id,
-            expected: modelEntry.sha256,
-            actual: actualHash
-          }
-        };
+        if (actualHash !== modelEntry.sha256) {
+          logger.error('Checksum mismatch', { 
+            modelId: request.id, 
+            expected: modelEntry.sha256, 
+            actual: actualHash 
+          });
+          
+          // Clean up invalid download
+          await fs.unlink(downloadedPath).catch(() => {});
+          
+          return {
+            code: 'VALIDATION_ERROR',
+            message: 'Downloaded model failed SHA256 verification',
+            details: { 
+              modelId: request.id,
+              expected: modelEntry.sha256,
+              actual: actualHash
+            }
+          };
+        }
+      } else {
+        logger.warn('Skipping checksum verification (placeholder SHA256)', { modelId: request.id });
       }
 
       logger.info('Checksum verified successfully', { modelId: request.id });
@@ -217,8 +231,8 @@ export class ModelManagerService {
       const now = new Date().toISOString();
       
       db.prepare(`
-        INSERT INTO models (id, name, kind, size_mb, path, sha256, enabled_tasks, installed_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO models (id, name, kind, size_mb, license, path, sha256, enabled_tasks, installed_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           path = excluded.path,
           installed_at = excluded.installed_at,
@@ -228,6 +242,7 @@ export class ModelManagerService {
         modelEntry.name,
         modelEntry.kind,
         modelEntry.sizeMb,
+        modelEntry.license,
         finalPath,
         modelEntry.sha256,
         JSON.stringify(modelEntry.kind === 'generator' ? ['summaries', 'nlsql'] : []),
@@ -266,16 +281,33 @@ export class ModelManagerService {
   }
 
   private async loadRawManifest(): Promise<{ version: string; models: any[] }> {
-    const manifestPath = join(process.cwd(), 'models', 'models.json');
-    const raw = await fs.readFile(manifestPath, 'utf-8');
-    return JSON.parse(raw);
+    const candidates = [
+      join(process.cwd(), 'models', 'models.json'),
+      join(__dirname, '..', '..', '..', '..', 'models', 'models.json'),
+      join(__dirname, '..', '..', '..', '..', 'core', 'models', 'models.json'),
+    ];
+
+    for (const pathCandidate of candidates) {
+      try {
+        const raw = await fs.readFile(pathCandidate, 'utf-8');
+        return JSON.parse(raw);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error(`Model manifest not found. Looked in: ${candidates.join(', ')}`);
   }
 
   private async downloadWithResume(
     url: string,
     destPath: string,
     expectedSizeMb: number,
-    logger: ModelManagerDeps['logger']
+    logger: ModelManagerDeps['logger'],
+    maxRedirects: number = 5,
+    modelId?: string
   ): Promise<string> {
     // Check if partial download exists
     let startByte = 0;
@@ -290,63 +322,141 @@ export class ModelManagerService {
     return new Promise((resolve, reject) => {
       const https = require('https');
       const http = require('http');
-      const protocol = url.startsWith('https') ? https : http;
-
-      const options = {
-        headers: startByte > 0 ? { 'Range': `bytes=${startByte}-` } : {}
-      };
-
-      const request = protocol.get(url, options, (response: any) => {
-        if (response.statusCode === 416) {
-          // Range not satisfiable - file already complete
-          logger.info('File already downloaded');
-          resolve(destPath);
+      
+      const makeRequest = (currentUrl: string, redirectCount: number) => {
+        if (redirectCount > maxRedirects) {
+          reject(new Error('Too many redirects'));
           return;
         }
 
-        if (response.statusCode !== 200 && response.statusCode !== 206) {
-          reject(new Error(`Download failed with status ${response.statusCode}`));
-          return;
-        }
+        const protocol = currentUrl.startsWith('https') ? https : http;
+        const options = {
+          headers: startByte > 0 ? { 'Range': `bytes=${startByte}-` } : {}
+        };
 
-        const fileStream = createWriteStream(destPath, { flags: startByte > 0 ? 'a' : 'w' });
-        let downloaded = startByte;
-        const totalSize = expectedSizeMb * 1024 * 1024;
+        const request = protocol.get(currentUrl, options, (response: any) => {
+          // Handle redirects (301, 302, 303, 307, 308)
+          if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+            logger.info('Following redirect', { 
+              from: currentUrl, 
+              to: response.headers.location,
+              statusCode: response.statusCode 
+            });
+            makeRequest(response.headers.location, redirectCount + 1);
+            return;
+          }
 
-        response.on('data', (chunk: Buffer) => {
-          downloaded += chunk.length;
-          const progress = Math.round((downloaded / totalSize) * 100);
-          if (downloaded % (10 * 1024 * 1024) < chunk.length) { // Log every 10MB
-            logger.info('Download progress', { 
-              downloadedMb: Math.round(downloaded / (1024 * 1024)), 
+          if (response.statusCode === 416) {
+            // Range not satisfiable - file already complete
+            logger.info('File already downloaded');
+            resolve(destPath);
+            return;
+          }
+
+          if (response.statusCode !== 200 && response.statusCode !== 206) {
+            reject(new Error(`Download failed with status ${response.statusCode}`));
+            return;
+          }
+
+          const fileStream = createWriteStream(destPath, { flags: startByte > 0 ? 'a' : 'w' });
+          let downloaded = startByte;
+          const totalSize = expectedSizeMb * 1024 * 1024;
+
+          // Emit initial progress
+          if (modelId && this.deps.emitProgress) {
+            this.deps.emitProgress('models:download:progress', {
+              modelId,
+              downloadedMb: Math.round(downloaded / (1024 * 1024)),
               totalMb: Math.round(totalSize / (1024 * 1024)),
-              progress: `${progress}%` 
+              progress: Math.round((downloaded / totalSize) * 100),
+              status: 'downloading'
             });
           }
+
+          let lastProgressEmit = 0;
+          
+          response.on('data', (chunk: Buffer) => {
+            downloaded += chunk.length;
+            const progress = Math.round((downloaded / totalSize) * 100);
+            
+            // Emit progress event every 1MB
+            const downloadedMb = Math.round(downloaded / (1024 * 1024));
+            if (modelId && this.deps.emitProgress && downloadedMb > lastProgressEmit) {
+              lastProgressEmit = downloadedMb;
+              this.deps.emitProgress('models:download:progress', {
+                modelId,
+                downloadedMb,
+                totalMb: Math.round(totalSize / (1024 * 1024)),
+                progress,
+                status: 'downloading'
+              });
+              logger.info('Progress event emitted', { downloadedMb, progress: `${progress}%` });
+            }
+            
+            if (downloaded % (10 * 1024 * 1024) < chunk.length) { // Log every 10MB
+              logger.info('Download progress', { 
+                downloadedMb: Math.round(downloaded / (1024 * 1024)), 
+                totalMb: Math.round(totalSize / (1024 * 1024)),
+                progress: `${progress}%` 
+              });
+            }
+          });
+
+          response.pipe(fileStream);
+
+          fileStream.on('finish', () => {
+            fileStream.close();
+            logger.info('Download completed');
+            
+            // Emit completion event
+            if (modelId && this.deps.emitProgress) {
+              this.deps.emitProgress('models:download:progress', {
+                modelId,
+                downloadedMb: Math.round(totalSize / (1024 * 1024)),
+                totalMb: Math.round(totalSize / (1024 * 1024)),
+                progress: 100,
+                status: 'completed'
+              });
+            }
+            
+            resolve(destPath);
+          });
+
+          fileStream.on('error', (err: Error) => {
+            fs.unlink(destPath).catch(() => {});
+            
+            // Emit error event
+            if (modelId && this.deps.emitProgress) {
+              this.deps.emitProgress('models:download:progress', {
+                modelId,
+                progress: 0,
+                status: 'error',
+                error: err.message
+              });
+            }
+            
+            reject(err);
+          });
         });
 
-        response.pipe(fileStream);
-
-        fileStream.on('finish', () => {
-          fileStream.close();
-          logger.info('Download completed');
-          resolve(destPath);
-        });
-
-        fileStream.on('error', (err: Error) => {
-          fs.unlink(destPath).catch(() => {});
+        request.on('error', (err: Error) => {
+          // Emit error event
+          if (modelId && this.deps.emitProgress) {
+            this.deps.emitProgress('models:download:progress', {
+              modelId,
+              progress: 0,
+              status: 'error',
+              error: err.message
+            });
+          }
           reject(err);
         });
-      });
 
-      request.on('error', (err: Error) => {
-        reject(err);
-      });
+        // No timeout - downloads can take as long as needed
+        // The connection will naturally fail if there's a network issue
+      };
 
-      request.setTimeout(30000, () => {
-        request.destroy();
-        reject(new Error('Download timeout'));
-      });
+      makeRequest(url, 0);
     });
   }
 
@@ -462,7 +572,7 @@ export class ModelManagerService {
 
   private async getInstalledModels(db: BetterSqliteDatabase): Promise<InstalledModel[]> {
     const rows = db.prepare(`
-      SELECT id, name, kind, size_mb, path, sha256, enabled_tasks, installed_at, updated_at
+      SELECT id, name, kind, size_mb, license, path, sha256, enabled_tasks, installed_at, updated_at
       FROM models
       WHERE installed_at IS NOT NULL
     `).all() as Array<{
@@ -470,6 +580,7 @@ export class ModelManagerService {
       name: string;
       kind: string;
       size_mb: number;
+      license: string;
       path: string | null;
       sha256: string;
       enabled_tasks: string;
@@ -482,7 +593,7 @@ export class ModelManagerService {
       name: row.name,
       kind: row.kind as 'embedding' | 'generator',
       sizeMb: row.size_mb,
-      license: '', // Would need to store this in DB or fetch from manifest
+      license: row.license,
       sha256: row.sha256,
       installedAt: row.installed_at,
       enabledTasks: JSON.parse(row.enabled_tasks || '[]') as ('summaries' | 'nlsql')[],

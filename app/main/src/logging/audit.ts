@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-import { AuditLogger } from './auditLogger';
+import { AuditLogger } from './auditLogger.js';
 
 let currentLogger: AuditLogger = new AuditLogger();
 

@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import type { ModelsHealthcheckResponse, ModelsListResponse, ModelManifestEntry } from '@semantiqa/contracts';
 import { IPC_CHANNELS } from '@semantiqa/app-config';
+import { notifications } from '@mantine/notifications';
+import { DownloadProgressModal } from './DownloadProgressModal';
+import { HealthcheckModal } from './HealthcheckModal';
 import './ModelsScreen.css';
 
 interface InstalledModel extends ModelManifestEntry {
@@ -13,6 +16,8 @@ export function ModelsScreen() {
   const [models, setModels] = useState<ModelsListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloadingModel, setDownloadingModel] = useState<{ id: string; name: string } | null>(null);
+  const [healthcheckModel, setHealthcheckModel] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     loadModels();
@@ -36,19 +41,35 @@ export function ModelsScreen() {
     }
   };
 
-  const handleDownload = async (modelId: string) => {
+  const handleDownload = async (modelId: string, modelName: string) => {
     try {
+      // Set downloading state to show modal
+      setDownloadingModel({ id: modelId, name: modelName });
+      
       const result = await window.semantiqa?.api.invoke(IPC_CHANNELS.MODELS_DOWNLOAD, { id: modelId });
       
       if (result && 'code' in result) {
-        alert(`Download failed: ${result.message}`);
+        notifications.show({
+          title: 'Download Failed',
+          message: result.message,
+          color: 'red',
+        });
+        setDownloadingModel(null);
       } else {
-        alert('Download started (placeholder)');
-        // In a real implementation, this would show download progress
-        await loadModels(); // Refresh the list
+        // Modal will auto-close on completion
+        // Refresh the list after a short delay
+        setTimeout(async () => {
+          await loadModels();
+          setDownloadingModel(null);
+        }, 1500);
       }
     } catch (err) {
-      alert(`Download failed: ${(err as Error).message}`);
+      notifications.show({
+        title: 'Download Failed',
+        message: (err as Error).message,
+        color: 'red',
+      });
+      setDownloadingModel(null);
     }
   };
 
@@ -59,7 +80,11 @@ export function ModelsScreen() {
         : [...currentTasks, task];
 
       if (newTasks.length === 0) {
-        alert('At least one task must be enabled');
+        notifications.show({
+          title: 'Validation Error',
+          message: 'At least one task must be enabled',
+          color: 'yellow',
+        });
         return;
       }
 
@@ -69,30 +94,61 @@ export function ModelsScreen() {
       });
       
       if (result && 'code' in result) {
-        alert(`Failed to update tasks: ${result.message}`);
+        notifications.show({
+          title: 'Failed to Update Tasks',
+          message: result.message,
+          color: 'red',
+        });
       } else {
+        notifications.show({
+          title: 'Tasks Updated',
+          message: 'Model tasks updated successfully',
+          color: 'green',
+        });
         await loadModels(); // Refresh the list
       }
     } catch (err) {
-      alert(`Failed to update tasks: ${(err as Error).message}`);
+      notifications.show({
+        title: 'Failed to Update Tasks',
+        message: (err as Error).message,
+        color: 'red',
+      });
     }
   };
 
-  const handleHealthcheck = async (modelId: string) => {
+  const handleHealthcheck = async (modelId: string, modelName: string) => {
+    setHealthcheckModel({ id: modelId, name: modelName });
+    
     try {
       const result = await window.semantiqa?.api.invoke(IPC_CHANNELS.MODELS_HEALTHCHECK, { id: modelId });
+      setHealthcheckModel(null);
+      
       if (result && 'code' in result) {
-        alert(`Healthcheck failed: ${result.message}`);
+        notifications.show({
+          title: 'Healthcheck Failed',
+          message: result.message,
+          color: 'red',
+        });
         return;
       }
       const data = result as ModelsHealthcheckResponse;
-      alert(
-        `Model ${modelId} is ${data.ok ? 'healthy' : 'unavailable'}\n` +
-          `Latency: ${data.latencyMs} ms\nTokens/sec: ${data.tokensPerSec}\n` +
-          (data.errors.length ? `Notes: ${data.errors.join(', ')}` : ''),
-      );
+      notifications.show({
+        title: data.ok ? `Model ${modelName} is healthy` : `Model ${modelName} is unavailable`,
+        message: (
+          `Latency: ${data.latencyMs} ms\n` +
+          `Tokens/sec: ${data.tokensPerSec || 'N/A'}\n` +
+          (data.errors.length ? `Notes: ${data.errors.join(', ')}` : '')
+        ),
+        color: data.ok ? 'green' : 'yellow',
+        autoClose: 5000,
+      });
     } catch (err) {
-      alert(`Healthcheck failed: ${(err as Error).message}`);
+      setHealthcheckModel(null);
+      notifications.show({
+        title: 'Healthcheck Failed',
+        message: (err as Error).message,
+        color: 'red',
+      });
     }
   };
 
@@ -128,49 +184,64 @@ export function ModelsScreen() {
   }
 
   return (
-    <div className="models-screen">
-      <header className="models-screen__header">
-        <h1>Model Manager</h1>
-        <p>Manage AI models for enhanced functionality. Models are optional and run locally on your device.</p>
-      </header>
+    <>
+      <div className="models-screen">
+        <header className="models-screen__header">
+          <h1>Model Manager</h1>
+          <p>Manage AI models for enhanced functionality. Models are optional and run locally on your device.</p>
+        </header>
 
-      <div className="models-screen__content">
-        {models.installed.length > 0 && (
-          <section className="models-section">
-            <h2>Installed Models</h2>
-            <div className="models-grid">
-              {models.installed.map((model) => (
-                <ModelCard 
-                  key={model.id}
-                  model={model}
-                  installed={true}
-                  onToggleTask={handleToggleTask}
-                  onHealthcheck={() => handleHealthcheck(model.id)}
-                />
-              ))}
-            </div>
-          </section>
-        )}
+        <div className="models-screen__content">
+          {models.installed.length > 0 && (
+            <section className="models-section">
+              <h2>Installed Models</h2>
+              <div className="models-grid">
+                {models.installed.map((model) => (
+                  <ModelCard 
+                    key={model.id}
+                    model={model}
+                    installed={true}
+                    onToggleTask={handleToggleTask}
+                    onHealthcheck={() => handleHealthcheck(model.id, model.name)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
 
-        <section className="models-section">
-          <h2>Available Models</h2>
-          <div className="models-grid">
-            {models.available.map((model) => {
-              const isInstalled = models.installed.some(installed => installed.id === model.id);
-              return (
-                <ModelCard 
-                  key={model.id}
-                  model={model}
-                  installed={isInstalled}
-                  onDownload={isInstalled ? undefined : () => handleDownload(model.id)}
-                  onHealthcheck={isInstalled ? () => handleHealthcheck(model.id) : undefined}
-                />
-              );
-            })}
-          </div>
-        </section>
+          {models.available.length > 0 && (
+            <section className="models-section">
+              <h2>Available Models</h2>
+              <div className="models-grid">
+                {models.available.map((model) => {
+                  const isInstalled = models.installed.some(installed => installed.id === model.id);
+                  return (
+                    <ModelCard 
+                      key={model.id}
+                      model={model}
+                      installed={isInstalled}
+                      onDownload={isInstalled ? undefined : () => handleDownload(model.id, model.name)}
+                      onHealthcheck={isInstalled ? () => handleHealthcheck(model.id, model.name) : undefined}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          )}
+        </div>
       </div>
-    </div>
+
+      {downloadingModel && (
+        <DownloadProgressModal modelName={downloadingModel.name} />
+      )}
+
+      {healthcheckModel && (
+        <HealthcheckModal 
+          modelName={healthcheckModel.name}
+          onCancel={() => setHealthcheckModel(null)}
+        />
+      )}
+    </>
   );
 }
 

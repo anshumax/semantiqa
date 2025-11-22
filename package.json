@@ -2,12 +2,15 @@
   "name": "semantiqa",
   "private": true,
   "version": "0.1.0",
+  "type": "module",
   "description": "Semantiqa monorepo",
   "engines": {
     "node": ">=18.18.0",
     "pnpm": ">=8.7.0"
   },
   "scripts": {
+    "postinstall": "node scripts/rebuild-native.js",
+    "rebuild": "node scripts/rebuild-native.js",
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
     "build": "pnpm -r --if-present build",

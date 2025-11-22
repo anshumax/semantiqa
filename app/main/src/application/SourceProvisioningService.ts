@@ -1,6 +1,6 @@
 import type { SemantiqaError, SourcesAddRequest } from '@semantiqa/contracts';
 import { SourceService } from '@semantiqa/graph-service';
-import type { CanvasService } from '../services/CanvasService';
+import type { CanvasService } from '../services/CanvasService.js';
 
 export interface SourceProvisioningDeps {
   openSourcesDb: () => any;
